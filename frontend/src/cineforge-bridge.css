@@ -312,6 +312,246 @@
   color: #6f757d;
 }
 
+.chapter-plan-panel,
+.chapter-creator-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  border: 1px solid #30343a;
+  border-radius: 8px;
+  background: #181b1e;
+  padding: 14px;
+}
+
+.chapter-plan-head,
+.chapter-creator-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.chapter-plan-head h3,
+.chapter-creator-head h3 {
+  margin: 4px 0;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.chapter-plan-head p,
+.chapter-creator-head p {
+  max-width: 660px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.chapter-count-control,
+.chapter-order-slot,
+.chapter-order-select {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.chapter-count-control {
+  width: 112px;
+  flex: 0 0 auto;
+}
+
+.chapter-order-slot {
+  min-width: 190px;
+  flex: 0 0 auto;
+}
+
+.chapter-count-control input,
+.chapter-order-slot select,
+.chapter-order-select select {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #191c1e;
+  color: var(--text);
+  padding: 0 9px;
+  font-size: 10px;
+}
+
+.chapter-plan-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid #2c3440;
+  border-radius: 7px;
+  background: #1a2028;
+  padding: 9px 11px;
+}
+
+.chapter-plan-summary span,
+.chapter-plan-summary b,
+.chapter-plan-summary small {
+  display: block;
+}
+
+.chapter-plan-summary span {
+  color: var(--muted);
+  font-size: 7px;
+  text-transform: uppercase;
+}
+
+.chapter-plan-summary b {
+  margin-top: 2px;
+  font-size: 14px;
+}
+
+.chapter-plan-summary small {
+  color: #9aa8bb;
+  font-size: 9px;
+  text-align: right;
+}
+
+.chapter-plan-list,
+.chapter-intake-form {
+  display: grid;
+  gap: 10px;
+}
+
+.chapter-plan-list details {
+  overflow: hidden;
+  border: 1px solid #2c3035;
+  border-radius: 7px;
+  background: #15181b;
+}
+
+.chapter-plan-list summary {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  cursor: pointer;
+  padding: 0 11px;
+}
+
+.chapter-plan-list summary span,
+.chapter-plan-list summary small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.chapter-plan-list summary b {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chapter-intake-form {
+  padding: 11px;
+}
+
+.chapter-intake-step {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #2b3035;
+  padding-top: 11px;
+}
+
+.chapter-intake-step:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.chapter-intake-step > header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.chapter-intake-step > header span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 1px solid #42516b;
+  border-radius: 50%;
+  background: #1d2634;
+  color: #a8c7fa;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.chapter-intake-step > header b {
+  color: #d8dde5;
+  font-size: 10px;
+}
+
+.chapter-runtime-fields {
+  margin-top: 0;
+}
+
+.chapter-creator-panel {
+  margin-bottom: 12px;
+}
+
+.chapter-creator-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.chapter-order-select {
+  width: 64px;
+  margin-right: 5px;
+}
+
+.hierarchy article > header > div {
+  align-items: center;
+}
+
+.hierarchy article > header > div button,
+.hierarchy-scenes > div > button {
+  border-radius: 5px;
+}
+
+.hierarchy article > header > div button:hover,
+.hierarchy-scenes > div > button:hover {
+  background: #252a30;
+  color: #d3e3fd;
+}
+
+@media (max-width: 720px) {
+  .chapter-plan-head,
+  .chapter-creator-head,
+  .chapter-plan-summary {
+    display: grid;
+  }
+
+  .chapter-count-control,
+  .chapter-order-slot {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .chapter-plan-list summary {
+    grid-template-columns: 42px minmax(0, 1fr);
+  }
+
+  .chapter-plan-list summary small {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .chapter-order-select {
+    width: 58px;
+  }
+}
+
 /* =============================================================================
    Managed media thumbs (were in styles.css; dropped when Gold CSS became primary)
    ============================================================================= */
@@ -719,6 +959,50 @@
   background: #1a2434;
   color: #a8c7fa;
 }
+.production-phase-rail > button.working {
+  border-color: #87a7d8;
+  background:
+    linear-gradient(145deg, rgba(42, 56, 80, 0.94), rgba(24, 30, 42, 0.96)),
+    #1a2434;
+  box-shadow:
+    inset 0 0 0 1px rgba(168, 199, 250, 0.2),
+    0 0 0 1px rgba(168, 199, 250, 0.06),
+    0 10px 26px rgba(11, 17, 25, 0.28);
+  overflow: hidden;
+  animation: phase-card-breathe 1.35s ease-in-out infinite;
+}
+.production-phase-rail > button.working::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    110deg,
+    transparent 0%,
+    transparent 32%,
+    rgba(168, 199, 250, 0.18) 48%,
+    transparent 64%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: phase-card-sweep 1.25s linear infinite;
+}
+.production-phase-rail > button.working > span {
+  border-color: #91afe0;
+  background: #2b3c5a;
+  color: #edf4ff;
+}
+.production-phase-rail > button.working small {
+  color: #b8cbed;
+}
+@keyframes phase-card-breathe {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1px); }
+}
+@keyframes phase-card-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
 .production-phase-panel { min-width: 0; outline: none; }
 .production-phase-panel > .phase-one-complete-message { margin-bottom: 14px; }
 
@@ -728,6 +1012,110 @@
 .phase-one-complete-message > span { display: grid; width: 34px; height: 34px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: #24344f; color: #a8c7fa; }
 .phase-one-complete-message b { color: #e4eaf4; }
 .phase-one-complete-message p { margin: 4px 0 0; color: #9bb6df; font-size: 0.72rem; }
+
+.phase-workflow-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(7, 9, 12, 0.72);
+  backdrop-filter: blur(10px);
+}
+.phase-workflow-modal > section {
+  width: min(660px, 100%);
+  border: 1px solid #3c4654;
+  border-radius: 10px;
+  background: #171a1f;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+  padding: 16px;
+}
+.phase-workflow-modal header,
+.phase-workflow-modal footer {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.phase-workflow-modal header {
+  margin-bottom: 14px;
+}
+.phase-workflow-modal header h3 {
+  margin: 2px 0 4px;
+  color: #eef3fb;
+  font-size: 1rem;
+}
+.phase-workflow-modal header p {
+  max-width: 520px;
+  margin: 0;
+  color: #97a1ad;
+  font-size: 0.72rem;
+  line-height: 1.5;
+}
+.phase-workflow-modal header > button {
+  min-width: 34px;
+  min-height: 34px;
+  border: 1px solid #3a4248;
+  border-radius: 7px;
+  background: #20242a;
+  color: #dbe5f2;
+  font-size: 1.05rem;
+}
+.phase-workflow-modal label {
+  display: grid;
+  gap: 7px;
+  margin-top: 11px;
+}
+.phase-workflow-modal label > span {
+  color: #c6d0dc;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.phase-workflow-modal select,
+.phase-workflow-modal input[type="file"] {
+  min-height: 40px;
+  border: 1px solid #333b45;
+  border-radius: 8px;
+  background: #111418;
+  color: #dfe7f2;
+  padding: 8px 10px;
+}
+.phase-workflow-modal small {
+  color: #8793a3;
+  font-size: 0.68rem;
+}
+.phase-workflow-modal footer {
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+.phase-queue-progress {
+  position: relative;
+  display: grid;
+  gap: 4px;
+  overflow: hidden;
+  margin-top: 12px;
+  border: 1px solid #35404d;
+  border-radius: 8px;
+  background: #11151b;
+  padding: 11px;
+}
+.phase-queue-progress > span {
+  position: absolute;
+  inset: auto auto 0 0;
+  height: 3px;
+  background: #8fb7f0;
+  transition: width 180ms ease;
+}
+.phase-queue-progress b {
+  color: #dfe7f2;
+  font-size: 0.72rem;
+}
+.phase-queue-progress small {
+  color: #9aabc2;
+}
 
 /* Residual .phase-one-empty / .phase-one-metrics → Gold .phase-empty / .phase-metrics
  * (full alias rules in GOLD PHASE RESIDUAL ALIASES ONLY section below). */

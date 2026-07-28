@@ -123,6 +123,7 @@ class PlanningEngine:
         auto_commit: bool = True,
     ) -> None:
         self.repo = PlanningRepository(db)
+        self._provider_registry_is_explicit = providers is not None
         self.providers: dict[str, PlanningProvider] = dict(
             providers if providers is not None else build_provider_registry()
         )
@@ -288,7 +289,19 @@ class PlanningEngine:
                     PlanningErrorCode.ROUTING_FAILED,
                     f"Provider '{manual_route.provider_identifier}' is not registered for planning",
                 )
-            if descriptor.availability_status.value != "available":
+            if (
+                self._provider_registry_is_explicit
+                and manual_route.provider_identifier not in self.providers
+            ):
+                raise PlanningError(
+                    PlanningErrorCode.ROUTING_FAILED,
+                    f"Provider '{manual_route.provider_identifier}' is not available in this planning engine",
+                    details={"availability_status": "not_configured"},
+                )
+            if (
+                not self._provider_registry_is_explicit
+                and descriptor.availability_status.value != "available"
+            ):
                 raise PlanningError(
                     PlanningErrorCode.ROUTING_FAILED,
                     f"Provider '{manual_route.provider_identifier}' is not available for planning",
@@ -339,7 +352,22 @@ class PlanningEngine:
             time_budget_sec=request.time_budget_sec,
             task_types=task_types,
         )
-        provider_catalog = [descriptor.as_dict() for descriptor in descriptors]
+        provider_catalog: list[dict[str, Any]] = []
+        for descriptor in descriptors:
+            if (
+                self._provider_registry_is_explicit
+                and descriptor.provider_identifier not in self.providers
+            ):
+                continue
+            entry = descriptor.as_dict()
+            if self._provider_registry_is_explicit:
+                # An injected registry is authoritative for this engine
+                # instance. Keep routing aligned with the provider objects the
+                # caller supplied instead of advertising globally configured
+                # providers that would bypass deterministic test/offline use.
+                entry["availability_status"] = "available"
+                entry["execution_mode"] = "injected"
+            provider_catalog.append(entry)
         routing_snapshot["provider_catalog"] = provider_catalog
         routing_snapshot["input_context_hash"] = input_context_hash
         routing_snapshot["base_content_hash"] = base_content_hash

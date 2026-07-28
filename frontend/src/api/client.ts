@@ -31,6 +31,19 @@ export type ProjectWorkspaceCreatePayload = {
   narration_dialogue_preference?: string | null
   source_fidelity_constraints?: string | null
   content_constraints?: string | null
+  requested_chapter_count?: number
+  chapter_intake?: Array<{
+    order_index: number
+    title: string
+    summary?: string | null
+    source_prompt?: string | null
+    target_duration_sec?: number | null
+    narrative_purpose?: string | null
+    dramatic_progression?: string | null
+    production_notes?: string | null
+  }>
+  bootstrap_phase_plan?: boolean
+  auto_approve_phases_through?: number | null
   run_phase_one?: boolean
   comparison_baseline?: 'transfiguration_phase_one' | null
   aspect_ratio: string
@@ -91,6 +104,15 @@ export type RuntimeStatus = {
   environment: string
   current_phase: string
   comfyui: HealthResponse
+  comfy_api_runner: HealthResponse
+  sulphur: HealthResponse & {
+    model_loaded?: boolean
+    model_id?: string
+    model_file?: string
+    quantization?: string
+    context_length?: number
+    parallel?: number
+  }
   object_info: {
     status: string
     available: boolean
@@ -104,9 +126,14 @@ export type RuntimeStatus = {
     submission_enabled: boolean
     controlled_submission_enabled: boolean
     public_submission_enabled: boolean
+    api_runner_available: boolean
     supported_states: string[]
   }
   disabled_actions: Record<string, string>
+  links: {
+    comfyui: string
+    comfy_api_runner: string
+  }
 }
 
 export type Story = {
@@ -222,6 +249,9 @@ export type Chapter = {
   order_index: number
   title: string
   summary: string | null
+  narrative_purpose?: string | null
+  target_duration_sec?: number | null
+  dramatic_progression?: string | null
   duration_sec: number
   scenes: Scene[]
 }
@@ -591,6 +621,14 @@ export type RuntimeCatalog = {
   loras: unknown[]
 }
 
+export type LocalModelInventory = {
+  status: 'available' | 'partial' | 'unavailable' | string
+  source_url: string
+  total_count: number
+  categories: Record<string, string[]>
+  errors: Record<string, string>
+}
+
 export type ProviderExecutionMode = 'disabled' | 'manual' | 'assisted' | 'automatic'
 
 export type ProviderProfile = {
@@ -776,6 +814,27 @@ export type ProjectWorkspace = {
   production_pipeline: ProductionPipeline | null
 }
 
+export type SulphurProjectWorkspace = ProjectWorkspace & {
+  intake_provider: 'sulphur'
+  intake_model: string
+  source_prompt_preserved: true
+  target_duration_sec: number
+  planned_scene_count: number
+  nominal_scene_duration_sec: 8
+  clip_duration_range_sec: [6, 10]
+}
+
+export type ComfyRestartRequest = {
+  restart_id: string
+  status: string
+  message: string
+}
+
+export type ComfyRestartStatus = ComfyRestartRequest & {
+  complete: boolean
+  failed: boolean
+}
+
 export type PhaseLifecycleState =
   | 'not_started'
   | 'drafting'
@@ -813,6 +872,10 @@ export type PhaseOnePackage = {
   dramatic_escalation: string[]
   narrative_structure: Record<'opening' | 'middle' | 'climax' | 'resolution', string>
   pacing_plan: Array<Record<string, string | number>>
+  planned_scene_count?: number
+  nominal_scene_duration_sec?: number
+  clip_duration_range_sec?: [number, number]
+  scene_duration_plan_sec?: number[]
   duration_analysis: PhaseOneDurationAnalysis
   script_word_count: number
   source_fidelity_notes: string[]
@@ -835,6 +898,23 @@ export type PhaseOnePackage = {
     review_items: string[]
     note: string
   }
+}
+
+export type PhaseOneGenerationPayload = {
+  original_prompt: string
+  target_duration_sec: number
+  audience?: string | null
+  genre?: string | null
+  tone?: string | null
+  language?: string
+  visual_style?: string | null
+  narration_dialogue_preference?: string | null
+  source_fidelity_constraints?: string | null
+  content_constraints?: string | null
+  requested_chapter_count?: number
+  chapter_intake?: Record<string, unknown>[]
+  comparison_baseline?: string | null
+  requested_by?: string | null
 }
 
 export type ProductionQAReport = {
@@ -1000,6 +1080,10 @@ export type StartingImageGenerateRequest = {
   requested_by?: string
   seed?: number | null
   model_name?: string | null
+  workflow_template_id?: string | null
+  workflow_label?: string | null
+  workflow_source?: string | null
+  workflow_api_json?: Record<string, unknown> | null
 }
 
 export type StartingImageGenerateResponse = {
@@ -1463,18 +1547,34 @@ export const api = {
   rootStatus: () => request<RootStatus>('/'),
   health: () => request<HealthResponse>('/health'),
   comfyHealth: () => request<HealthResponse>('/health/comfy'),
+  comfyApiRunnerHealth: () => request<HealthResponse>('/health/comfy-api-runner'),
+  sulphurHealth: () => request<HealthResponse>('/health/sulphur'),
   gpuHealth: () => request<HealthResponse>('/health/gpu'),
   ffmpegHealth: () => request<HealthResponse>('/health/ffmpeg'),
   runtimeStatus: () => request<RuntimeStatus>('/runtime/status'),
+  restartComfyUi: () =>
+    request<ComfyRestartRequest>('/runtime/comfyui/restart', { method: 'POST' }),
+  comfyRestartStatus: (restartId: string) =>
+    request<ComfyRestartStatus>(`/runtime/comfyui/restart/${encodeURIComponent(restartId)}`),
 
   listProjects: () => request<Project[]>('/projects'),
   createProject: (payload: { name: string; description?: string | null }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(payload) }),
   createProjectWorkspace: (payload: ProjectWorkspaceCreatePayload) =>
     request<ProjectWorkspace>('/projects/workspace', { method: 'POST', body: JSON.stringify(payload) }),
+  createProjectFromSulphur: (payload: { idempotency_key: string; prompt: string }) =>
+    request<SulphurProjectWorkspace>('/projects/sulphur-intake', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   getProject: (projectId: string) => request<Project>(`/projects/${projectId}`),
   getProductionPipeline: (storyId: string) =>
     request<ProductionPipeline>(`/production/stories/${storyId}`),
+  generatePhaseOne: (storyId: string, payload: PhaseOneGenerationPayload) =>
+    request<PhaseOneMutationResponse>(`/production/stories/${storyId}/phases/1/generate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   approveProductionPhase: (
     storyId: string,
     phaseNumber: number,
@@ -1616,8 +1716,15 @@ export const api = {
       }),
     }),
 
-  createChapter: (storyId: string, payload: { title: string; summary?: string; order_index: number }) =>
-    request(`/storyboard/stories/${storyId}/chapters`, { method: 'POST', body: JSON.stringify(payload) }),
+  createChapter: (storyId: string, payload: {
+    title: string
+    summary?: string | null
+    order_index: number
+    narrative_purpose?: string | null
+    target_duration_sec?: number | null
+    dramatic_progression?: string | null
+  }) =>
+    request<Chapter>(`/storyboard/stories/${storyId}/chapters`, { method: 'POST', body: JSON.stringify(payload) }),
   updateChapter: (chapterId: string, payload: Record<string, unknown>) =>
     request(`/storyboard/chapters/${chapterId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteChapter: (chapterId: string, reason?: string) =>
@@ -1845,6 +1952,8 @@ export const api = {
     optionalRequest<void>(`/assets/character-references/${linkId}`, { method: 'DELETE' }),
 
   runtimeCatalog: () => optionalRequest<RuntimeCatalog>('/runtime-catalog'),
+  localModelInventory: () =>
+    optionalRequest<LocalModelInventory>('/runtime-catalog/local-model-inventory'),
   listRuntimeWorkflowTemplates: () =>
     optionalRequest<RuntimeCatalogWorkflowTemplate[]>('/runtime-catalog/workflow-templates'),
 

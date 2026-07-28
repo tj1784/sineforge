@@ -230,6 +230,10 @@ def generate_phase_six_starting_image(
             requested_by=request_payload.requested_by,
             seed=request_payload.seed,
             model_name=request_payload.model_name or phase_six_images.DEFAULT_FLUX_IMAGE_MODEL,
+            workflow_template_id=request_payload.workflow_template_id,
+            workflow_label=request_payload.workflow_label,
+            workflow_source=request_payload.workflow_source,
+            workflow_api_json=request_payload.workflow_api_json,
         )
         return StartingImageGenerateResponse(**result)
     except phase_six_images.PhaseSixImageError as exc:

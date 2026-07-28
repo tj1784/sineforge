@@ -7,6 +7,9 @@ import { Projects } from './Projects'
 vi.mock('../api/client', () => ({
   api: {
     createProjectWorkspace: vi.fn(),
+    createProjectFromSulphur: vi.fn(),
+    restartComfyUi: vi.fn(),
+    comfyRestartStatus: vi.fn(),
     listProjects: vi.fn(),
     listStories: vi.fn(),
   },
@@ -36,6 +39,12 @@ function reachFinalStep() {
   fireEvent.change(screen.getByPlaceholderText('Describe the complete story, required moments, and creative boundaries in one prompt…'), {
     target: { value: 'The complete source.' },
   })
+  fireEvent.change(screen.getByLabelText('Number of chapters'), { target: { value: '2' } })
+  fireEvent.change(screen.getByLabelText('CH01 title'), { target: { value: 'Opening Act' } })
+  fireEvent.change(screen.getByLabelText('CH01 source prompt'), {
+    target: { value: 'Start with the inciting discovery.' },
+  })
+  fireEvent.change(screen.getByLabelText('CH02 title'), { target: { value: 'Final Choice' } })
   fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
 }
 
@@ -79,6 +88,20 @@ describe('new project workspace', () => {
       allow_model_download: true,
       allow_rendering: true,
       require_production_plan_approval: true,
+      requested_chapter_count: 2,
+      chapter_intake: [
+        expect.objectContaining({
+          order_index: 0,
+          title: 'Opening Act',
+          source_prompt: 'Start with the inciting discovery.',
+          target_duration_sec: 150,
+        }),
+        expect.objectContaining({
+          order_index: 1,
+          title: 'Final Choice',
+          target_duration_sec: 150,
+        }),
+      ],
       run_phase_one: true,
     }))
     expect(onOpenProject).toHaveBeenCalledWith('project-1', 'The Test Film')
@@ -123,5 +146,70 @@ describe('project workspace navigation', () => {
 
     expect(onOpenProjectPage).toHaveBeenCalledWith('project-1', 'The Test Film', 'storyboard')
     expect(onNavigateStudio).not.toHaveBeenCalled()
+  })
+
+  it('creates a complete project from the homepage through Sulphur', async () => {
+    vi.mocked(api.listProjects).mockResolvedValue([])
+    vi.mocked(api.createProjectFromSulphur).mockResolvedValue({
+      ...workspace,
+      intake_provider: 'sulphur',
+      intake_model: 'sulphur-2-base',
+      source_prompt_preserved: true,
+      target_duration_sec: 125,
+      planned_scene_count: 16,
+      nominal_scene_duration_sec: 8,
+      clip_duration_range_sec: [6, 10],
+    } as never)
+    const onOpenProject = vi.fn()
+    const sourcePrompt =
+      'Create a 2 minute 5 second noir film about a courier returning a lost letter.'
+
+    render(
+      <Projects
+        mode="list"
+        onOpenProject={onOpenProject}
+        onNavigateStudio={vi.fn()}
+      />,
+    )
+
+    fireEvent.change(
+      screen.getByLabelText('Describe the complete CineForge project for Sulphur'),
+      { target: { value: sourcePrompt } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Create complete project/ }))
+
+    await waitFor(() => expect(api.createProjectFromSulphur).toHaveBeenCalledTimes(1))
+    expect(api.createProjectFromSulphur).toHaveBeenCalledWith({
+      idempotency_key: expect.stringMatching(/^sulphur-project-/),
+      prompt: sourcePrompt,
+    })
+    expect(onOpenProject).toHaveBeenCalledWith('project-1', 'The Test Film')
+  })
+
+  it('shows the API Runner and completes a visible ComfyUI restart', async () => {
+    vi.mocked(api.listProjects).mockResolvedValue([])
+    vi.mocked(api.restartComfyUi).mockResolvedValue({
+      restart_id: 'a'.repeat(32),
+      status: 'scheduled',
+      message: 'Restart scheduled',
+    })
+    vi.mocked(api.comfyRestartStatus).mockResolvedValue({
+      restart_id: 'a'.repeat(32),
+      status: 'complete',
+      message: 'ComfyUI restarted',
+      complete: true,
+      failed: false,
+    })
+
+    render(<Projects mode="list" onNavigateStudio={vi.fn()} />)
+
+    expect(screen.getByRole('link', { name: /Open API Runner/ }).getAttribute('href'))
+      .toBe('http://127.0.0.1:8022')
+    fireEvent.click(screen.getByRole('button', { name: /Restart ComfyUI/ }))
+
+    expect(await screen.findByText('ComfyUI restarted successfully with CUDA device 0.'))
+      .toBeTruthy()
+    expect(api.restartComfyUi).toHaveBeenCalledTimes(1)
+    expect(api.comfyRestartStatus).toHaveBeenCalledWith('a'.repeat(32))
   })
 })

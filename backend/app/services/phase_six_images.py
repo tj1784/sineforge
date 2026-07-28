@@ -28,20 +28,23 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from backend.app.core.config import get_settings
 from backend.app.db.base import (
     AuditLog,
+    Character,
+    CharacterReferenceAsset,
     Chapter,
     PlanningMediaAsset,
     ProductionPhase,
     Scene,
     Shot,
+    ShotCharacter,
     ShotPromptPackage,
     Story,
 )
 from backend.app.services import reference_assets
 
 
-COMFYUI_BASE_URL = "http://127.0.0.1:8188"
 SOURCE_WORKFLOW_PATH = r"C:\Users\razer\Documents\FLUX2.json"
 
 DEFAULT_FLUX_IMAGE_MODEL = "flux2_dev_fp8mixed.safetensors"
@@ -335,6 +338,128 @@ def _latest_prompt_package(db: Session, shot_id: UUID) -> ShotPromptPackage | No
     )
 
 
+def _character_metadata(db: Session, row: ShotRow) -> list[dict[str, Any]]:
+    links = list(
+        db.execute(
+            select(ShotCharacter, Character)
+            .join(Character, Character.id == ShotCharacter.character_id)
+            .where(ShotCharacter.shot_id == row.shot.id)
+            .order_by(ShotCharacter.order_index.asc(), Character.name.asc())
+        )
+    )
+    if not links:
+        return [
+            {
+                "character_id": None,
+                "name": "Principal Story Subject",
+                "role": "unassigned",
+                "role_in_shot": "principal story subject",
+                "order_index": 0,
+                "continuity_notes": "No explicit character link was assigned to this shot.",
+                "consistency_prompt": row.shot.visual_description or row.shot.story_purpose or row.shot.title,
+                "negative_identity_prompt": "identity drift, inconsistent wardrobe",
+                "asset_ids": [],
+                "approved_asset_ids": [],
+                "reference_assets": [],
+                "asset_status": "pending_reference_asset",
+            }
+        ]
+
+    metadata: list[dict[str, Any]] = []
+    for link, character in links:
+        references = []
+        for reference, asset in db.execute(
+            select(CharacterReferenceAsset, PlanningMediaAsset)
+            .join(PlanningMediaAsset, PlanningMediaAsset.id == CharacterReferenceAsset.asset_id)
+            .where(
+                CharacterReferenceAsset.character_id == character.id,
+                PlanningMediaAsset.archived_at.is_(None),
+            )
+            .order_by(
+                CharacterReferenceAsset.approved.desc(),
+                CharacterReferenceAsset.order_index.asc(),
+            )
+        ):
+            references.append(
+                {
+                    "link_id": str(reference.id),
+                    "asset_id": str(reference.asset_id),
+                    "reference_role": reference.reference_role,
+                    "approved": bool(reference.approved),
+                    "order_index": int(reference.order_index),
+                    "asset_approval_state": asset.approval_state,
+                    "managed_uri": asset.managed_uri,
+                    "original_filename": asset.original_filename,
+                }
+            )
+        approved_asset_ids = [
+            item["asset_id"]
+            for item in references
+            if item["approved"] and item["asset_approval_state"] == "approved"
+        ]
+        metadata.append(
+            {
+                "character_id": str(character.id),
+                "name": character.name,
+                "role": character.role,
+                "role_in_shot": link.role_in_shot,
+                "order_index": int(link.order_index),
+                "continuity_notes": link.continuity_notes,
+                "physical_description": character.physical_description,
+                "wardrobe": character.wardrobe,
+                "consistency_prompt": character.consistency_prompt,
+                "negative_identity_prompt": character.negative_identity_prompt,
+                "asset_ids": [item["asset_id"] for item in references],
+                "approved_asset_ids": approved_asset_ids,
+                "reference_assets": references,
+                "asset_status": "approved_reference_assets" if approved_asset_ids else "pending_reference_asset",
+            }
+        )
+    return metadata
+
+
+def _scene_metadata(row: ShotRow) -> dict[str, Any]:
+    return {
+        "chapter_id": str(row.chapter.id),
+        "chapter_title": row.chapter.title,
+        "scene_id": str(row.scene.id),
+        "scene_number": row.scene_number,
+        "scene_title": row.scene.title,
+        "scene_label": f"Scene {row.scene_number:02d}: {row.scene.title}",
+        "shot_id": str(row.shot.id),
+        "shot_number": row.shot_number,
+        "shot_code": _shot_code(row),
+        "shot_title": row.shot.title,
+    }
+
+
+def _identity_prompt_text(row: ShotRow, characters: list[dict[str, Any]]) -> str:
+    scene = _scene_metadata(row)
+    chunks = [f"Scene label: {scene['scene_label']}", f"Shot label: {scene['shot_code']}"]
+    character_chunks: list[str] = []
+    for character in characters:
+        name = str(character.get("name") or "Unnamed Character")
+        approved_assets = character.get("approved_asset_ids")
+        all_assets = character.get("asset_ids")
+        asset_ids = approved_assets if isinstance(approved_assets, list) and approved_assets else all_assets
+        if isinstance(asset_ids, list) and asset_ids:
+            asset_text = ", ".join(str(asset_id) for asset_id in asset_ids)
+        else:
+            asset_text = "no approved reference asset yet"
+        descriptors = [
+            name,
+            f"role: {character.get('role_in_shot') or character.get('role') or 'story character'}",
+            f"asset IDs: {asset_text}",
+        ]
+        for key in ("consistency_prompt", "wardrobe", "continuity_notes"):
+            value = _visual_text(str(character.get(key) or ""))
+            if value:
+                descriptors.append(value[:180])
+        character_chunks.append("; ".join(descriptors))
+    chunks.append("Character identity locks: " + " | ".join(character_chunks))
+    return ". ".join(chunks)
+
+
 def _shot_context_text(row: ShotRow) -> str:
     parts = [
         row.chapter.title,
@@ -457,7 +582,12 @@ def _narrative_action_overlay(row: ShotRow, archetype: Mapping[str, Any]) -> str
     return "candid observed moment, characters focused on each other and the story action, not looking at the camera"
 
 
-def _prompt(db: Session, row: ShotRow, archetype: Mapping[str, Any]) -> tuple[str, str]:
+def _prompt(
+    db: Session,
+    row: ShotRow,
+    archetype: Mapping[str, Any],
+    characters: list[dict[str, Any]],
+) -> tuple[str, str]:
     package = _latest_prompt_package(db, row.shot.id)
     image_prompt = _visual_text(
         (package.image_prompt if package else None) or row.shot.visual_description or row.shot.title
@@ -468,7 +598,9 @@ def _prompt(db: Session, row: ShotRow, archetype: Mapping[str, Any]) -> tuple[st
     action_boundary = _action_boundary_lock(row)
     location = _visual_text(row.shot.location or row.scene.title)
     story_purpose = _visual_text(row.shot.story_purpose or row.scene.title)
+    identity_prompt = _identity_prompt_text(row, characters)
     positive_parts = [
+        identity_prompt,
         f"CineForge shot must show this exact story moment: {_narrative_action_overlay(row, archetype)}",
         _character_color_lock(row),
         "exactly three adult men visible, no bystanders, no crowd, no floating white particles, clean uninjured faces, no blood, no red face marks, no wounds, no bruises, no injuries, no children",
@@ -485,7 +617,7 @@ def _prompt(db: Session, row: ShotRow, archetype: Mapping[str, Any]) -> tuple[st
     positive = ". ".join(part for part in positive_parts if part)
     positive = re.sub(r"\s+", " ", positive).strip()
     negative_prompt = re.sub(r"\s+", " ", negative_prompt).strip()
-    return positive[:950], negative_prompt[:900]
+    return positive[:1400], negative_prompt[:900]
 
 
 def _load_source_api_workflow() -> dict[str, Any] | None:
@@ -699,8 +831,16 @@ def _workflow(
     *,
     archetype: Mapping[str, Any] | None = None,
     model_name: str = DEFAULT_FLUX_IMAGE_MODEL,
+    source_workflow_override: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    source_workflow = _load_source_api_workflow()
+    if source_workflow_override is not None:
+        if "nodes" in source_workflow_override:
+            raise PhaseSixImageError(
+                "Uploaded workflow must be ComfyUI API JSON, not UI graph JSON."
+            )
+        source_workflow = dict(source_workflow_override)
+    else:
+        source_workflow = _load_source_api_workflow()
     if source_workflow is not None:
         return _patch_source_api_workflow(
             source_workflow,
@@ -751,13 +891,14 @@ def _raise_for_node_errors(response_json: Mapping[str, Any]) -> None:
 def _generate_bytes(workflow: dict[str, Any], *, timeout_sec: int = 300) -> tuple[bytes, dict[str, Any]]:
     client_id = f"cineforge-phase6-{uuid4()}"
     timeout = httpx.Timeout(10.0, connect=5.0, read=30.0)
-    with httpx.Client(base_url=COMFYUI_BASE_URL, timeout=timeout) as client:
+    comfyui_base_url = str(get_settings().comfyui_base_url).rstrip("/")
+    with httpx.Client(base_url=comfyui_base_url, timeout=timeout) as client:
         try:
             health = client.get("/")
             health.raise_for_status()
         except httpx.HTTPError as exc:
             raise PhaseSixImageError(
-                f"Local ComfyUI is not reachable at {COMFYUI_BASE_URL}: {exc}"
+                f"Local ComfyUI is not reachable at {comfyui_base_url}: {exc}"
             ) from exc
 
         response = client.post("/prompt", json={"prompt": workflow, "client_id": client_id})
@@ -791,6 +932,7 @@ def _generate_bytes(workflow: dict[str, Any], *, timeout_sec: int = 300) -> tupl
         return image_response.content, {
             "prompt_id": prompt_id,
             "client_id": client_id,
+            "comfyui_base_url": comfyui_base_url,
             "output": output,
         }
 
@@ -846,6 +988,10 @@ def generate_shot(
     requested_by: str,
     seed: int | None = None,
     model_name: str = DEFAULT_FLUX_IMAGE_MODEL,
+    workflow_template_id: UUID | None = None,
+    workflow_label: str | None = None,
+    workflow_source: str | None = None,
+    workflow_api_json: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     story = _story(db, story_id)
     row = next((candidate for candidate in _shot_rows(db, story_id) if candidate.shot.id == shot_id), None)
@@ -857,7 +1003,9 @@ def generate_shot(
 
     chosen_seed = seed if seed is not None else secrets.randbits(63)
     archetype = _image_archetype(row.shot.title)
-    positive_prompt, negative_prompt = _prompt(db, row, archetype)
+    character_metadata = _character_metadata(db, row)
+    scene_metadata = _scene_metadata(row)
+    positive_prompt, negative_prompt = _prompt(db, row, archetype, character_metadata)
     filename_prefix = f"cineforge/{story.project_id}/phase6/{_slug(_shot_code(row)).lower()}"
     workflow = _workflow(
         positive_prompt,
@@ -866,9 +1014,17 @@ def generate_shot(
         filename_prefix,
         archetype=archetype,
         model_name=model_name,
+        source_workflow_override=workflow_api_json,
     )
     image_bytes, runtime, used_model = _generate_with_flux_fallback(workflow)
     original_filename = _canonical_filename(row)
+    workflow_selection = {
+        "workflow_template_id": str(workflow_template_id) if workflow_template_id else None,
+        "workflow_label": workflow_label,
+        "workflow_source": workflow_source
+        or ("uploaded_api_json" if workflow_api_json is not None else "configured_phase6_flux2_api_spine"),
+        "uploaded_workflow_supplied": workflow_api_json is not None,
+    }
     asset, created = reference_assets.upload_asset(
         db,
         project_id=story.project_id,
@@ -886,11 +1042,20 @@ def generate_shot(
             "shot_code": _shot_code(row),
             "scene_id": str(row.scene.id),
             "scene_number": row.scene_number,
+            "scene": scene_metadata,
+            "characters": character_metadata,
+            "character_names": [item["name"] for item in character_metadata],
+            "character_asset_ids": [
+                asset_id
+                for item in character_metadata
+                for asset_id in (item.get("approved_asset_ids") or item.get("asset_ids") or [])
+            ],
             "shot_number": row.shot_number,
             "original_comfy_output": runtime.get("output"),
             "comfy_prompt_id": runtime.get("prompt_id"),
             "comfy_client_id": runtime.get("client_id"),
             "workflow_source_path": SOURCE_WORKFLOW_PATH,
+            "workflow_selection": workflow_selection,
             "workflow_conversion": "ui_graph_to_executable_flux2_api_spine",
             "model_name": used_model,
             "seed": chosen_seed,
@@ -921,6 +1086,9 @@ def generate_shot(
                 "model_name": used_model,
                 "seed": chosen_seed,
                 "workflow_source_path": SOURCE_WORKFLOW_PATH,
+                "workflow_selection": workflow_selection,
+                "scene": scene_metadata,
+                "characters": character_metadata,
             },
         )
     )

@@ -43,6 +43,8 @@ class PhaseOneGenerationInput(BaseModel):
     narration_dialogue_preference: str | None = None
     source_fidelity_constraints: str | None = None
     content_constraints: str | None = None
+    requested_chapter_count: int = Field(default=1, ge=1, le=50)
+    chapter_intake: list[dict[str, Any]] = Field(default_factory=list)
     comparison_baseline: PhaseOneBaselineKey | None = None
     requested_by: str | None = Field(default=None, max_length=200)
 

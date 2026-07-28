@@ -144,6 +144,10 @@ def test_one_prompt_creates_only_complete_phase_one_package(client: TestClient, 
     assert package["duration_analysis"]["narration_duration_sec"] > 0
     assert package["duration_analysis"]["dialogue_duration_sec"] > 0
     assert package["duration_analysis"]["planned_silence_visual_duration_sec"] > 0
+    assert package["planned_scene_count"] == 38
+    assert len(package["scene_duration_plan_sec"]) == 38
+    assert sum(package["scene_duration_plan_sec"]) == 300
+    assert all(6 <= duration <= 10 for duration in package["scene_duration_plan_sec"])
     assert "Source-required speech" in package["dialogue_script"]
     assert package["baseline_comparison"]["classification"] == "acceptable_variation"
     assert package["baseline_comparison"]["missing_count"] == 0

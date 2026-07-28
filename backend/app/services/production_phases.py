@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,7 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.app.core.config import get_settings
 from backend.app.db.base import (
     AuditLog,
     Chapter,
@@ -57,6 +59,16 @@ from backend.app.schemas.production import (
     ProductionPipelineRead,
     QAReportRead,
 )
+from backend.app.services.clip_planning import (
+    MAX_CLIP_DURATION_SEC,
+    MIN_CLIP_DURATION_SEC,
+    NOMINAL_CLIP_DURATION_SEC,
+    plan_scenes_for_duration,
+)
+from backend.app.services.planning.sulphur_phase_one import enhance_phase_one_package
+
+
+logger = logging.getLogger(__name__)
 
 SNAPSHOT_SCHEMA_VERSION = 1
 PHASE_ONE_PACKAGE_SCHEMA = "cineforge.phase_one_script_package"
@@ -248,6 +260,9 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
     facts, prompt_constraints = _split_prompt(payload.original_prompt)
     groups = _group_facts(facts)
     target = round(float(payload.target_duration_sec), 3)
+    scene_clip_plan = plan_scenes_for_duration(target)
+    requested_chapter_count = max(1, int(payload.requested_chapter_count or 1))
+    chapter_intake = list(payload.chapter_intake or [])
     movement_duration = target / 4
     narration_lines: list[str] = []
     dialogue_lines: list[str] = []
@@ -362,7 +377,16 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
     detailed_treatment = "\n\n".join(treatment_sections)
     source_notes = [
         "Every narrative movement retains a direct source anchor from the original prompt.",
-        "Macro movements are editorial guidance only; final scene and shot segmentation is reserved for Phase 2.",
+        (
+            f"Project creation requested {requested_chapter_count} chapter"
+            f"{'' if requested_chapter_count == 1 else 's'} as Phase 2 planning guidance."
+        ),
+        (
+            "Phase 2 must materialize exactly "
+            f"{scene_clip_plan.planned_scene_count} scenes from total seconds divided by "
+            f"{NOMINAL_CLIP_DURATION_SEC:g}, rounded up."
+        ),
+        "Macro movements are editorial guidance only; final scene and shot records remain reserved for Phase 2.",
     ]
     if payload.source_fidelity_constraints:
         source_notes.append(payload.source_fidelity_constraints.strip())
@@ -374,6 +398,11 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
         "The requested duration is achieved through supported action, reaction, environmental observation, and intentional silence.",
         "No new named character, location, object, or plot event was added beyond the supplied source.",
         "Dialogue is omitted unless quoted or clearly required by the supplied prompt.",
+        (
+            f"Generated clips use a nominal {NOMINAL_CLIP_DURATION_SEC:g}-second target "
+            f"and remain between {MIN_CLIP_DURATION_SEC:g} and "
+            f"{MAX_CLIP_DURATION_SEC:g} seconds."
+        ),
     ]
     if payload.narration_dialogue_preference:
         assumptions.append(
@@ -408,6 +437,22 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
             "resolution": treatment_sections[3],
         },
         "pacing_plan": pacing_plan,
+        "chapter_planning": {
+            "requested_chapter_count": requested_chapter_count,
+            "provided_chapter_count": len(chapter_intake),
+            "chapter_intake": chapter_intake,
+            "phase_2_instruction": (
+                "Use this as chapter-level planning guidance only. "
+                "Do not treat it as persisted scene or shot segmentation until Phase 2."
+            ),
+        },
+        "planned_scene_count": scene_clip_plan.planned_scene_count,
+        "nominal_scene_duration_sec": NOMINAL_CLIP_DURATION_SEC,
+        "clip_duration_range_sec": [
+            MIN_CLIP_DURATION_SEC,
+            MAX_CLIP_DURATION_SEC,
+        ],
+        "scene_duration_plan_sec": list(scene_clip_plan.scene_duration_plan_sec),
         "duration_analysis": {
             "target_duration_sec": target,
             "narration_word_count": _word_count(narration_script),
@@ -445,6 +490,107 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
             package, payload.comparison_baseline
         )
     return package
+
+
+def _refresh_phase_one_metrics(
+    package: dict[str, Any],
+    payload: PhaseOneGenerationInput,
+) -> None:
+    """Recalculate bounded duration facts after text-only enhancement."""
+
+    narration_script = str(package.get("narration_script") or "")
+    dialogue_script = str(package.get("dialogue_script") or "")
+    dialogue_words = (
+        0
+        if dialogue_script.startswith("No spoken character dialogue")
+        else _word_count(dialogue_script)
+    )
+    narration_duration = round(_word_count(narration_script) / 145 * 60, 2)
+    dialogue_duration = round(dialogue_words / 135 * 60, 2)
+    target = round(float(payload.target_duration_sec), 3)
+    planned_visual_duration = round(
+        max(0.0, target - narration_duration - dialogue_duration),
+        2,
+    )
+    package["script_word_count"] = _word_count(str(package.get("complete_script") or ""))
+    package["duration_analysis"] = {
+        **dict(package.get("duration_analysis") or {}),
+        "target_duration_sec": target,
+        "narration_word_count": _word_count(narration_script),
+        "dialogue_word_count": dialogue_words,
+        "narration_duration_sec": narration_duration,
+        "dialogue_duration_sec": dialogue_duration,
+        "planned_silence_visual_duration_sec": planned_visual_duration,
+        "estimated_total_duration_sec": round(
+            narration_duration + dialogue_duration + planned_visual_duration,
+            2,
+        ),
+        "narration_wpm": 145,
+        "dialogue_wpm": 135,
+    }
+
+
+def _apply_sulphur_phase_one_enhancement(
+    package: dict[str, Any],
+    payload: PhaseOneGenerationInput,
+) -> dict[str, Any]:
+    """Use Sulphur when enabled, retaining the valid deterministic package on failure."""
+
+    settings = get_settings()
+    if not (settings.sulphur_configured and settings.sulphur_phase_one_enabled):
+        return package
+
+    enhanced_package = dict(package)
+    try:
+        enhancement = enhance_phase_one_package(
+            original_prompt=payload.original_prompt,
+            target_duration_sec=float(payload.target_duration_sec),
+            creative_direction=dict(package.get("creative_direction") or {}),
+            baseline_package=package,
+            settings=settings,
+        )
+        enhanced_package.update(enhancement)
+        creative_direction = dict(enhanced_package.get("creative_direction") or {})
+        creative_direction.update(
+            {
+                "script_provider": "sulphur",
+                "script_model": settings.sulphur_model_id,
+                "script_model_file": settings.sulphur_model_path.name,
+            }
+        )
+        enhanced_package["creative_direction"] = creative_direction
+        enhanced_package["source_fidelity_notes"] = [
+            *list(enhanced_package.get("source_fidelity_notes") or []),
+            "Script language was enhanced locally by Sulphur; deterministic QA remains authoritative.",
+        ]
+        _refresh_phase_one_metrics(enhanced_package, payload)
+        enhanced_qa = _qa_report(enhanced_package, payload)
+        if not enhanced_qa.get("passed"):
+            raise ValueError("Sulphur enhancement did not pass the Phase 1 QA contract")
+        return enhanced_package
+    except Exception as exc:
+        logger.warning(
+            "sulphur_phase_one_fallback error_type=%s",
+            exc.__class__.__name__,
+        )
+        fallback = dict(package)
+        creative_direction = dict(fallback.get("creative_direction") or {})
+        creative_direction.update(
+            {
+                "script_provider": "deterministic_fallback",
+                "script_model": settings.sulphur_model_id,
+                "script_model_file": settings.sulphur_model_path.name,
+            }
+        )
+        fallback["creative_direction"] = creative_direction
+        fallback["source_fidelity_notes"] = [
+            *list(fallback.get("source_fidelity_notes") or []),
+            (
+                "Sulphur was requested but its structured enhancement did not pass the "
+                "Phase 1 contract; the deterministic source-faithful script was retained."
+            ),
+        ]
+        return fallback
 
 
 def _scan_forbidden_keys(value: Any, path: str = "$") -> list[str]:
@@ -491,7 +637,32 @@ def _qa_report(
         ),
     )
     minimum_words = max(240, round(target * 1.1))
+    expected_scene_clip_plan = plan_scenes_for_duration(target)
+    actual_scene_durations = [
+        float(item) for item in (package.get("scene_duration_plan_sec") or [])
+    ]
     checks = [
+        {
+            "code": "scene_clip_plan",
+            "label": "Scene count and short-clip durations match the total runtime",
+            "passed": (
+                int(package.get("planned_scene_count") or 0)
+                == expected_scene_clip_plan.planned_scene_count
+                and len(actual_scene_durations)
+                == expected_scene_clip_plan.planned_scene_count
+                and abs(sum(actual_scene_durations) - target) <= 0.01
+                and all(
+                    MIN_CLIP_DURATION_SEC <= item <= MAX_CLIP_DURATION_SEC
+                    for item in actual_scene_durations
+                )
+            ),
+            "blocking": True,
+            "detail": (
+                f"Planned {package.get('planned_scene_count', 0)} scenes using "
+                f"ceil({target:g} / {NOMINAL_CLIP_DURATION_SEC:g}); clips must be "
+                f"{MIN_CLIP_DURATION_SEC:g}-{MAX_CLIP_DURATION_SEC:g} seconds."
+            ),
+        },
         {
             "code": "source_fidelity",
             "label": "Original prompt remains represented",
@@ -959,7 +1130,10 @@ def generate_phase_one(
             details={"story_id": str(story.id), "approved": False},
         )
     )
-    package = _build_phase_one_package(story, payload)
+    package = _apply_sulphur_phase_one_enhancement(
+        _build_phase_one_package(story, payload),
+        payload,
+    )
     phase.lifecycle_state = "qa_pending"
     qa = _qa_report(package, payload)
     _persist_phase_one_version(

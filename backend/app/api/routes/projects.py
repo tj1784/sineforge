@@ -1,16 +1,29 @@
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from backend.app.core.config import get_settings
 from backend.app.core.errors import not_found
 from backend.app.db.base import Project
 from backend.app.db.session import get_db
-from backend.app.schemas.api import ProjectCreate, ProjectRead, ProjectWorkspaceCreate, ProjectWorkspaceRead
+from backend.app.schemas.api import (
+    ProjectCreate,
+    ProjectRead,
+    ProjectWorkspaceCreate,
+    ProjectWorkspaceRead,
+    SulphurProjectPromptCreate,
+    SulphurProjectWorkspaceRead,
+)
 from backend.app.schemas.storyboard import StoryRead
 from backend.app.schemas.storyboard_settings import ProjectStoryboardSettingsRead
+from backend.app.services.planning.sulphur_project_intake import (
+    SulphurProjectIntakeError,
+    build_sulphur_project_intake,
+)
 from backend.app.services.project_workspace import (
     ProjectWorkspaceConflictError,
+    ProjectWorkspaceResult,
     create_project_workspace,
 )
 from backend.app.services import production_phases
@@ -26,6 +39,19 @@ def project_to_response(project: Project) -> ProjectRead:
         description=project.description,
         created_at=project.created_at,
         persistence="db",
+    )
+
+
+def workspace_to_response(
+    db: Session,
+    result: ProjectWorkspaceResult,
+) -> ProjectWorkspaceRead:
+    return ProjectWorkspaceRead(
+        project=project_to_response(result.project),
+        story=StoryRead.model_validate(result.story),
+        settings=ProjectStoryboardSettingsRead.model_validate(result.settings),
+        idempotent_replay=result.idempotent_replay,
+        production_pipeline=production_phases.get_pipeline(db, result.story.id),
     )
 
 
@@ -46,12 +72,37 @@ def create_workspace(
         result = create_project_workspace(db, payload)
     except ProjectWorkspaceConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
-    return ProjectWorkspaceRead(
-        project=project_to_response(result.project),
-        story=StoryRead.model_validate(result.story),
-        settings=ProjectStoryboardSettingsRead.model_validate(result.settings),
-        idempotent_replay=result.idempotent_replay,
-        production_pipeline=production_phases.get_pipeline(db, result.story.id),
+    return workspace_to_response(db, result)
+
+
+@router.post(
+    "/sulphur-intake",
+    response_model=SulphurProjectWorkspaceRead,
+    status_code=status.HTTP_201_CREATED,
+)
+def create_workspace_from_sulphur(
+    payload: SulphurProjectPromptCreate,
+    db: Session = Depends(get_db),
+) -> SulphurProjectWorkspaceRead:
+    """Create a complete local project from one validated Sulphur conversation turn."""
+
+    try:
+        intake = build_sulphur_project_intake(payload)
+        result = create_project_workspace(db, intake.workspace_payload)
+    except SulphurProjectIntakeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except ProjectWorkspaceConflictError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    workspace = workspace_to_response(db, result)
+    return SulphurProjectWorkspaceRead(
+        **workspace.model_dump(),
+        intake_model=get_settings().sulphur_model_id,
+        target_duration_sec=intake.clip_plan.target_duration_sec,
+        planned_scene_count=intake.clip_plan.planned_scene_count,
     )
 
 

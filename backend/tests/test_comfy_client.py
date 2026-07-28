@@ -14,6 +14,8 @@ async def test_comfy_client_health_and_object_info_use_mock_transport():
             return httpx.Response(200, json={"status": "ok"})
         if request.url.path == "/object_info":
             return httpx.Response(200, json={"KSampler": {"input": {"required": {"seed": ["INT", {}]}}}})
+        if request.url.path == "/models/loras":
+            return httpx.Response(200, json=["z.safetensors", "a.safetensors", "a.safetensors"])
         return httpx.Response(404)
 
     transport = httpx.MockTransport(handler)
@@ -23,12 +25,20 @@ async def test_comfy_client_health_and_object_info_use_mock_transport():
         object_info = await client.get_object_info()
         class_info = await client.get_object_info_class("KSampler")
         missing_class = await client.get_object_info_class("MissingNode")
+        loras = await client.get_model_names("loras")
 
     assert health == {"status": "ok", "reachable": True}
     assert object_info == {"KSampler": {"input": {"required": {"seed": ["INT", {}]}}}}
     assert class_info == {"input": {"required": {"seed": ["INT", {}]}}}
     assert missing_class is None
-    assert [request.url.path for request in requests] == ["/", "/object_info", "/object_info", "/object_info"]
+    assert loras == ["a.safetensors", "z.safetensors"]
+    assert [request.url.path for request in requests] == [
+        "/",
+        "/object_info",
+        "/object_info",
+        "/object_info",
+        "/models/loras",
+    ]
 
 
 @pytest.mark.asyncio

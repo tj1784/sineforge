@@ -18,8 +18,9 @@ from backend.app.db.base import (
     Story,
 )
 from backend.app.schemas.api import ProjectWorkspaceCreate
-from backend.app.schemas.production import PhaseOneGenerationInput
+from backend.app.schemas.production import PhaseApproveRequest, PhaseOneGenerationInput
 from backend.app.services import production_phases
+from backend.app.services.sulphur_storyboard_bootstrap import bootstrap_from_phase_one
 from backend.app.services.storyboard_settings import default_settings_values
 
 
@@ -45,6 +46,12 @@ def _request_hash(payload: ProjectWorkspaceCreate) -> str:
 
 
 def _new_story(project_id, payload: ProjectWorkspaceCreate) -> Story:
+    chapter_guidance = _chapter_guidance_text(payload)
+    production_notes = payload.production_notes
+    if chapter_guidance:
+        production_notes = "\n\n".join(
+            part for part in (production_notes, chapter_guidance) if part
+        )
     return Story(
         project_id=project_id,
         title=payload.story_title,
@@ -55,7 +62,7 @@ def _new_story(project_id, payload: ProjectWorkspaceCreate) -> Story:
         tone=payload.tone,
         point_of_view=payload.point_of_view,
         visual_style=payload.visual_style,
-        production_notes=payload.production_notes,
+        production_notes=production_notes,
         approval_state="draft",
     )
 
@@ -99,6 +106,33 @@ def _derived_title(prompt: str) -> str:
     return titled[:200]
 
 
+def _chapter_guidance_text(payload: ProjectWorkspaceCreate) -> str:
+    if payload.requested_chapter_count <= 1 and not payload.chapter_intake:
+        return ""
+    lines = [
+        "Project creation chapter guidance:",
+        f"- Requested chapter count: {payload.requested_chapter_count}",
+    ]
+    for chapter in payload.chapter_intake:
+        details = [
+            f"Chapter {chapter.order_index + 1}: {chapter.title}",
+        ]
+        if chapter.target_duration_sec:
+            details.append(f"target {chapter.target_duration_sec:g}s")
+        if chapter.summary:
+            details.append(f"summary: {chapter.summary.strip()}")
+        if chapter.source_prompt:
+            details.append(f"source prompt: {chapter.source_prompt.strip()}")
+        if chapter.narrative_purpose:
+            details.append(f"purpose: {chapter.narrative_purpose.strip()}")
+        if chapter.dramatic_progression:
+            details.append(f"progression: {chapter.dramatic_progression.strip()}")
+        if chapter.production_notes:
+            details.append(f"notes: {chapter.production_notes.strip()}")
+        lines.append("- " + " | ".join(details))
+    return "\n".join(lines)
+
+
 def _new_settings(project_id, payload: ProjectWorkspaceCreate) -> ProjectStoryboardSettings:
     values = default_settings_values()
     values.update(
@@ -127,6 +161,12 @@ def _new_settings(project_id, payload: ProjectWorkspaceCreate) -> ProjectStorybo
         "privacy_preference": payload.privacy_preference,
         "quality_preference": payload.quality_preference,
         "cost_sensitivity": payload.cost_sensitivity,
+        "requested_chapter_count": payload.requested_chapter_count,
+        "chapter_intake": [
+            item.model_dump(mode="json") for item in payload.chapter_intake
+        ],
+        "bootstrap_phase_plan": payload.bootstrap_phase_plan,
+        "auto_approve_phases_through": payload.auto_approve_phases_through,
     }
     return ProjectStoryboardSettings(project_id=project_id, **values)
 
@@ -170,8 +210,9 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
         db.flush()
 
         production_phases.ensure_contract(db, story, commit=False)
+        phase_one_package: dict | None = None
         if payload.run_phase_one:
-            production_phases.generate_phase_one(
+            phase_one_response = production_phases.generate_phase_one(
                 db,
                 story.id,
                 PhaseOneGenerationInput(
@@ -185,11 +226,47 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
                     narration_dialogue_preference=payload.narration_dialogue_preference,
                     source_fidelity_constraints=payload.source_fidelity_constraints,
                     content_constraints=payload.content_constraints,
+                    requested_chapter_count=payload.requested_chapter_count,
+                    chapter_intake=[
+                        item.model_dump(mode="json") for item in payload.chapter_intake
+                    ],
                     comparison_baseline=payload.comparison_baseline,
                     requested_by="project_creation",
                 ),
                 commit=False,
             )
+            latest = phase_one_response.phase.latest_version
+            phase_one_package = latest.output_json if latest is not None else None
+
+        if payload.bootstrap_phase_plan:
+            if not isinstance(phase_one_package, dict):
+                raise RuntimeError("Phase plan bootstrap requires a generated Phase 1 package.")
+            bootstrap_from_phase_one(
+                db,
+                story,
+                phase_one_package,
+                requested_chapter_count=payload.requested_chapter_count,
+                chapter_intake=[
+                    item.model_dump(mode="json") for item in payload.chapter_intake
+                ],
+                created_by="sulphur_bootstrap",
+            )
+
+        if payload.auto_approve_phases_through:
+            for phase_number in range(1, payload.auto_approve_phases_through + 1):
+                production_phases.approve_phase(
+                    db,
+                    story.id,
+                    phase_number,
+                    PhaseApproveRequest(
+                        approved_by="Sulphur bootstrap",
+                        notes=(
+                            f"Auto-approved Phase {phase_number} as an initial local/private "
+                            "Sulphur planning baseline. User review and regeneration remain available."
+                        ),
+                    ),
+                    commit=False,
+                )
 
         db.add(
             ProjectWorkspaceCreation(

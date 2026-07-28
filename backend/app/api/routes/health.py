@@ -1,13 +1,20 @@
-from fastapi import APIRouter, Response, status
+import asyncio
+import re
+from urllib.parse import urlsplit, urlunsplit
+
+import httpx
+from fastapi import APIRouter, HTTPException, Response, status
 
 from backend.app.core.config import get_settings
 from backend.app.services.comfy.client import ComfyUIClient
+from backend.app.services.comfy.runner import ComfyAPIRunnerClient
 from backend.app.services.ffmpeg.service import FFmpegService
 from backend.app.services.telemetry.gpu import GPUTelemetryService
 
 
 router = APIRouter(tags=["health"])
 CURRENT_PHASE = "Phase 2 controlled ComfyUI submission backend capability"
+_RESTART_ID_RE = re.compile(r"^[a-f0-9]{32}$")
 
 
 @router.get("/")
@@ -47,6 +54,166 @@ async def health_comfy() -> dict:
         return await client.health()
 
 
+@router.get("/health/comfy-api-runner")
+async def health_comfy_api_runner() -> dict:
+    settings = get_settings()
+    async with ComfyAPIRunnerClient(
+        str(settings.comfy_api_runner_base_url),
+    ) as client:
+        return await client.health(str(settings.comfyui_base_url))
+
+
+@router.get("/health/sulphur")
+async def health_sulphur() -> dict:
+    settings = get_settings()
+    if not settings.sulphur_planning_enabled:
+        return {
+            "status": "disabled",
+            "reachable": False,
+            "model_loaded": False,
+            "model_id": settings.sulphur_model_id,
+            "model_file": settings.sulphur_model_path.name,
+        }
+    try:
+        parsed = urlsplit(settings.sulphur_base_url)
+        native_models_url = urlunsplit(
+            (parsed.scheme, parsed.netloc, "/api/v1/models", "", "")
+        )
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(3.0),
+            follow_redirects=False,
+        ) as client:
+            response = await client.get(native_models_url)
+            response.raise_for_status()
+            payload = response.json()
+        entries = payload.get("models") if isinstance(payload, dict) else None
+        matching_model = next(
+            (
+                item
+                for item in (entries if isinstance(entries, list) else [])
+                if isinstance(item, dict)
+                and (
+                    item.get("key") == settings.sulphur_model_id
+                    or any(
+                        isinstance(instance, dict)
+                        and instance.get("id") == settings.sulphur_model_id
+                        for instance in (
+                            item.get("loaded_instances")
+                            if isinstance(item.get("loaded_instances"), list)
+                            else []
+                        )
+                    )
+                )
+            ),
+            None,
+        )
+        loaded_instances = (
+            matching_model.get("loaded_instances")
+            if isinstance(matching_model, dict)
+            and isinstance(matching_model.get("loaded_instances"), list)
+            else []
+        )
+        model_loaded = any(
+            isinstance(instance, dict)
+            and instance.get("id") == settings.sulphur_model_id
+            for instance in loaded_instances
+        )
+        loaded_config = (
+            loaded_instances[0].get("config")
+            if loaded_instances
+            and isinstance(loaded_instances[0], dict)
+            and isinstance(loaded_instances[0].get("config"), dict)
+            else {}
+        )
+        return {
+            "status": "ok" if model_loaded else "degraded",
+            "reachable": True,
+            "model_loaded": model_loaded,
+            "model_id": settings.sulphur_model_id,
+            "model_file": settings.sulphur_model_path.name,
+            "quantization": (
+                (matching_model.get("quantization") or {}).get("name")
+                if isinstance(matching_model, dict)
+                and isinstance(matching_model.get("quantization"), dict)
+                else None
+            ),
+            "context_length": loaded_config.get("context_length"),
+            "parallel": loaded_config.get("parallel"),
+        }
+    except (httpx.HTTPError, ValueError) as exc:
+        return {
+            "status": "unavailable",
+            "reachable": False,
+            "model_loaded": False,
+            "model_id": settings.sulphur_model_id,
+            "model_file": settings.sulphur_model_path.name,
+            "error": str(exc),
+        }
+
+
+@router.post("/runtime/comfyui/restart", status_code=status.HTTP_202_ACCEPTED)
+async def restart_comfyui() -> dict:
+    """Proxy one explicit local restart through the separately supervised Runner."""
+
+    settings = get_settings()
+    try:
+        async with ComfyAPIRunnerClient(
+            str(settings.comfy_api_runner_base_url),
+            timeout=10,
+            allow_mutation=True,
+        ) as client:
+            payload = await client.restart_comfy(
+                comfy_url=str(settings.comfyui_base_url),
+            )
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"ComfyAPI Runner could not schedule the restart: {exc}",
+        ) from exc
+
+    restart_id = payload.get("restartId") if isinstance(payload, dict) else None
+    if not isinstance(restart_id, str) or not _RESTART_ID_RE.fullmatch(restart_id):
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="ComfyAPI Runner returned an invalid restart identifier.",
+        )
+    return {
+        "restart_id": restart_id,
+        "status": "scheduled",
+        "message": "ComfyUI restart scheduled through the local API Runner.",
+    }
+
+
+@router.get("/runtime/comfyui/restart/{restart_id}")
+async def comfyui_restart_status(restart_id: str) -> dict:
+    if not _RESTART_ID_RE.fullmatch(restart_id):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="Invalid ComfyUI restart identifier.",
+        )
+    settings = get_settings()
+    try:
+        async with ComfyAPIRunnerClient(
+            str(settings.comfy_api_runner_base_url),
+            timeout=10,
+        ) as client:
+            payload = await client.get_restart(restart_id)
+    except (httpx.HTTPError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"ComfyAPI Runner restart status is unavailable: {exc}",
+        ) from exc
+
+    restart_status = str(payload.get("status") or "unknown")
+    return {
+        "restart_id": restart_id,
+        "status": restart_status,
+        "message": str(payload.get("message") or ""),
+        "complete": restart_status == "complete",
+        "failed": restart_status == "error",
+    }
+
+
 @router.get("/health/gpu")
 def health_gpu() -> dict:
     return GPUTelemetryService().health()
@@ -60,7 +227,11 @@ def health_ffmpeg() -> dict:
 @router.get("/runtime/status")
 async def runtime_status() -> dict:
     settings = get_settings()
-    comfy_status = await health_comfy()
+    comfy_status, runner_status, sulphur_status = await asyncio.gather(
+        health_comfy(),
+        health_comfy_api_runner(),
+        health_sulphur(),
+    )
     object_info = {
         "status": "not_checked",
         "available": False,
@@ -85,11 +256,20 @@ async def runtime_status() -> dict:
                 "error": str(exc),
             }
 
+    required_statuses = [
+        comfy_status.get("status"),
+        runner_status.get("status"),
+    ]
+    if settings.sulphur_planning_enabled:
+        required_statuses.append(sulphur_status.get("status"))
+
     return {
-        "status": "ok" if comfy_status.get("status") == "ok" else "degraded",
+        "status": "ok" if all(item == "ok" for item in required_statuses) else "degraded",
         "environment": settings.env,
         "current_phase": CURRENT_PHASE,
         "comfyui": comfy_status,
+        "comfy_api_runner": runner_status,
+        "sulphur": sulphur_status,
         "object_info": object_info,
         "gpu": health_gpu(),
         "ffmpeg": health_ffmpeg(),
@@ -98,6 +278,7 @@ async def runtime_status() -> dict:
             "submission_enabled": False,
             "controlled_submission_enabled": True,
             "public_submission_enabled": False,
+            "api_runner_available": runner_status.get("status") == "ok",
             "supported_states": [
                 "pending",
                 "reserved",
@@ -121,6 +302,10 @@ async def runtime_status() -> dict:
             "websocket_monitor": "disabled_until_future_phase",
             "output_collection": "disabled_until_future_phase",
             "ffmpeg_assembly": "disabled_until_future_phase",
+        },
+        "links": {
+            "comfyui": str(settings.comfyui_base_url).rstrip("/"),
+            "comfy_api_runner": str(settings.comfy_api_runner_base_url).rstrip("/"),
         },
     }
 

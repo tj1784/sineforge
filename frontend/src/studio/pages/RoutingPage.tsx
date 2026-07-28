@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import {
   api,
+  type LocalModelInventory,
   type PlanningTaskType,
   type ProjectStoryboardSettings,
   type ProviderExecutionMode,
@@ -59,6 +60,7 @@ function capabilityLabels(profile: ProviderProfile): string {
 export function RoutingPage() {
   const { data, busy, reload, setMessage } = useStudio()
   const [catalog, setCatalog] = useState<RuntimeCatalog | null>(null)
+  const [localInventory, setLocalInventory] = useState<LocalModelInventory | null>(null)
   const [profiles, setProfiles] = useState<ProviderProfile[]>([])
   const [assignments, setAssignments] = useState<TaskProviderAssignment[]>([])
   const [settings, setSettings] = useState<ProjectStoryboardSettings | null>(null)
@@ -69,6 +71,7 @@ export function RoutingPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedProfileId, setSelectedProfileId] = useState('')
   const [selectedTask, setSelectedTask] = useState<PlanningTaskType>(TASK_PROFILE_MAP[0].task)
+  const [modelFilter, setModelFilter] = useState('')
   const [preferLocal, setPreferLocal] = useState(true)
   const [preferHosted, setPreferHosted] = useState(false)
   const [routeDrafts, setRouteDrafts] = useState<Record<string, RouteDraft>>({})
@@ -81,14 +84,16 @@ export function RoutingPage() {
     setLoading(true)
     setError(null)
     try {
-      const [catalogResult, profileResult, assignmentResult, settingsResult] = await Promise.all([
+      const [catalogResult, localInventoryResult, profileResult, assignmentResult, settingsResult] = await Promise.all([
         api.runtimeCatalog(),
+        api.localModelInventory(),
         api.listProviderProfiles(),
         api.listTaskProviderAssignments(data.story.id),
         api.getSettings(data.story.project_id),
       ])
       setCatalogAvailable(catalogResult != null)
       setCatalog(catalogResult)
+      setLocalInventory(localInventoryResult)
       setProfiles(profileResult)
       setAssignments(assignmentResult)
       setRouteDrafts({})
@@ -114,6 +119,13 @@ export function RoutingPage() {
     () => new Map(catalog?.models.map((model) => [model.id, model]) ?? []),
     [catalog],
   )
+  const localModelRows = useMemo(() => {
+    const query = modelFilter.trim().toLowerCase()
+    return Object.entries(localInventory?.categories ?? {})
+      .flatMap(([category, names]) => names.map((name) => ({ category, name })))
+      .filter(({ category, name }) => !query || `${category} ${name}`.toLowerCase().includes(query))
+      .sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name))
+  }, [localInventory, modelFilter])
 
   if (!data) return null
 
@@ -811,6 +823,65 @@ export function RoutingPage() {
           </div>
         </form>
       ) : null}
+
+      <section className="panel" style={{ marginTop: 12 }}>
+        <header className="panel-head">
+          <div>
+            <h2>Installed ComfyUI model lists</h2>
+            <p>
+              Live read-only inventory from {localInventory?.source_url ?? 'the configured ComfyUI instance'}.
+            </p>
+          </div>
+          <span className="status-pill" data-status={evidenceStatus(localInventory?.status ?? 'unavailable')}>
+            {localInventory ? `${localInventory.total_count} files · ${localInventory.status}` : 'Unavailable'}
+          </span>
+        </header>
+        <label style={{ display: 'block', marginBottom: 12 }}>
+          <span>Filter installed models and LoRAs</span>
+          <input
+            value={modelFilter}
+            onChange={(event) => setModelFilter(event.target.value)}
+            placeholder="Search filename or folder…"
+          />
+        </label>
+        {!localInventory ? (
+          <UnavailableState
+            title="Live model inventory unavailable"
+            detail="Sineforge could not read the configured ComfyUI model-list endpoints."
+          />
+        ) : null}
+        {localInventory && !localModelRows.length ? (
+          <EmptyState
+            title={modelFilter ? 'No installed files match this filter' : 'No installed model files reported'}
+            detail={modelFilter ? 'Clear or change the filter.' : 'ComfyUI returned empty model lists.'}
+          />
+        ) : null}
+        {localModelRows.length ? (
+          <div className="data-table">
+            <div className="table-head" style={{ gridTemplateColumns: '.45fr 1.55fr' }}>
+              <span>ComfyUI folder</span>
+              <span>Model filename</span>
+            </div>
+            {localModelRows.map(({ category, name }) => (
+              <div
+                key={`${category}:${name}`}
+                className="data-row"
+                style={{ gridTemplateColumns: '.45fr 1.55fr' }}
+              >
+                <span>
+                  <b>{category.replaceAll('_', ' ')}</b>
+                </span>
+                <span className="mono">{name}</span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        {localInventory && Object.keys(localInventory.errors).length ? (
+          <p className="notice warning">
+            Some ComfyUI folders could not be read: {Object.keys(localInventory.errors).join(', ')}.
+          </p>
+        ) : null}
+      </section>
 
       <section className="panel" style={{ marginTop: 12 }}>
         <header className="panel-head">

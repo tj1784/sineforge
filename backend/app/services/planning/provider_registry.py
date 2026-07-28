@@ -1,7 +1,8 @@
 """Planning provider registry for Storyboard Phase 1.
 
 Responsibilities:
-- Keep the deterministic mock as the default local provider.
+- Prefer the configured local Sulphur GGUF for automatic planning.
+- Keep the deterministic mock as the offline/test fallback.
 - Expose OpenAI only when configuration enables it and an API key is present.
 - Represent anthropic / xai / qwen / local_cli / custom as explicitly
   not_implemented or not_configured — never silently invent adapters.
@@ -24,6 +25,10 @@ from backend.app.services.planning.openai_provider import (
     build_openai_provider_from_settings,
 )
 from backend.app.services.planning.provider import MockPlanningProvider, PlanningProvider
+from backend.app.services.planning.sulphur_provider import (
+    SulphurPlanningProvider,
+    build_sulphur_provider_from_settings,
+)
 
 
 class ProviderAvailability(StrEnum):
@@ -36,7 +41,9 @@ class ProviderAvailability(StrEnum):
 # Identifiers that must never be constructed from shell/exec paths in Phase 1.
 _SHELL_REFUSED_PROVIDERS = frozenset({"local_cli", "custom"})
 _HOSTED_STUBS = frozenset({"anthropic", "xai", "qwen"})
-_KNOWN_PROVIDERS = frozenset({"mock", "openai", "anthropic", "xai", "qwen", "local_cli", "custom"})
+_KNOWN_PROVIDERS = frozenset(
+    {"mock", "sulphur", "openai", "anthropic", "xai", "qwen", "local_cli", "custom"}
+)
 
 _FORBIDDEN_REGISTRATION_KEYS = frozenset(
     {
@@ -63,6 +70,7 @@ class ProviderDescriptor:
     privacy_classification: str
     capabilities: tuple[str, ...]
     detail: str
+    routing_priority: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -73,6 +81,7 @@ class ProviderDescriptor:
             "privacy_classification": self.privacy_classification,
             "capabilities": list(self.capabilities),
             "detail": self.detail,
+            "routing_priority": self.routing_priority,
         }
 
 
@@ -122,8 +131,32 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
         if cfg.openai_configured
         else "OpenAI disabled or API key not configured; mock remains default"
     )
+    sulphur_status = (
+        ProviderAvailability.available
+        if cfg.sulphur_configured
+        else ProviderAvailability.not_configured
+    )
+    sulphur_detail = (
+        "Local Sulphur Q8 GGUF is configured through LM Studio"
+        if cfg.sulphur_configured
+        else "Local Sulphur planning is disabled or its configured GGUF is missing"
+    )
 
     return [
+        ProviderDescriptor(
+            provider_identifier=SulphurPlanningProvider.identifier,
+            display_name="Sulphur Prompt Enhancer Q8",
+            availability_status=sulphur_status,
+            execution_mode="local_http" if cfg.sulphur_configured else "disabled",
+            privacy_classification="local",
+            capabilities=(
+                ("planning", "script_generation", "prompt_enhancement")
+                if cfg.sulphur_configured
+                else tuple()
+            ),
+            detail=sulphur_detail,
+            routing_priority=100,
+        ),
         ProviderDescriptor(
             provider_identifier=MockPlanningProvider.identifier,
             display_name="Deterministic Mock",
@@ -132,6 +165,7 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
             privacy_classification="local",
             capabilities=("planning",),
             detail="Default provider for tests and local use",
+            routing_priority=0,
         ),
         ProviderDescriptor(
             provider_identifier=OpenAIPlanningProvider.identifier,
@@ -207,7 +241,7 @@ def build_provider_registry(
 ) -> dict[str, PlanningProvider]:
     """Build the live provider map.
 
-    Mock is always present. OpenAI is included only when configured.
+    Mock is always present. Sulphur and OpenAI are included only when configured.
     """
     cfg = settings or get_settings()
     registry: dict[str, PlanningProvider] = {
@@ -217,6 +251,9 @@ def build_provider_registry(
     openai = build_openai_provider_from_settings(cfg)
     if openai is not None:
         registry[OpenAIPlanningProvider.identifier] = openai
+    sulphur = build_sulphur_provider_from_settings(cfg)
+    if sulphur is not None:
+        registry[SulphurPlanningProvider.identifier] = sulphur
 
     if extra:
         for key, provider in extra.items():
@@ -246,6 +283,20 @@ def resolve_provider(
 
     if provider_identifier == MockPlanningProvider.identifier:
         return MockPlanningProvider()
+
+    if provider_identifier == SulphurPlanningProvider.identifier:
+        cfg = settings or get_settings()
+        if not cfg.sulphur_configured:
+            raise PlanningError(
+                PlanningErrorCode.ROUTING_FAILED,
+                "Provider 'sulphur' is not configured for planning",
+                details={
+                    "provider_identifier": "sulphur",
+                    "availability_status": ProviderAvailability.not_configured.value,
+                    "sulphur_planning_enabled": cfg.sulphur_planning_enabled,
+                },
+            )
+        return SulphurPlanningProvider.from_settings(cfg)
 
     if provider_identifier in _SHELL_REFUSED_PROVIDERS:
         raise PlanningError(

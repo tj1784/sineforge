@@ -156,6 +156,9 @@ class ChapterCreate(BaseModel):
     order_index: int = Field(ge=0)
     title: str = Field(min_length=1, max_length=300)
     summary: str | None = None
+    narrative_purpose: str | None = None
+    target_duration_sec: float | None = Field(default=None, gt=0)
+    dramatic_progression: str | None = None
 
 
 class ChapterRead(ChapterCreate):

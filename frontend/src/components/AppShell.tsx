@@ -212,8 +212,8 @@ export function AppShell({
       : view === 'new-project'
         ? labels['new-project']
         : labels[activePage]
-  // Gold Sites sidebar chip is always “Browser preview mode”; backend status lives in the popover.
-  const runtimeLabel = 'Browser preview mode'
+  // Local runtime shortcuts live in the sidebar popover; backend status remains read-only.
+  const runtimeLabel = 'Local AI tools'
   const runtimeStatusDetail =
     backendStatus === 'ok' || backendStatus === 'ready'
       ? 'Local backend ok'
@@ -407,7 +407,7 @@ export function AppShell({
             <i aria-hidden="true" />
             <span>
               <strong>{runtimeLabel}</strong>
-              <small>Planning only · no execution</small>
+              <small>ComfyUI · Runner · Sulphur</small>
             </span>
           </button>
           {runtime ? (
@@ -417,11 +417,29 @@ export function AppShell({
               role="dialog"
               aria-label="Preview runtime status"
             >
-              <b>Preview boundary</b>
+              <b>Local runtime tools</b>
               <p>
-                This local shell never submits a workflow, downloads a model, or starts rendering.
-                Status: {runtimeStatusDetail}.
+                Sineforge keeps public submission gated while supervising the approved local
+                runtimes. Backend status: {runtimeStatusDetail}.
               </p>
+              <a
+                href="http://127.0.0.1:8022"
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setRuntime(false)}
+              >
+                Open ComfyAPI Runner
+                <Icon name="arrow" size={14} />
+              </a>
+              <a
+                href="http://127.0.0.1:8888"
+                target="_blank"
+                rel="noreferrer"
+                onClick={() => setRuntime(false)}
+              >
+                Open ComfyUI
+                <Icon name="arrow" size={14} />
+              </a>
               {onRefreshStatus ? (
                 <button
                   type="button"
@@ -441,7 +459,7 @@ export function AppShell({
                   goPage('settings')
                 }}
               >
-                Open preview settings
+                Open project settings
                 <Icon name="arrow" size={14} />
               </button>
             </div>

@@ -7,12 +7,16 @@ import { ProductionPhases } from './ProductionPhases'
 vi.mock('../../api/client', () => ({
   api: {
     getProductionPipeline: vi.fn(),
+    generatePhaseOne: vi.fn(),
     approveProductionPhase: vi.fn(),
     revisePhaseOne: vi.fn(),
     listPhaseVersions: vi.fn(),
     getPhaseVersion: vi.fn(),
     createPhaseVersion: vi.fn(),
     exportPhaseHistory: vi.fn(),
+    listRuntimeWorkflowTemplates: vi.fn(),
+    preparePhaseSixImages: vi.fn(),
+    generateStartingImage: vi.fn(),
   },
 }))
 
@@ -262,6 +266,66 @@ function mockHistoryApis() {
     },
     pipeline,
   })
+  vi.mocked(api.generatePhaseOne).mockResolvedValue({
+    pipeline,
+    phase: pipeline.phases[0],
+    completion_message: 'Your complete script is ready for review.',
+  })
+  vi.mocked(api.listRuntimeWorkflowTemplates).mockResolvedValue([])
+  vi.mocked(api.preparePhaseSixImages).mockResolvedValue({
+    status: {
+      shot_count: 1,
+      required_count: 1,
+      assigned_count: 0,
+      approved_count: 0,
+      in_review_count: 0,
+      missing_count: 1,
+      complete: false,
+      phase_7_locked: false,
+      runtime_reachable: null,
+    },
+    message: 'Phase 6 images are ready for local ComfyUI generation; Phase 7 is not artificially locked.',
+  })
+  vi.mocked(api.generateStartingImage).mockResolvedValue({
+    asset: {
+      id: 'asset-1',
+      project_id: 'project-1',
+      kind: 'starting_image',
+      source_type: 'comfyui_generated',
+      managed_uri: '/media/asset-1.png',
+      sha256: 'f'.repeat(64),
+      mime_type: 'image/png',
+      width: 1024,
+      height: 576,
+      duration_sec: null,
+      approval_state: 'in_review',
+      metadata_json: {},
+      original_filename: 'S01A_Opening_image.png',
+      size_bytes: 123,
+      archived_at: null,
+      created_at: '2026-07-19T00:00:00Z',
+      updated_at: '2026-07-19T00:00:00Z',
+      is_duplicate: false,
+    },
+    created: true,
+    duplicate_of_existing: false,
+    shot_id: 'shot-1',
+    previous_asset_id: null,
+    status: {
+      shot_count: 1,
+      required_count: 1,
+      assigned_count: 1,
+      approved_count: 0,
+      in_review_count: 1,
+      missing_count: 0,
+      complete: false,
+      phase_7_locked: false,
+      runtime_reachable: true,
+    },
+    prompt_id: 'prompt-1',
+    model_name: 'flux2_dev_fp8mixed.safetensors',
+    seed: 123,
+  })
   vi.mocked(api.exportPhaseHistory).mockResolvedValue({
     schema_name: 'cineforge.phase-history',
     version: 1,
@@ -442,7 +506,7 @@ describe('ProductionPhases', () => {
     }))
   })
 
-  it('loads SQLite-backed history and retains a current draft iteration', async () => {
+  it('loads SQLite-backed history and regenerates a current Phase 1 iteration', async () => {
     vi.mocked(api.getProductionPipeline).mockResolvedValue(pipeline)
     mockHistoryApis()
     render(<ProductionPhases storyId="story-1" projectId="project-1" data={aggregate} />)
@@ -450,14 +514,18 @@ describe('ProductionPhases', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New iteration' }))
     fireEvent.change(screen.getByPlaceholderText(/Director review/), { target: { value: 'Director review' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Retain current draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate new iteration' }))
 
-    await waitFor(() => expect(api.createPhaseVersion).toHaveBeenCalledTimes(1))
-    expect(api.createPhaseVersion).toHaveBeenCalledWith(
+    await waitFor(() => expect(api.generatePhaseOne).toHaveBeenCalledTimes(1))
+    expect(api.generatePhaseOne).toHaveBeenCalledWith(
       'story-1',
-      1,
-      expect.objectContaining({ label: 'Director review' }),
+      expect.objectContaining({
+        original_prompt: 'A complete source story.',
+        target_duration_sec: 300,
+        requested_by: 'CineForge UI reviewer: Director review',
+      }),
     )
+    expect(api.createPhaseVersion).not.toHaveBeenCalled()
     expect(api.listPhaseVersions).toHaveBeenCalled()
   })
 

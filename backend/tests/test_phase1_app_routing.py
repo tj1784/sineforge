@@ -104,11 +104,22 @@ def _create_app() -> FastAPI:
     return create_app()
 
 
+def _iter_api_routes(routes):
+    """Yield API routes across eager and FastAPI lazy router inclusion."""
+
+    for route in routes:
+        if isinstance(route, APIRoute):
+            yield route
+            continue
+        original_router = getattr(route, "original_router", None)
+        if original_router is not None:
+            yield from _iter_api_routes(original_router.routes)
+
+
 def _method_path_pairs(routes) -> list[tuple[str, str]]:
     return [
         (method, route.path)
-        for route in routes
-        if isinstance(route, APIRoute)
+        for route in _iter_api_routes(routes)
         for method in sorted(route.methods)
     ]
 
@@ -219,7 +230,7 @@ def test_canonical_proposal_api_is_the_only_public_mutation_boundary():
 
 def test_internal_voice_asset_and_gpu_controls_are_not_publicly_mounted():
     mounted_paths = {
-        route.path for route in _create_app().routes if isinstance(route, APIRoute)
+        route.path for route in _iter_api_routes(_create_app().routes)
     }
 
     assert not any(path.startswith("/voices/planning-assets") for path in mounted_paths)

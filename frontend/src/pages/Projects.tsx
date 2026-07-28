@@ -5,11 +5,14 @@ import {
   type PhaseASnapshot,
   type Project,
   type Story,
+  type SulphurProjectWorkspace,
 } from '../api/client'
 import { projectCoverUrl } from '../studio/mediaUrls'
 import { EmptyState, ErrorNotice } from '../components/Cards'
 import { PageHeader } from '../components/Page'
 import { StudioHomeHero } from '../components/StudioHomeHero'
+import { ChapterIntakeForm } from '../components/ChapterIntakeForm'
+import { makeChapterIntakeDraft, type ChapterIntakeDraft } from '../components/chapterIntake'
 import type { PageId } from '../components/AppShell'
 /* PIXEL: Sites project-card density (also loaded last from main.tsx). */
 import '../projects-sites-density.css'
@@ -43,6 +46,8 @@ type ProjectDraft = {
   sourceMode: SourceMode
   baseStory: string
   targetRuntime: number
+  requestedChapterCount: number
+  chapterIntake: ChapterIntakeDraft[]
   audience: string
   genre: string
   tone: string
@@ -61,12 +66,23 @@ type ProjectDraft = {
   contentConstraints: string
 }
 
+const DEFAULT_CHAPTER_COUNT = 3
+const MAX_CHAPTER_COUNT = 50
+
+function makeChapterIntakes(count: number, targetRuntime: number): ChapterIntakeDraft[] {
+  const safeCount = Math.max(1, Math.min(MAX_CHAPTER_COUNT, Math.round(count) || 1))
+  const targetDurationSec = Math.max(6, Math.round((targetRuntime || 300) / safeCount))
+  return Array.from({ length: safeCount }, (_, index) => makeChapterIntakeDraft(index, targetDurationSec))
+}
+
 const EMPTY_DRAFT: ProjectDraft = {
   name: '',
   description: '',
   sourceMode: 'story',
   baseStory: '',
   targetRuntime: 300,
+  requestedChapterCount: DEFAULT_CHAPTER_COUNT,
+  chapterIntake: makeChapterIntakes(DEFAULT_CHAPTER_COUNT, 300),
   audience: 'General audience',
   genre: 'Cinematic narrative',
   tone: 'Grounded, cinematic, human',
@@ -109,6 +125,10 @@ function projectInitials(name: string) {
 
 function formatRuntime(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+function chapterCode(index: number) {
+  return `CH${String(index + 1).padStart(2, '0')}`
 }
 
 function formatUpdated(value: string) {
@@ -235,6 +255,14 @@ function ProjectList({
     <div className="page projects-page">
       {onNavigateStudio ? (
         <StudioHomeHero
+          onCreateProject={async (prompt, idempotencyKey): Promise<SulphurProjectWorkspace> => {
+            const workspace = await api.createProjectFromSulphur({
+              idempotency_key: idempotencyKey,
+              prompt,
+            })
+            onOpenProject?.(workspace.project.id, workspace.project.name)
+            return workspace
+          }}
           onNavigateStudio={(page) => {
             const target =
               summaries.find(({ project }) => project.id === currentProjectId)?.project ??
@@ -388,6 +416,55 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
     update('targetRuntime', Math.max(6, Math.min(3600, Math.max(0, nextMinutes) * 60 + Math.max(0, Math.min(59, nextSeconds)))))
   }
 
+  const setChapterCount = (value: number) => {
+    const nextCount = Math.max(1, Math.min(MAX_CHAPTER_COUNT, Math.round(value) || 1))
+    setDraft((current) => {
+      const nextIntake = [...current.chapterIntake]
+      const targetDurationSec = Math.max(6, Math.round(current.targetRuntime / nextCount))
+      const previousDefaultDuration = Math.max(6, Math.round(current.targetRuntime / current.requestedChapterCount))
+      const untouchedChapterDefaults = nextIntake.slice(0, current.requestedChapterCount).every((chapter, index) => (
+        chapter.title === `Chapter ${index + 1}` &&
+        !chapter.summary.trim() &&
+        !chapter.sourcePrompt.trim() &&
+        !chapter.narrativePurpose.trim() &&
+        !chapter.dramaticProgression.trim() &&
+        !chapter.productionNotes.trim() &&
+        chapter.targetDurationSec === previousDefaultDuration
+      ))
+      for (let index = nextIntake.length; index < nextCount; index += 1) {
+        nextIntake.push(makeChapterIntakeDraft(index, targetDurationSec))
+      }
+      if (untouchedChapterDefaults) {
+        for (let index = 0; index < nextCount; index += 1) {
+          nextIntake[index] = {
+            ...(nextIntake[index] ?? makeChapterIntakeDraft(index, targetDurationSec)),
+            title: `Chapter ${index + 1}`,
+            targetDurationSec,
+          }
+        }
+      }
+      return {
+        ...current,
+        requestedChapterCount: nextCount,
+        chapterIntake: nextIntake,
+      }
+    })
+  }
+
+  const updateChapterIntake = <Key extends keyof ChapterIntakeDraft>(
+    index: number,
+    key: Key,
+    value: ChapterIntakeDraft[Key],
+  ) => {
+    setDraft((current) => {
+      const chapterIntake = [...current.chapterIntake]
+      const fallbackDuration = Math.max(6, Math.round(current.targetRuntime / current.requestedChapterCount))
+      const currentChapter = chapterIntake[index] ?? makeChapterIntakeDraft(index, fallbackDuration)
+      chapterIntake[index] = { ...currentChapter, [key]: value }
+      return { ...current, chapterIntake }
+    })
+  }
+
   const validate = () => {
     if (step === 2 && draft.sourceMode !== 'blank' && !draft.baseStory.trim()) {
       setError(draft.sourceMode === 'import' ? 'Choose a source file or paste its contents.' : 'Add the source story, script, or treatment.')
@@ -419,6 +496,16 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
       const hostedAllowed = draft.privacy === 'Hosted providers allowed'
       const autoTitle = !draft.name.trim()
       const workingTitle = draft.name.trim() || 'CineForge Production'
+      const chapterIntake = draft.chapterIntake.slice(0, draft.requestedChapterCount).map((chapter, index) => ({
+        order_index: index,
+        title: chapter.title.trim() || `Chapter ${index + 1}`,
+        summary: chapter.summary.trim() || null,
+        source_prompt: chapter.sourcePrompt.trim() || null,
+        target_duration_sec: chapter.targetDurationSec,
+        narrative_purpose: chapter.narrativePurpose.trim() || null,
+        dramatic_progression: chapter.dramaticProgression.trim() || null,
+        production_notes: chapter.productionNotes.trim() || null,
+      }))
       const workspace = await api.createProjectWorkspace({
         idempotency_key: idempotencyKey.current,
         name: workingTitle,
@@ -438,6 +525,8 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
         narration_dialogue_preference: draft.narrationDialoguePreference.trim() || null,
         source_fidelity_constraints: draft.sourceFidelityConstraints.trim() || null,
         content_constraints: draft.contentConstraints.trim() || null,
+        requested_chapter_count: draft.requestedChapterCount,
+        chapter_intake: chapterIntake,
         run_phase_one: draft.sourceMode !== 'blank',
         aspect_ratio: draft.aspectRatio,
         preview_width: dimensions.preview[0],
@@ -465,6 +554,13 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
       setSaving(false)
     }
   }
+
+  const visibleChapterIntake = Array.from(
+    { length: draft.requestedChapterCount },
+    (_, index) => draft.chapterIntake[index] ?? makeChapterIntakeDraft(index, Math.max(6, Math.round(draft.targetRuntime / draft.requestedChapterCount))),
+  )
+  const chapterDurationTotal = visibleChapterIntake.reduce((total, chapter) => total + chapter.targetDurationSec, 0)
+  const chapterRuntimeDelta = chapterDurationTotal - draft.targetRuntime
 
   return (
     <form className="page new-project-page" onSubmit={createProject}>
@@ -514,6 +610,53 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                 <label>Seconds<input type="number" min="0" max="59" value={seconds} onChange={(event) => setRuntime(minutes, Number(event.target.value))} /></label>
                 <div><span>Target runtime</span><b>{formatRuntime(draft.targetRuntime)}</b><small>Storyboard duration must reconcile exactly before approval.</small></div>
               </div>
+              <div className="chapter-plan-panel">
+                <header className="chapter-plan-head">
+                  <div>
+                    <span className="eyebrow">CHAPTER INTAKE</span>
+                    <h3>Plan chapters before Phase 1</h3>
+                    <p>Each chapter uses the same three-part intake pattern: foundation, story and timing, then production defaults.</p>
+                  </div>
+                  <label className="chapter-count-control">
+                    <span>Chapters</span>
+                    <input
+                      aria-label="Number of chapters"
+                      type="number"
+                      min="1"
+                      max={MAX_CHAPTER_COUNT}
+                      value={draft.requestedChapterCount}
+                      onChange={(event) => setChapterCount(Number(event.target.value))}
+                    />
+                  </label>
+                </header>
+                <div className="chapter-plan-summary">
+                  <div>
+                    <span>Chapter targets</span>
+                    <b>{formatRuntime(chapterDurationTotal)}</b>
+                  </div>
+                  <small>
+                    {chapterRuntimeDelta === 0
+                      ? 'Chapter timing matches the project runtime.'
+                      : `${chapterRuntimeDelta > 0 ? '+' : '-'}${formatRuntime(Math.abs(chapterRuntimeDelta))} from the project target.`}
+                  </small>
+                </div>
+                <div className="chapter-plan-list">
+                  {visibleChapterIntake.map((chapter, index) => (
+                    <details key={index} open={index < 3}>
+                      <summary>
+                        <span>{chapterCode(index)}</span>
+                        <b>{chapter.title.trim() || `Chapter ${index + 1}`}</b>
+                        <small>{formatRuntime(chapter.targetDurationSec)}</small>
+                      </summary>
+                      <ChapterIntakeForm
+                        draft={chapter}
+                        index={index}
+                        onChange={(key, value) => updateChapterIntake(index, key, value)}
+                      />
+                    </details>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -555,6 +698,7 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
           <dl>
             <div><dt>Source</dt><dd>{SOURCE_OPTIONS.find((option) => option.id === draft.sourceMode)?.title.replace('Start from a ', '')}</dd></div>
             <div><dt>Target runtime</dt><dd>{formatRuntime(draft.targetRuntime)}</dd></div><div><dt>Output</dt><dd>{draft.aspectRatio} · {draft.fps} fps</dd></div>
+            <div><dt>Chapters</dt><dd>{draft.requestedChapterCount}</dd></div>
             <div><dt>Mode</dt><dd>{draft.orchestrationMode}</dd></div><div><dt>Visual style</dt><dd>{draft.visualStyle}</dd></div>
           </dl>
           <div className="creation-boundary"><span>▣</span><p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–7 stay locked. No image, voice, video, ComfyUI, FFmpeg, model-download, or render job can start.</p></div>

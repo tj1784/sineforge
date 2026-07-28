@@ -19,8 +19,8 @@ from backend.app.services.planning.profiles import (
 )
 
 
-# Logical provider identifiers available to the planning engine.
-# Real network providers are out of scope for Phase 1; mock is always available.
+# Logical provider identifiers available to the planning engine. The runtime
+# catalog can add configured local/hosted adapters; mock is always available.
 MOCK_PROVIDER = "mock"
 LOCAL_CLI_PROVIDER = "local_cli"
 HOSTED_PROVIDERS = ("openai", "anthropic", "xai", "qwen")
@@ -126,6 +126,11 @@ def _pick_automatic_provider(
         for entry in available
         if entry.get("privacy_classification") in allowed_privacy_classes
     ]
+    available = sorted(
+        available,
+        key=lambda entry: int(entry.get("routing_priority") or 0),
+        reverse=True,
+    )
     if not available:
         raise PlanningError(
             PlanningErrorCode.ROUTING_FAILED,

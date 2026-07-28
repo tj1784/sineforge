@@ -31,6 +31,19 @@ class ProjectRead(BaseModel):
     persistence: str = "stub"
 
 
+class ProjectChapterIntake(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    order_index: int = Field(ge=0)
+    title: str = Field(min_length=1, max_length=300)
+    summary: str | None = None
+    source_prompt: str | None = None
+    target_duration_sec: float | None = Field(default=None, gt=0, le=21_600)
+    narrative_purpose: str | None = None
+    dramatic_progression: str | None = None
+    production_notes: str | None = None
+
+
 class ProjectWorkspaceCreate(BaseModel):
     """One complete project-creation request before final video rendering."""
 
@@ -54,6 +67,10 @@ class ProjectWorkspaceCreate(BaseModel):
     narration_dialogue_preference: str | None = None
     source_fidelity_constraints: str | None = None
     content_constraints: str | None = None
+    requested_chapter_count: int = Field(default=1, ge=1, le=50)
+    chapter_intake: list[ProjectChapterIntake] = Field(default_factory=list)
+    bootstrap_phase_plan: bool = False
+    auto_approve_phases_through: int | None = Field(default=None, ge=1, le=5)
     run_phase_one: bool = False
     comparison_baseline: PhaseOneBaselineKey | None = None
 
@@ -83,6 +100,13 @@ class ProjectWorkspaceCreate(BaseModel):
             raise ValueError("base_story is required unless source_mode is blank.")
         if self.run_phase_one and not self.base_story.strip():
             raise ValueError("base_story is required when run_phase_one is enabled.")
+        if (self.bootstrap_phase_plan or self.auto_approve_phases_through) and not self.run_phase_one:
+            raise ValueError("Phase plan bootstrap and auto-approval require run_phase_one.")
+        if len(self.chapter_intake) > self.requested_chapter_count:
+            raise ValueError("chapter_intake cannot exceed requested_chapter_count.")
+        chapter_indexes = sorted(chapter.order_index for chapter in self.chapter_intake)
+        if chapter_indexes and chapter_indexes != list(range(len(chapter_indexes))):
+            raise ValueError("chapter_intake order_index values must be contiguous from 0.")
         return self
 
 
@@ -92,6 +116,25 @@ class ProjectWorkspaceRead(BaseModel):
     settings: ProjectStoryboardSettingsRead
     idempotent_replay: bool
     production_pipeline: ProductionPipelineRead | None = None
+
+
+class SulphurProjectPromptCreate(BaseModel):
+    """One complete homepage message to turn into an atomic local project."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(min_length=8, max_length=128)
+    prompt: str = Field(min_length=12, max_length=24_000)
+
+
+class SulphurProjectWorkspaceRead(ProjectWorkspaceRead):
+    intake_provider: Literal["sulphur"] = "sulphur"
+    intake_model: str
+    source_prompt_preserved: Literal[True] = True
+    target_duration_sec: float
+    planned_scene_count: int
+    nominal_scene_duration_sec: Literal[8] = 8
+    clip_duration_range_sec: tuple[Literal[6], Literal[10]] = (6, 10)
 
 
 class CampaignCreate(BaseModel):

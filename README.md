@@ -52,16 +52,21 @@ Start the complete local stack from the repository root:
 .\start-cineforge.cmd
 ```
 
-The trusted launcher starts ComfyUI, the FastAPI backend, and the Vite frontend in that
-order. It reuses services that already pass their full readiness probes, writes logs and
-owned process metadata under `storage/runtime/supervisor/`, and stops only processes it
-started when you press Ctrl+C. Run `.\start-cineforge.cmd --check` for a read-only
-configuration and readiness check.
+The trusted launcher starts or reuses the local Sulphur model API, ComfyUI, the
+ComfyAPI Runner, the FastAPI backend, and the Vite frontend in that order. It
+opens Sineforge in the default browser after all readiness checks pass, writes
+logs and owned process metadata under `storage/runtime/supervisor/`, and stops
+only persistent child processes it started when you press Ctrl+C. Run
+`.\start-cineforge.cmd --check` for a read-only configuration and readiness
+check, or add `--no-browser` to suppress the browser tab. The default startup
+destination is the Sulphur-backed Projects home at `/projects`.
 
 Administrator overrides are supported through `CINEFORGE_COMFYUI_WORKING_DIR`,
-`CINEFORGE_COMFYUI_LAUNCHER`, `CINEFORGE_PYTHON_EXECUTABLE`, and
-`CINEFORGE_NPM_EXECUTABLE`. These values are local configuration only; no API request,
-story text, AI proposal, or prompt can supply an executable path or shell command.
+`CINEFORGE_COMFYUI_LAUNCHER`, `CINEFORGE_COMFY_API_RUNNER_WORKING_DIR`,
+`CINEFORGE_COMFY_API_RUNNER_LAUNCHER`, `CINEFORGE_LMS_EXECUTABLE`,
+`CINEFORGE_PYTHON_EXECUTABLE`, and `CINEFORGE_NPM_EXECUTABLE`. These values are
+local configuration only; no API request, story text, AI proposal, or prompt can
+supply an executable path or shell command.
 Readiness URLs are restricted to loopback HTTP origins, shell metacharacters are rejected
 from command paths, ports and timeouts are range-checked, and a singleton lock prevents
 competing supervisors. Logs rotate at 10 MiB per stream.
@@ -72,7 +77,7 @@ Starting CineForge must also start the explicitly configured external ComfyUI ru
 
 The startup orchestrator must:
 
-1. Read an administrator-configured ComfyUI working directory and launcher path. On the primary Windows workstation, the current runtime is `C:\AI\ComfyUI_windows_portable` and its launcher is `run_nvidia_gpu.bat`.
+1. Read an administrator-configured ComfyUI working directory and launcher path. On the primary Windows workstation, the current runtime is `C:\ComfyUI\BlokeyUI`, its launcher is `run_blokeyui.bat`, and its loopback URL is `http://127.0.0.1:8888`.
 2. Probe `CINEFORGE_COMFYUI_BASE_URL` before launching. If ComfyUI is already healthy, reuse it and do not start a duplicate process.
 3. Start the configured launcher as a hidden background child process with the configured runtime directory as its working directory. AI-authored text must never become a shell command or executable path.
 4. Wait for both the ComfyUI root endpoint and `/object_info` to respond within a bounded timeout. Only then may CineForge report ComfyUI as ready.
@@ -81,6 +86,36 @@ The startup orchestrator must:
 7. Never install, update, download models, mutate custom nodes, or weaken host security as part of auto-start.
 
 Auto-start does not by itself enable generation. Image generation additionally requires an enabled backend worker/submission path, a validated workflow manifest compatible with live `/object_info`, registered model evidence, output collection, and provenance persistence. Video generation remains a separately gated phase.
+
+### Sulphur and ComfyAPI Runner
+
+The primary workstation launcher verifies the exact local
+`sulphur_prompt_enhancer_model-q8_0.gguf`, starts LM Studio's loopback API on
+`127.0.0.1:1234`, and loads the model with full GPU offload when it is not
+already loaded. Sulphur has the highest automatic local planning priority, so
+script structure, story planning, shot planning, and prompt-package tasks use
+it unless a story has an explicit manual provider assignment. Phase 1 also
+requests a structured Sulphur script enhancement and retains the deterministic
+source-faithful package if the model response does not pass the existing QA
+contract.
+
+The Projects homepage composer sends one complete creative message to the local
+Sulphur model. Sulphur extracts a validated title, runtime, audience, genre,
+tone, point of view, visual style, language, format, and production constraints;
+the original message is also preserved verbatim as the story source. Only after
+that intake passes validation does Sineforge call its existing atomic workspace
+creator and run Phase 1. The Phase 1 package records
+`ceil(target_duration_sec / 8)` planned scenes, equalizes their durations to the
+requested total, and requires every generated clip to remain between 6 and 10
+seconds.
+
+ComfyAPI Runner is supervised at `http://127.0.0.1:8022`. Sineforge exposes its
+health in `/health/comfy-api-runner` and `/runtime/status`, provides quick-open
+buttons on the Projects home and Runtime page, and includes a bounded backend
+client for workflow analysis, controlled submission, job status, and an
+explicit user-triggered ComfyUI restart. Restart progress is proxied through
+`/runtime/comfyui/restart`; the runner does not bypass Sineforge's workflow
+validation or public-submission gates.
 
 Run tests:
 

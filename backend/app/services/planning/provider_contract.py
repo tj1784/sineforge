@@ -1,18 +1,19 @@
 """Factual provider discovery and non-mutating routing validation.
 
-The only network-capable operation in this module is the explicit OpenAI
-connection test.  It reads its credential from ``Settings`` at the secret
-boundary, performs one bounded non-destructive HTTP request, and never returns
-response content or exception text.  Catalog reads and routing preflight never
-call any provider.
+The only network-capable operations in this module are explicit, bounded
+connection tests. Hosted credentials remain at the ``Settings`` secret
+boundary; the Sulphur test targets its configured loopback-only LM Studio API.
+Catalog reads and routing preflight never call any provider.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+import json
 import time
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 from uuid import UUID
 
 import httpx
@@ -44,7 +45,7 @@ from backend.app.services.planning.routing import build_routing_snapshot, select
 
 
 MAX_CONNECTION_TEST_RESPONSE_BYTES = 65_536
-CONNECTION_TEST_CAPABLE = frozenset({"mock", "openai"})
+CONNECTION_TEST_CAPABLE = frozenset({"mock", "openai", "sulphur"})
 
 
 class ProviderContractNotFoundError(LookupError):
@@ -186,6 +187,116 @@ class ProviderConnectionTester:
             limits=httpx.Limits(max_connections=1, max_keepalive_connections=0),
         )
 
+    def _test_sulphur(
+        self,
+        *,
+        timeout_sec: float,
+        checked_at: datetime,
+        capabilities: list[str],
+    ) -> ProviderConnectionTestResponse:
+        if not self.settings.sulphur_configured:
+            return self._result(
+                provider_identifier="sulphur",
+                attempted=False,
+                success=False,
+                availability_status="not_configured",
+                checked_at=checked_at,
+                capabilities=capabilities,
+                detail="Sulphur planning is disabled or its configured GGUF is missing.",
+                error_code="not_configured",
+            )
+
+        started_at = time.monotonic()
+        try:
+            parsed = urlsplit(self.settings.sulphur_base_url)
+            models_url = urlunsplit(
+                (parsed.scheme, parsed.netloc, "/api/v1/models", "", "")
+            )
+            with self._client(timeout_sec) as client:
+                response = client.get(
+                    models_url,
+                    timeout=timeout_sec,
+                )
+                content = response.content
+                if len(content) > self.max_response_bytes:
+                    return self._result(
+                        provider_identifier="sulphur",
+                        attempted=True,
+                        success=False,
+                        availability_status="unavailable",
+                        checked_at=checked_at,
+                        capabilities=capabilities,
+                        detail="Sulphur response exceeded the connection-test byte limit.",
+                        started_at=started_at,
+                        error_code="response_too_large",
+                    )
+                if not 200 <= response.status_code < 300:
+                    return self._result(
+                        provider_identifier="sulphur",
+                        attempted=True,
+                        success=False,
+                        availability_status="unavailable",
+                        checked_at=checked_at,
+                        capabilities=capabilities,
+                        detail="LM Studio returned an unexpected status for Sulphur.",
+                        started_at=started_at,
+                        error_code="unexpected_status",
+                    )
+                payload = json.loads(content.decode("utf-8"))
+                entries = payload.get("models") if isinstance(payload, dict) else None
+                loaded = any(
+                    isinstance(item, dict)
+                    and any(
+                        isinstance(instance, dict)
+                        and instance.get("id") == self.settings.sulphur_model_id
+                        for instance in (
+                            item.get("loaded_instances")
+                            if isinstance(item.get("loaded_instances"), list)
+                            else []
+                        )
+                    )
+                    for item in (entries if isinstance(entries, list) else [])
+                )
+                return self._result(
+                    provider_identifier="sulphur",
+                    attempted=True,
+                    success=loaded,
+                    availability_status="available" if loaded else "unavailable",
+                    checked_at=checked_at,
+                    capabilities=capabilities,
+                    detail=(
+                        "The configured Sulphur model is loaded in LM Studio."
+                        if loaded
+                        else "LM Studio is reachable, but the configured Sulphur model is not loaded."
+                    ),
+                    started_at=started_at,
+                    error_code=None if loaded else "model_not_loaded",
+                )
+        except httpx.TimeoutException:
+            return self._result(
+                provider_identifier="sulphur",
+                attempted=True,
+                success=False,
+                availability_status="unavailable",
+                checked_at=checked_at,
+                capabilities=capabilities,
+                detail="Sulphur connection check timed out within the requested bound.",
+                started_at=started_at,
+                error_code="timeout",
+            )
+        except (httpx.TransportError, UnicodeDecodeError, json.JSONDecodeError):
+            return self._result(
+                provider_identifier="sulphur",
+                attempted=True,
+                success=False,
+                availability_status="unavailable",
+                checked_at=checked_at,
+                capabilities=capabilities,
+                detail="Sulphur could not be verified through the loopback LM Studio API.",
+                started_at=started_at,
+                error_code="transport_failed",
+            )
+
     @staticmethod
     def _result(
         *,
@@ -235,6 +346,13 @@ class ProviderConnectionTester:
                 capabilities=capabilities,
                 detail="Deterministic local mock is available; no network call was made.",
                 started_at=started_at,
+            )
+
+        if descriptor.provider_identifier == "sulphur":
+            return self._test_sulphur(
+                timeout_sec=timeout_sec,
+                checked_at=checked_at,
+                capabilities=capabilities,
             )
 
         if descriptor.provider_identifier != "openai":

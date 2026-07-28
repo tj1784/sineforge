@@ -1,4 +1,5 @@
 from pydantic import BaseModel
+from typing import Any
 from uuid import UUID
 
 from backend.app.schemas.assets import PlanningMediaAssetRead
@@ -25,6 +26,10 @@ class StartingImageGenerateRequest(BaseModel):
     requested_by: str = "CineForge local operator"
     seed: int | None = None
     model_name: str | None = None
+    workflow_template_id: UUID | None = None
+    workflow_label: str | None = None
+    workflow_source: str | None = None
+    workflow_api_json: dict[str, Any] | None = None
 
 
 class StartingImageGenerateResponse(BaseModel):

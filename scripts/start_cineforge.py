@@ -2,7 +2,7 @@
 
 This is the trusted bootstrap boundary for local executables. It never accepts
 commands from prompts or API requests; paths come only from administrator-owned
-environment variables or conservative local defaults.
+environment variables, the local `.env` file, or conservative local defaults.
 """
 
 from __future__ import annotations
@@ -19,6 +19,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import webbrowser
 from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Callable
@@ -35,6 +36,56 @@ CREATE_NEW_PROCESS_GROUP = 0x00000200 if os.name == "nt" else 0
 FORBIDDEN_COMMAND_PATH_CHARS = set("\r\n&|<>^`\"%'!()")
 
 
+def apply_primary_workstation_defaults() -> None:
+    """Enable the approved local runtimes when no local override was supplied."""
+
+    defaults = {
+        "CINEFORGE_COMFYUI_BASE_URL": "http://127.0.0.1:8888",
+        "CINEFORGE_COMFYUI_WORKING_DIR": r"C:\ComfyUI\BlokeyUI",
+        "CINEFORGE_COMFYUI_LAUNCHER": r"C:\ComfyUI\BlokeyUI\run_blokeyui.bat",
+        "CINEFORGE_COMFY_API_RUNNER_BASE_URL": "http://127.0.0.1:8022",
+        "CINEFORGE_COMFY_API_RUNNER_WORKING_DIR": r"C:\ComfyUI\BlokeyUI",
+        "CINEFORGE_COMFY_API_RUNNER_LAUNCHER": (
+            r"C:\ComfyUI\BlokeyUI\run_comfy_api_runner.bat"
+        ),
+        "CINEFORGE_LMS_EXECUTABLE": (
+            str(Path.home() / ".lmstudio" / "bin" / "lms.exe")
+        ),
+        "CINEFORGE_SULPHUR_PLANNING_ENABLED": "true",
+        "CINEFORGE_SULPHUR_PHASE_ONE_ENABLED": "true",
+        "CINEFORGE_SULPHUR_BASE_URL": "http://127.0.0.1:1234/v1",
+        "CINEFORGE_SULPHUR_MODEL_ID": "sulphur-2-base",
+        "CINEFORGE_SULPHUR_MODEL_KEY": "sulphur-2-base",
+        "CINEFORGE_SULPHUR_MODEL_PATH": str(
+            Path.home()
+            / ".lmstudio"
+            / "models"
+            / "SulphurAI"
+            / "Sulphur-2-base"
+            / "sulphur_prompt_enhancer_model-q8_0.gguf"
+        ),
+    }
+    for key, value in defaults.items():
+        os.environ.setdefault(key, value)
+
+
+def load_local_env(path: Path = REPO_ROOT / ".env") -> None:
+    """Load simple local CINEFORGE_* defaults without shell expansion."""
+
+    if not path.is_file():
+        return
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key.startswith("CINEFORGE_") or key in os.environ:
+            continue
+        cleaned = value.strip().strip('"').strip("'")
+        os.environ[key] = cleaned
+
+
 @dataclass(frozen=True)
 class Service:
     name: str
@@ -43,6 +94,8 @@ class Service:
     args: tuple[str, ...]
     readiness_urls: tuple[str, ...]
     timeout_seconds: float
+    persistent: bool = True
+    always_start: bool = False
 
 
 @dataclass
@@ -81,7 +134,12 @@ def _timeout(name: str, default: float) -> float:
     return value
 
 
-def _loopback_base_url(name: str, default: str) -> str:
+def _loopback_base_url(
+    name: str,
+    default: str,
+    *,
+    allowed_paths: frozenset[str] = frozenset({"", "/"}),
+) -> str:
     value = os.environ.get(name, default).rstrip("/")
     parsed = urllib.parse.urlsplit(value)
     if parsed.scheme != "http" or not parsed.hostname:
@@ -92,7 +150,7 @@ def _loopback_base_url(name: str, default: str) -> str:
         loopback = parsed.hostname.lower() == "localhost"
     if not loopback or parsed.username or parsed.password:
         raise ValueError(f"{name} must not target a non-loopback host or contain credentials")
-    if parsed.query or parsed.fragment or parsed.path not in {"", "/"}:
+    if parsed.query or parsed.fragment or parsed.path not in allowed_paths:
         raise ValueError(f"{name} must be an origin URL without a path, query, or fragment")
     return value
 
@@ -108,11 +166,19 @@ def _npm_executable() -> Path:
 def build_services() -> list[Service]:
     comfy_root = _env_path(
         "CINEFORGE_COMFYUI_WORKING_DIR",
-        Path(r"C:\AI\ComfyUI_windows_portable"),
+        Path(r"C:\ComfyUI\BlokeyUI"),
     )
     comfy_launcher = _env_path(
         "CINEFORGE_COMFYUI_LAUNCHER",
-        comfy_root / "run_nvidia_gpu.bat",
+        comfy_root / "run_blokeyui.bat",
+    )
+    runner_root = _env_path(
+        "CINEFORGE_COMFY_API_RUNNER_WORKING_DIR",
+        Path(r"C:\ComfyUI\BlokeyUI"),
+    )
+    runner_launcher = _env_path(
+        "CINEFORGE_COMFY_API_RUNNER_LAUNCHER",
+        runner_root / "run_comfy_api_runner.bat",
     )
     python = _env_path(
         "CINEFORGE_PYTHON_EXECUTABLE",
@@ -122,7 +188,20 @@ def build_services() -> list[Service]:
     command_processor = Path(os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe"))
     comfy_base_url = _loopback_base_url(
         "CINEFORGE_COMFYUI_BASE_URL",
-        "http://127.0.0.1:8188",
+        "http://127.0.0.1:8888",
+    )
+    runner_base_url = _loopback_base_url(
+        "CINEFORGE_COMFY_API_RUNNER_BASE_URL",
+        "http://127.0.0.1:8022",
+    )
+    sulphur_base_url = _loopback_base_url(
+        "CINEFORGE_SULPHUR_BASE_URL",
+        "http://127.0.0.1:1234/v1",
+        allowed_paths=frozenset({"", "/", "/v1"}),
+    )
+    sulphur_parts = urllib.parse.urlsplit(sulphur_base_url)
+    sulphur_origin = urllib.parse.urlunsplit(
+        (sulphur_parts.scheme, sulphur_parts.netloc, "", "", "")
     )
     backend_port = _port("CINEFORGE_BACKEND_PORT", 8010)
     frontend_port = _port("CINEFORGE_FRONTEND_PORT", 5174)
@@ -134,6 +213,18 @@ def build_services() -> list[Service]:
     except ValueError as exc:
         raise ValueError("ComfyUI launcher must be located inside CINEFORGE_COMFYUI_WORKING_DIR") from exc
 
+    if runner_launcher.suffix.lower() not in {".bat", ".cmd", ".exe"}:
+        raise ValueError(
+            "ComfyAPI Runner launcher must be an administrator-configured .bat, .cmd, or .exe"
+        )
+    try:
+        runner_launcher.relative_to(runner_root)
+    except ValueError as exc:
+        raise ValueError(
+            "ComfyAPI Runner launcher must be located inside "
+            "CINEFORGE_COMFY_API_RUNNER_WORKING_DIR"
+        ) from exc
+
     if comfy_launcher.suffix.lower() in {".bat", ".cmd"}:
         command = command_processor
         comfy_args = ("/d", "/c", str(comfy_launcher))
@@ -141,7 +232,24 @@ def build_services() -> list[Service]:
         command = comfy_launcher
         comfy_args = ()
 
+    if runner_launcher.suffix.lower() in {".bat", ".cmd"}:
+        runner_command = command_processor
+        runner_args = ("/d", "/c", str(runner_launcher))
+    else:
+        runner_command = runner_launcher
+        runner_args = ()
+
     return [
+        Service(
+            name="sulphur",
+            cwd=REPO_ROOT,
+            executable=python,
+            args=(str(REPO_ROOT / "scripts" / "bootstrap_sulphur.py"),),
+            readiness_urls=(sulphur_origin + "/api/v1/models",),
+            timeout_seconds=_timeout("CINEFORGE_SULPHUR_STARTUP_TIMEOUT_SEC", 600),
+            persistent=False,
+            always_start=True,
+        ),
         Service(
             name="comfyui",
             cwd=comfy_root,
@@ -152,6 +260,21 @@ def build_services() -> list[Service]:
                 comfy_base_url + "/object_info",
             ),
             timeout_seconds=_timeout("CINEFORGE_COMFYUI_STARTUP_TIMEOUT_SEC", 180),
+        ),
+        Service(
+            name="comfy_api_runner",
+            cwd=runner_root,
+            executable=runner_command,
+            args=runner_args,
+            readiness_urls=(
+                runner_base_url
+                + "/api/health?url="
+                + urllib.parse.quote(comfy_base_url, safe=""),
+            ),
+            timeout_seconds=_timeout(
+                "CINEFORGE_COMFY_API_RUNNER_STARTUP_TIMEOUT_SEC",
+                90,
+            ),
         ),
         Service(
             name="backend",
@@ -218,10 +341,16 @@ def validate_service(service: Service) -> None:
         raise FileNotFoundError(f"{service.name}: working directory does not exist: {service.cwd}")
     if not service.executable.is_file():
         raise FileNotFoundError(f"{service.name}: executable does not exist: {service.executable}")
-    if service.name == "comfyui" and service.args:
+    if service.name in {"comfyui", "comfy_api_runner"} and service.args:
         launcher = Path(service.args[-1])
         if not launcher.is_file():
-            raise FileNotFoundError(f"comfyui: launcher does not exist: {launcher}")
+            raise FileNotFoundError(
+                f"{service.name}: launcher does not exist: {launcher}"
+            )
+    if service.name == "sulphur":
+        bootstrap = Path(service.args[0])
+        if not bootstrap.is_file():
+            raise FileNotFoundError(f"sulphur: bootstrap does not exist: {bootstrap}")
 
 
 def _rotate_log(path: Path) -> None:
@@ -321,13 +450,17 @@ def wait_until_ready(
 ) -> None:
     deadline = time.monotonic() + owned.service.timeout_seconds
     while time.monotonic() < deadline:
-        if owned.process.poll() is not None:
-            raise RuntimeError(
-                f"{owned.service.name} exited with code {owned.process.returncode}; "
-                f"see {LOG_ROOT}"
-            )
-        if is_ready(owned.service, probe_fn):
+        exit_code = owned.process.poll()
+        if owned.service.persistent and is_ready(owned.service, probe_fn):
             return
+        if exit_code is not None:
+            if exit_code != 0 or owned.service.persistent:
+                raise RuntimeError(
+                    f"{owned.service.name} exited with code {owned.process.returncode}; "
+                    f"see {LOG_ROOT}"
+                )
+            if is_ready(owned.service, probe_fn):
+                return
         time.sleep(1)
     raise TimeoutError(
         f"{owned.service.name} did not become ready within "
@@ -345,6 +478,8 @@ def write_state(owned: list[OwnedProcess], reused: list[Service]) -> None:
                 "name": item.service.name,
                 "pid": item.process.pid,
                 "owned": True,
+                "persistent": item.service.persistent,
+                "always_start": item.service.always_start,
                 "readiness_urls": item.service.readiness_urls,
             }
             for item in owned
@@ -354,6 +489,8 @@ def write_state(owned: list[OwnedProcess], reused: list[Service]) -> None:
                 "name": service.name,
                 "pid": None,
                 "owned": False,
+                "persistent": service.persistent,
+                "always_start": service.always_start,
                 "readiness_urls": service.readiness_urls,
             }
             for service in reused
@@ -386,7 +523,7 @@ def stop_owned(owned: list[OwnedProcess]) -> None:
             item.stderr.close()
 
 
-def run() -> int:
+def run(*, open_browser: bool = True) -> int:
     services = build_services()
     owned: list[OwnedProcess] = []
     reused: list[Service] = []
@@ -396,7 +533,7 @@ def run() -> int:
         locked = True
         for service in services:
             validate_service(service)
-            if is_ready(service):
+            if not service.always_start and is_ready(service):
                 reused.append(service)
                 print(f"[ready] {service.name}: reusing existing healthy service", flush=True)
                 continue
@@ -408,31 +545,50 @@ def run() -> int:
             write_state(owned, reused)
 
         write_state(owned, reused)
-        frontend_url = services[-1].readiness_urls[0]
+        frontend_url = services[-1].readiness_urls[0].rstrip("/") + "/projects"
         print(f"CineForge is ready: {frontend_url}")
         print(f"Logs: {LOG_ROOT}")
         print("Press Ctrl+C to stop only services started by this supervisor.")
+        if open_browser:
+            webbrowser.open(frontend_url, new=2)
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
         print("\nStopping CineForge-owned services...")
         return 0
     except Exception as exc:
+        if (
+            isinstance(exc, RuntimeError)
+            and "supervisor is already running" in str(exc)
+            and is_ready(services[-1])
+        ):
+            frontend_url = services[-1].readiness_urls[0].rstrip("/") + "/projects"
+            print(f"CineForge is already running: {frontend_url}")
+            if open_browser:
+                webbrowser.open(frontend_url, new=2)
+            return 0
         print(f"Startup failed: {exc}", file=sys.stderr)
         return 1
     finally:
         stop_owned(owned)
-        STATE_PATH.unlink(missing_ok=True)
         if locked:
+            STATE_PATH.unlink(missing_ok=True)
             release_lock()
 
 
 def main() -> int:
+    load_local_env()
+    apply_primary_workstation_defaults()
     parser = argparse.ArgumentParser(description="Start and supervise the CineForge local stack")
     parser.add_argument(
         "--check",
         action="store_true",
         help="validate configuration and report readiness without starting anything",
+    )
+    parser.add_argument(
+        "--no-browser",
+        action="store_true",
+        help="start the stack without opening the CineForge browser tab",
     )
     args = parser.parse_args()
     if args.check:
@@ -446,7 +602,7 @@ def main() -> int:
                 failed = True
                 print(f"{service.name}: invalid: {exc}", file=sys.stderr)
         return 1 if failed else 0
-    return run()
+    return run(open_browser=not args.no_browser)
 
 
 if __name__ == "__main__":
