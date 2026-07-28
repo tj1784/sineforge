@@ -51,6 +51,9 @@ DEFAULT_FLUX_IMAGE_MODEL = "flux2_dev_fp8mixed.safetensors"
 FALLBACK_FLUX_IMAGE_MODEL = "flux2_dev.safetensors"
 DEFAULT_FLUX_TEXT_ENCODER = "mistral_3_small_flux2_bf16.safetensors"
 DEFAULT_FLUX_VAE = "full_encoder_small_decoder.safetensors"
+DEFAULT_FLUX1_CLIP_L = "clip_l.safetensors"
+DEFAULT_FLUX1_T5 = "t5xxl_fp16.safetensors"
+DEFAULT_FLUX1_VAE = "ae.safetensors"
 DETAIL_HAND_LORA = "Detailed_Hands-000001.safetensors"
 
 DEFAULT_STEPS = 30
@@ -64,6 +67,12 @@ DEFAULT_NEGATIVE_PROMPT = (
     "modern clothing, modern buildings, bad hands, extra fingers, missing fingers, "
     "deformed fingers, fused fingers, duplicate limbs, distorted face, low detail, "
     "blurry, text, watermark"
+)
+GENERIC_DEFAULT_NEGATIVE_PROMPT = (
+    "cartoon, illustration, painting, anime, CGI look, plastic skin, waxy skin, "
+    "bad hands, extra fingers, missing fingers, deformed fingers, fused fingers, "
+    "duplicate limbs, duplicated subject, distorted face, low detail, blurry, "
+    "overprocessed HDR, oversaturation, text, captions, logo, watermark"
 )
 
 STYLE_LOCK = (
@@ -593,31 +602,68 @@ def _prompt(
         (package.image_prompt if package else None) or row.shot.visual_description or row.shot.title
     )
     package_negative = (package.negative_prompt if package else None) or ""
-    negative_prompt = f"{DEFAULT_NEGATIVE_PROMPT}, {NEGATIVE_HISTORICAL_GUARDRAIL}, {package_negative}"
+    context = _shot_context_text(row)
+    legacy_historical_story = any(
+        marker in context
+        for marker in (
+            "prodigal",
+            "younger son",
+            "older son",
+            "inheritance demand",
+            "first-century jude",
+            "1st-century jude",
+        )
+    )
+    negative_parts = [
+        DEFAULT_NEGATIVE_PROMPT
+        if legacy_historical_story
+        else GENERIC_DEFAULT_NEGATIVE_PROMPT
+    ]
+    if legacy_historical_story:
+        negative_parts.append(NEGATIVE_HISTORICAL_GUARDRAIL)
+    if package_negative:
+        negative_parts.append(package_negative)
+    negative_prompt = ", ".join(negative_parts)
     package_style_lock = _package_style_text(package.style_lock_prompt if package else None)
     action_boundary = _action_boundary_lock(row)
     location = _visual_text(row.shot.location or row.scene.title)
     story_purpose = _visual_text(row.shot.story_purpose or row.scene.title)
     identity_prompt = _identity_prompt_text(row, characters)
-    positive_parts = [
-        identity_prompt,
-        f"CineForge shot must show this exact story moment: {_narrative_action_overlay(row, archetype)}",
-        _character_color_lock(row),
-        "exactly three adult men visible, no bystanders, no crowd, no floating white particles, clean uninjured faces, no blood, no red face marks, no wounds, no bruises, no injuries, no children",
-        f"Composition: {archetype['prompt']}",
-        STYLE_LOCK,
-        QUALITY_LOCK,
-        action_boundary,
-        f"Shot brief: {image_prompt}",
-        POSITIVE_AVOIDANCE_LOCK,
-        f"Location: {location}",
-        f"Purpose: {story_purpose}",
-        package_style_lock,
-    ]
+    positive_parts = [identity_prompt]
+    if legacy_historical_story:
+        positive_parts.extend(
+            [
+                f"CineForge shot must show this exact story moment: {_narrative_action_overlay(row, archetype)}",
+                _character_color_lock(row),
+                "exactly three adult men visible, no bystanders, no crowd, no floating white particles, clean uninjured faces, no blood, no red face marks, no wounds, no bruises, no injuries, no children",
+                f"Composition: {archetype['prompt']}",
+                STYLE_LOCK,
+                QUALITY_LOCK,
+                action_boundary,
+                f"Shot brief: {image_prompt}",
+                POSITIVE_AVOIDANCE_LOCK,
+            ]
+        )
+    else:
+        positive_parts.extend(
+            [
+                "CineForge shot must show the exact action and subjects in the persisted shot brief",
+                f"Shot brief: {image_prompt}",
+                f"Composition: {archetype['prompt']}",
+            ]
+        )
+    positive_parts.extend(
+        [
+            f"Location: {location}",
+            f"Purpose: {story_purpose}",
+            package_style_lock,
+        ]
+    )
     positive = ". ".join(part for part in positive_parts if part)
     positive = re.sub(r"\s+", " ", positive).strip()
     negative_prompt = re.sub(r"\s+", " ", negative_prompt).strip()
-    return positive[:1400], negative_prompt[:900]
+    prompt_limit = 1400 if legacy_historical_story else 2600
+    return positive[:prompt_limit], negative_prompt[:1200]
 
 
 def _load_source_api_workflow() -> dict[str, Any] | None:
@@ -718,6 +764,15 @@ def _fallback_workflow(
     """
 
     archetype = archetype or _image_archetype("")
+    if not _is_flux2_model(model_name):
+        return _flux1_fallback_workflow(
+            positive_prompt,
+            negative_prompt,
+            seed,
+            filename_prefix,
+            archetype=archetype,
+            model_name=model_name,
+        )
     width = int(archetype.get("width") or DEFAULT_WIDTH)
     height = int(archetype.get("height") or DEFAULT_HEIGHT)
     model_ref: Any = ["1", 0]
@@ -819,6 +874,83 @@ def _fallback_workflow(
         }
 
     return workflow
+
+
+def _is_flux2_model(model_name: str) -> bool:
+    normalized = model_name.lower().replace("\\", "/")
+    return "flux2" in normalized or "flux.2" in normalized
+
+
+def _flux1_fallback_workflow(
+    positive_prompt: str,
+    negative_prompt: str,
+    seed: int,
+    filename_prefix: str,
+    *,
+    archetype: Mapping[str, Any],
+    model_name: str,
+) -> dict[str, dict[str, Any]]:
+    """Executable FLUX.1 spine for installations with the original Dev stack."""
+
+    width = int(archetype.get("width") or DEFAULT_WIDTH)
+    height = int(archetype.get("height") or DEFAULT_HEIGHT)
+    return {
+        "1": {
+            "class_type": "UNETLoader",
+            "inputs": {"unet_name": model_name, "weight_dtype": "default"},
+        },
+        "2": {
+            "class_type": "DualCLIPLoader",
+            "inputs": {
+                "clip_name1": DEFAULT_FLUX1_CLIP_L,
+                "clip_name2": DEFAULT_FLUX1_T5,
+                "type": "flux",
+            },
+        },
+        "3": {
+            "class_type": "VAELoader",
+            "inputs": {"vae_name": DEFAULT_FLUX1_VAE},
+        },
+        "4": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"clip": ["2", 0], "text": positive_prompt},
+        },
+        "5": {
+            "class_type": "FluxGuidance",
+            "inputs": {"conditioning": ["4", 0], "guidance": 3.5},
+        },
+        "6": {
+            "class_type": "CLIPTextEncode",
+            "inputs": {"clip": ["2", 0], "text": negative_prompt},
+        },
+        "7": {
+            "class_type": "EmptySD3LatentImage",
+            "inputs": {"width": width, "height": height, "batch_size": 1},
+        },
+        "8": {
+            "class_type": "KSampler",
+            "inputs": {
+                "model": ["1", 0],
+                "seed": seed,
+                "steps": DEFAULT_STEPS,
+                "cfg": 1.0,
+                "sampler_name": DEFAULT_SAMPLER,
+                "scheduler": "simple",
+                "positive": ["5", 0],
+                "negative": ["6", 0],
+                "latent_image": ["7", 0],
+                "denoise": 1.0,
+            },
+        },
+        "9": {
+            "class_type": "VAEDecode",
+            "inputs": {"samples": ["8", 0], "vae": ["3", 0]},
+        },
+        "10": {
+            "class_type": "SaveImage",
+            "inputs": {"images": ["9", 0], "filename_prefix": filename_prefix},
+        },
+    }
 
 
 def _workflow(

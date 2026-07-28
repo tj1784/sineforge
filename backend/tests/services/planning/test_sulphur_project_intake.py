@@ -95,6 +95,96 @@ def test_scene_count_uses_ceiling_of_seconds_divided_by_eight():
     assert plan.durations_within_generation_range is True
 
 
+def test_explicit_runtime_overrides_sulphur_fallback_arithmetic(tmp_path):
+    source_prompt = (
+        "Create a 60-second short. Use exactly eight 7.5-second visual beats "
+        "and render at 24 fps."
+    )
+    content = {
+        "title": "One Minute",
+        "description": "A one-minute visual short.",
+        "target_duration_sec": 300,
+        "audience": "General audience",
+        "genre": "Drama",
+        "tone": "Grounded",
+        "point_of_view": "Third person",
+        "visual_style": "Photoreal",
+        "production_notes": "",
+        "language": "English",
+        "narration_dialogue_preference": "",
+        "source_fidelity_constraints": "",
+        "content_constraints": "",
+        "aspect_ratio": "16:9",
+        "fps": 24,
+    }
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(content)}}]},
+        )
+    )
+
+    intake = build_sulphur_project_intake(
+        SulphurProjectPromptCreate(
+            idempotency_key="sulphur-runtime-correction",
+            prompt=source_prompt,
+        ),
+        settings=configured_settings(tmp_path),
+        transport=transport,
+    )
+
+    assert intake.brief.target_duration_sec == 60
+    assert intake.workspace_payload.target_duration_sec == 60
+    assert intake.clip_plan.planned_scene_count == 8
+    assert sum(intake.clip_plan.scene_duration_plan_sec) == 60
+
+
+def test_word_and_compound_runtimes_are_deterministic(tmp_path):
+    content = {
+        "title": "Runtime Parsing",
+        "description": "Runtime parser coverage.",
+        "target_duration_sec": 300,
+        "audience": "General audience",
+        "genre": "Drama",
+        "tone": "Grounded",
+        "point_of_view": "Third person",
+        "visual_style": "Photoreal",
+        "production_notes": "",
+        "language": "English",
+        "narration_dialogue_preference": "",
+        "source_fidelity_constraints": "",
+        "content_constraints": "",
+        "aspect_ratio": "16:9",
+        "fps": 24,
+    }
+    transport = httpx.MockTransport(
+        lambda _request: httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": json.dumps(content)}}]},
+        )
+    )
+
+    one_minute = build_sulphur_project_intake(
+        SulphurProjectPromptCreate(
+            idempotency_key="sulphur-runtime-one-minute",
+            prompt="Create a one-minute cinematic short about a train station.",
+        ),
+        settings=configured_settings(tmp_path),
+        transport=transport,
+    )
+    compound = build_sulphur_project_intake(
+        SulphurProjectPromptCreate(
+            idempotency_key="sulphur-runtime-compound",
+            prompt="Create a 2 minute 5 second cinematic short about a courier.",
+        ),
+        settings=configured_settings(tmp_path),
+        transport=transport,
+    )
+
+    assert one_minute.brief.target_duration_sec == 60
+    assert compound.brief.target_duration_sec == 125
+
+
 def test_invalid_sulphur_brief_fails_before_project_creation(tmp_path):
     transport = httpx.MockTransport(
         lambda _request: httpx.Response(

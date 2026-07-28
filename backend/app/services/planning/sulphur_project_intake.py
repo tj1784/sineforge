@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 from typing import Literal
 
 import httpx
@@ -38,6 +39,86 @@ _SYSTEM_PROMPT = (
     "seconds. Do not return analysis, markdown, hidden reasoning, commands, file paths, credentials, "
     "ComfyUI payloads, or executable instructions. This is planning data only."
 )
+
+_NUMBER_WORDS = {
+    "one": 1,
+    "two": 2,
+    "three": 3,
+    "four": 4,
+    "five": 5,
+    "six": 6,
+    "seven": 7,
+    "eight": 8,
+    "nine": 9,
+    "ten": 10,
+    "eleven": 11,
+    "twelve": 12,
+    "thirteen": 13,
+    "fourteen": 14,
+    "fifteen": 15,
+    "sixteen": 16,
+    "seventeen": 17,
+    "eighteen": 18,
+    "nineteen": 19,
+    "twenty": 20,
+}
+
+
+def _explicit_runtime_seconds(prompt: str) -> float | None:
+    """Extract an explicit user runtime without trusting model arithmetic.
+
+    The largest duration is selected so a total such as ``60 seconds`` wins
+    over accompanying clip guidance such as ``8-second scenes``. Compound
+    minute/second expressions are handled as one value.
+    """
+
+    text = prompt.casefold()
+    candidates: list[float] = []
+    compound_spans: list[tuple[int, int]] = []
+    compound_pattern = re.compile(
+        r"\b(?P<minutes>\d+(?:\.\d+)?)\s*[- ]*\s*"
+        r"(?:minutes?|mins?)\s*(?:and\s*)?"
+        r"(?P<seconds>\d+(?:\.\d+)?)\s*[- ]*\s*(?:seconds?|secs?)\b"
+    )
+    for match in compound_pattern.finditer(text):
+        candidates.append(
+            float(match.group("minutes")) * 60 + float(match.group("seconds"))
+        )
+        compound_spans.append(match.span())
+
+    def in_compound(position: int) -> bool:
+        return any(start <= position < end for start, end in compound_spans)
+
+    numeric_pattern = re.compile(
+        r"\b(?P<value>\d+(?:\.\d+)?)\s*[- ]*\s*"
+        r"(?P<unit>hours?|hrs?|minutes?|mins?|seconds?|secs?)\b"
+    )
+    for match in numeric_pattern.finditer(text):
+        if in_compound(match.start()):
+            continue
+        value = float(match.group("value"))
+        unit = match.group("unit")
+        multiplier = 3600 if unit.startswith(("hour", "hr")) else 60 if unit.startswith(("minute", "min")) else 1
+        candidates.append(value * multiplier)
+
+    word_pattern = re.compile(
+        rf"\b(?P<value>{'|'.join(_NUMBER_WORDS)})\s*[- ]+\s*"
+        r"(?P<unit>hours?|minutes?|seconds?)\b"
+    )
+    for match in word_pattern.finditer(text):
+        value = float(_NUMBER_WORDS[match.group("value")])
+        unit = match.group("unit")
+        multiplier = 3600 if unit.startswith("hour") else 60 if unit.startswith("minute") else 1
+        candidates.append(value * multiplier)
+
+    if not candidates:
+        return None
+    runtime = max(candidates)
+    if runtime < 24 or runtime > 21_600:
+        raise SulphurProjectIntakeError(
+            "Explicit project runtime must be between 24 seconds and 6 hours"
+        )
+    return runtime
 
 
 class SulphurProjectIntakeError(RuntimeError):
@@ -206,6 +287,20 @@ def build_sulphur_project_intake(
         raise SulphurProjectIntakeError(
             f"Sulphur could not produce a valid project brief ({exc.__class__.__name__})"
         ) from exc
+
+    explicit_runtime = _explicit_runtime_seconds(prompt)
+    if (
+        explicit_runtime is not None
+        and abs(float(brief.target_duration_sec) - explicit_runtime) > 0.001
+    ):
+        logger.warning(
+            "sulphur_runtime_corrected model_seconds=%s explicit_seconds=%s",
+            brief.target_duration_sec,
+            explicit_runtime,
+        )
+        brief = brief.model_copy(
+            update={"target_duration_sec": explicit_runtime}
+        )
 
     clip_plan = plan_scenes_for_duration(brief.target_duration_sec)
     if not clip_plan.durations_within_generation_range:

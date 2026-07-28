@@ -17,6 +17,8 @@ storage/assets/*
 storage/inputs/*
 storage/benchmarks/*.json
 storage/benchmarks/*.jsonl
+storage/backups/
+storage/exports/
 storage/headless_orchestrator/
 storage/local_jobs/
 storage/planning_media/
