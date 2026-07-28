@@ -55,6 +55,8 @@ type ProjectDraft = {
   visualStyle: string
   aspectRatio: string
   fps: number
+  productionProfileKey: 'ltx_base@1' | 'wan_base@1'
+  stitchStage: 'phase7_before_audio' | 'phase8_before_foley'
   orchestrationMode: string
   privacy: string
   qualityPreference: string
@@ -90,6 +92,8 @@ const EMPTY_DRAFT: ProjectDraft = {
   visualStyle: 'Photoreal cinematic realism',
   aspectRatio: '16:9',
   fps: 24,
+  productionProfileKey: 'ltx_base@1',
+  stitchStage: 'phase7_before_audio',
   orchestrationMode: 'Hybrid',
   privacy: 'Prefer local for bulk work',
   qualityPreference: 'Quality weighted',
@@ -536,6 +540,8 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
         fps: draft.fps,
         captions_enabled: true,
         audio_enabled: true,
+        production_profile_key: draft.productionProfileKey,
+        stitch_stage: draft.stitchStage,
         speaking_rate: 1,
         prefer_hosted_providers: hostedAllowed,
         prefer_local_providers: draft.privacy !== 'Hosted providers allowed' || draft.orchestrationMode === 'Hybrid',
@@ -672,6 +678,31 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                 <label className="full-span">Visual style<input value={draft.visualStyle} onChange={(event) => update('visualStyle', event.target.value)} /></label>
                 <label>Aspect ratio<select value={draft.aspectRatio} onChange={(event) => update('aspectRatio', event.target.value)}><option>16:9</option><option>9:16</option><option>2.39:1</option><option>1:1</option></select></label>
                 <label>Frame rate<select value={draft.fps} onChange={(event) => update('fps', Number(event.target.value))}><option value="24">24 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
+                <label>
+                  Base-model profile
+                  <select
+                    value={draft.productionProfileKey}
+                    onChange={(event) => update('productionProfileKey', event.target.value as ProjectDraft['productionProfileKey'])}
+                  >
+                    <option value="ltx_base@1">LTX Base v1 · qualified compatibility profile</option>
+                    <option value="wan_base@1">WAN Base v1 · runtime qualification required</option>
+                  </select>
+                  <small>
+                    {draft.productionProfileKey === 'wan_base@1'
+                      ? 'WAN is saved with the project but rendering stays fail-closed until its exact workflow, models, nodes, and workstation pass admission.'
+                      : 'Preserves the current LTX rendering contract and remains the qualified default.'}
+                  </small>
+                </label>
+                <label>
+                  Picture stitch stage
+                  <select
+                    value={draft.stitchStage}
+                    onChange={(event) => update('stitchStage', event.target.value as ProjectDraft['stitchStage'])}
+                  >
+                    <option value="phase7_before_audio">Phase 7 · stitch and lock before audio</option>
+                    <option value="phase8_before_foley">Phase 8 · materialize locked EDL before Foley</option>
+                  </select>
+                </label>
                 <label>Orchestration<select value={draft.orchestrationMode} onChange={(event) => update('orchestrationMode', event.target.value)}><option>Hybrid</option><option>Automatic</option><option>Manual</option></select></label>
                 <label>Privacy preference<select value={draft.privacy} onChange={(event) => update('privacy', event.target.value)}><option>Prefer local for bulk work</option><option>Hosted providers allowed</option><option>Local only</option></select></label>
                 <label>Quality preference<select value={draft.qualityPreference} onChange={(event) => update('qualityPreference', event.target.value)}><option>Quality weighted</option><option>Balanced</option><option>Speed weighted</option></select></label>
@@ -699,16 +730,17 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
             <div><dt>Source</dt><dd>{SOURCE_OPTIONS.find((option) => option.id === draft.sourceMode)?.title.replace('Start from a ', '')}</dd></div>
             <div><dt>Target runtime</dt><dd>{formatRuntime(draft.targetRuntime)}</dd></div><div><dt>Output</dt><dd>{draft.aspectRatio} · {draft.fps} fps</dd></div>
             <div><dt>Chapters</dt><dd>{draft.requestedChapterCount}</dd></div>
+            <div><dt>Base model</dt><dd>{draft.productionProfileKey === 'wan_base@1' ? 'WAN Base v1 · qualification required' : 'LTX Base v1'}</dd></div>
             <div><dt>Mode</dt><dd>{draft.orchestrationMode}</dd></div><div><dt>Visual style</dt><dd>{draft.visualStyle}</dd></div>
           </dl>
-          <div className="creation-boundary"><span>▣</span><p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–7 stay locked. No image, voice, video, ComfyUI, FFmpeg, model-download, or render job can start.</p></div>
+          <div className="creation-boundary"><span>▣</span><p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–8 stay locked. No image, voice, video, audio, ComfyUI, FFmpeg, model-download, or render job can start.</p></div>
         </aside>
       </div>
       {saving ? (
         <div className="phase-one-progress" role="status" aria-live="polite">
           <div className="phase-one-progress-card">
             <span className="phase-one-spinner" aria-hidden="true" />
-            <div><span className="eyebrow">PHASE 1 OF EXACTLY 7</span><h2>Building your complete script</h2><p>CineForge is drafting the narrative package and running Phase 1 QA. Approval is never automatic.</p></div>
+            <div><span className="eyebrow">PHASE 1 OF EXACTLY 8</span><h2>Building your complete script</h2><p>CineForge is drafting the narrative package and running Phase 1 QA. Approval is never automatic.</p></div>
             <ol>
               <li className="active"><b>1</b><span>Script and Narrative Development<small>Drafting · QA pending</small></span></li>
               {[
@@ -717,7 +749,8 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                 'Location and Key-Asset Development',
                 'Production Prompt and Workflow Package',
                 'Image and Voice Generation and Mapping',
-                'Video Generation, Assembly, and Final QA',
+                'Video Generation, Continuity, Assembly, and Picture Lock',
+                'Foley, Audio Mix, Final Mux, and Delivery QA',
               ].map((name, index) => <li key={name}><b>{index + 2}</b><span>{name}<small>Locked · not started</small></span></li>)}
             </ol>
           </div>

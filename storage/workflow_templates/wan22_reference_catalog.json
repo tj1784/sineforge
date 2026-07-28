@@ -1,0 +1,90 @@
+{
+  "schema_version": 1,
+  "catalog_id": "wan22-reference-evidence-2026-07-28",
+  "execution_policy": "disabled_evidence_only",
+  "artifacts": [
+    {
+      "artifact_id": "CF-EVID-WAN22-14B-I2V-001",
+      "name": "Official ComfyUI WAN 2.2 14B I2V reference",
+      "artifact_kind": "comfyui_ui_workflow",
+      "provenance_class": "official_reference",
+      "not_author_original": true,
+      "relative_path": "storage/workflow_templates/wan22_14b_i2v_official_reference/workflow_ui_reference.json",
+      "sha256": "6eea9b627b10fcfaf3e75a43aad2c58d8daabdbf72b32ede1602c668cac376bb",
+      "archive_name": "SineForge_Article_Workflow_Recovery_2026-07-28.zip",
+      "archive_entry": "recovered_workflows/official_video_wan2_2_14B_i2v.json",
+      "official_source_url": "https://github.com/Comfy-Org/workflow_templates/blob/8e53edd8a810694c35c92accda40c4dccfb965ae/templates/video_wan2_2_14B_i2v.json",
+      "official_source_commit": "8e53edd8a810694c35c92accda40c4dccfb965ae",
+      "capabilities": [
+        "image_to_video",
+        "wan_2_2_14b",
+        "high_low_noise_stages"
+      ],
+      "api_format": false,
+      "runtime_qualified": false,
+      "enabled": false,
+      "qualification_blockers": [
+        "Load and review in the exact active ComfyUI installation.",
+        "Validate every required node class and input against /object_info.",
+        "Resolve and hash models, text encoder, VAE, and optional LoRAs.",
+        "Export a distinct Save (API Format) workflow and semantic manifest.",
+        "Pass one-segment smoke, resource, quality, and license gates."
+      ]
+    },
+    {
+      "artifact_id": "CF-EVID-WAN22-14B-FLF2V-001",
+      "name": "Official ComfyUI WAN 2.2 14B first/last-frame reference",
+      "artifact_kind": "comfyui_ui_workflow",
+      "provenance_class": "official_reference",
+      "not_author_original": true,
+      "relative_path": "storage/workflow_templates/wan22_14b_flf2v_official_reference/workflow_ui_reference.json",
+      "sha256": "9fb579e07caff9081c14a4c0e3b983e210aa7d976f83f1c2758d2ad6ed949fdf",
+      "archive_name": "SineForge_Article_Workflow_Recovery_2026-07-28.zip",
+      "archive_entry": "recovered_workflows/official_video_wan2_2_14B_flf2v.json",
+      "official_source_url": "https://github.com/Comfy-Org/workflow_templates/blob/8e53edd8a810694c35c92accda40c4dccfb965ae/templates/video_wan2_2_14B_flf2v.json",
+      "official_source_commit": "8e53edd8a810694c35c92accda40c4dccfb965ae",
+      "capabilities": [
+        "first_last_frame",
+        "continuity_bridge",
+        "wan_2_2_14b",
+        "high_low_noise_stages"
+      ],
+      "api_format": false,
+      "runtime_qualified": false,
+      "enabled": false,
+      "qualification_blockers": [
+        "Load and review in the exact active ComfyUI installation.",
+        "Validate every required node class and input against /object_info.",
+        "Resolve and hash models, text encoder, VAE, and optional LoRAs.",
+        "Export a distinct Save (API Format) workflow and semantic manifest.",
+        "Pass first/last-frame, boundary, resource, quality, and license gates."
+      ]
+    },
+    {
+      "artifact_id": "CF-EVID-WAN22-ARTICLE-001",
+      "name": "Recovered article reconstruction evidence manifest",
+      "artifact_kind": "reconstruction_manifest",
+      "provenance_class": "recovery_evidence",
+      "not_author_original": true,
+      "relative_path": "storage/workflow_templates/wan22_article_reconstruction_evidence/reconstruction_manifest.json",
+      "sha256": "051d4541a158c1759a52b7a23247f08636ffeff9507c47ef00a066dcdd13b8f5",
+      "archive_name": "SineForge_Article_Workflow_Recovery_2026-07-28.zip",
+      "archive_entry": "recovered_workflows/article_reconstruction_manifest.json",
+      "official_source_url": null,
+      "official_source_commit": null,
+      "capabilities": [
+        "provenance",
+        "article_derived_continuity_policy",
+        "reference_profile_settings"
+      ],
+      "api_format": false,
+      "runtime_qualified": false,
+      "enabled": false,
+      "qualification_blockers": [
+        "This is evidence and planning metadata, not a ComfyUI graph.",
+        "Article-derived and forensic-inference fields require independent qualification.",
+        "Referenced workflows and assets must be admitted separately."
+      ]
+    }
+  ]
+}

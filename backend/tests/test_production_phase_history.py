@@ -77,12 +77,12 @@ def _story(db: Session) -> Story:
     return story
 
 
-def test_seven_phase_contract_and_baselines(db_session: Session):
+def test_eight_phase_contract_and_baselines(db_session: Session):
     story = _story(db_session)
     pipeline = production_phases.get_pipeline(db_session, story.id)
-    assert pipeline.exact_phase_count == 7
-    assert len(pipeline.phases) == 7
-    assert [p.phase_number for p in pipeline.phases] == [1, 2, 3, 4, 5, 6, 7]
+    assert pipeline.exact_phase_count == 8
+    assert len(pipeline.phases) == 8
+    assert [p.phase_number for p in pipeline.phases] == [1, 2, 3, 4, 5, 6, 7, 8]
     assert all(p.version_count >= 1 for p in pipeline.phases)
     assert all(
         p.latest_version and p.latest_version.source == "baseline"
@@ -97,7 +97,7 @@ def test_manual_append_all_phases_unique_and_immutable(db_session: Session):
     story = _story(db_session)
     production_phases.get_pipeline(db_session, story.id)
     prior_rows: dict[int, list[tuple]] = {}
-    for phase_number in range(1, 8):
+    for phase_number in range(1, 9):
         rows = list(
             db_session.scalars(
                 select(ProductionPhaseVersion)
@@ -135,6 +135,14 @@ def test_manual_append_all_phases_unique_and_immutable(db_session: Session):
         assert created.version.source == "manual"
         assert created.version.previous_version_id == prior_rows[phase_number][-1][0]
         assert created.version.verified is True
+        if phase_number == 8:
+            assert created.version.output_json["picture"][
+                "production_profile_key"
+            ] == "ltx_base@1"
+            assert (
+                created.version.output_json["picture"]["stitch_stage"]
+                == "phase7_before_audio"
+            )
 
     # Prior rows unchanged byte-for-byte on tracked fields
     for phase_number, expected in prior_rows.items():
@@ -204,13 +212,13 @@ def test_export_complete_or_fail_and_routes(client: TestClient, db_session: Sess
     body = created.json()
     assert body["version"]["label"] == "Location pass"
     assert body["version"]["source"] == "manual"
-    assert body["pipeline"]["exact_phase_count"] == 7
+    assert body["pipeline"]["exact_phase_count"] == 8
 
     export = client.get(f"/production/stories/{story.id}/versions/export")
     assert export.status_code == 200
     payload = export.json()
     assert payload["integrity"]["verified"] is True
-    assert payload["integrity"]["iteration_count"] >= 8
+    assert payload["integrity"]["iteration_count"] >= 9
     assert payload["story_id"] == str(story.id)
     assert set(payload["integrity"]["phase_counts"].keys()) == {
         "1",
@@ -220,6 +228,7 @@ def test_export_complete_or_fail_and_routes(client: TestClient, db_session: Sess
         "5",
         "6",
         "7",
+        "8",
     }
 
 
@@ -276,6 +285,28 @@ def test_phase_six_approval_does_not_artificially_gate_local_generation_or_phase
     assert phase_seven["approved_at"] is None
     assert phase_seven["is_locked"] is False
 
+    phase_seven_approval = client.post(
+        f"/production/stories/{story.id}/phases/7/approve",
+        json={
+            "approved_by": "CineForge QA",
+            "notes": "Planning approval only; no picture-lock media evidence.",
+        },
+    )
+    assert phase_seven_approval.status_code == 200, phase_seven_approval.text
+    phase_eight = phase_seven_approval.json()["pipeline"]["phases"][7]
+    assert phase_eight["lifecycle_state"] == "not_started"
+    assert phase_eight["is_locked"] is True
+    assert "immutable picture lock" in phase_eight["locked_reason"]
+
+    blocked_phase_eight = client.post(
+        f"/production/stories/{story.id}/phases/8/approve",
+        json={"approved_by": "CineForge QA"},
+    )
+    assert blocked_phase_eight.status_code == 422
+    assert "Planning approval alone is not media evidence" in (
+        blocked_phase_eight.json()["detail"]
+    )
+
     approval_logs = list(
         db_session.scalars(
             select(AuditLog)
@@ -283,5 +314,5 @@ def test_phase_six_approval_does_not_artificially_gate_local_generation_or_phase
             .order_by(AuditLog.created_at)
         )
     )
-    assert len(approval_logs) == 6
+    assert len(approval_logs) == 7
     assert all(log.details["media_generated"] is False for log in approval_logs)

@@ -527,7 +527,7 @@ PRODUCTION_PHASE_LIFECYCLE_STATES = (
 
 
 class ProductionPhase(UUIDMixin, StoryboardTimestampMixin, Base):
-    """Canonical seven-phase lifecycle ledger for one story.
+    """Canonical eight-phase lifecycle ledger for one story.
 
     Completion and approval intentionally remain separate.  ``is_stale`` is
     orthogonal to lifecycle state so an upstream revision can preserve, rather
@@ -553,7 +553,7 @@ class ProductionPhase(UUIDMixin, StoryboardTimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("story_id", "phase_number", name="uq_production_phase_story_number"),
         CheckConstraint(
-            "phase_number >= 1 AND phase_number <= 7",
+            "phase_number >= 1 AND phase_number <= 8",
             name="ck_production_phase_number",
         ),
         CheckConstraint(
@@ -954,6 +954,15 @@ class ProjectStoryboardSettings(UUIDMixin, StoryboardTimestampMixin, Base):
     fps: Mapped[float] = mapped_column(Numeric, nullable=False)
     captions_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     audio_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    production_profile_key: Mapped[str] = mapped_column(
+        String(128), default="ltx_base@1", nullable=False
+    )
+    production_profile_snapshot_json: Mapped[dict] = mapped_column(
+        json_type(), default=dict, nullable=False
+    )
+    stitch_stage: Mapped[str] = mapped_column(
+        String(32), default="phase7_before_audio", nullable=False
+    )
     prefer_hosted_providers: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     prefer_local_providers: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     allow_model_download: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -975,6 +984,14 @@ class ProjectStoryboardSettings(UUIDMixin, StoryboardTimestampMixin, Base):
         CheckConstraint("final_width > 0", name="ck_pss_final_width_positive"),
         CheckConstraint("final_height > 0", name="ck_pss_final_height_positive"),
         CheckConstraint("fps > 0", name="ck_pss_fps_positive"),
+        CheckConstraint(
+            "production_profile_key <> ''",
+            name="ck_pss_production_profile_key_nonempty",
+        ),
+        CheckConstraint(
+            "stitch_stage IN ('phase7_before_audio', 'phase8_before_foley')",
+            name="ck_pss_stitch_stage",
+        ),
         CheckConstraint("settings_version > 0", name="ck_pss_settings_version_positive"),
     )
 

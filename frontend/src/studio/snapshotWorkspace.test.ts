@@ -122,6 +122,81 @@ describe('snapshotWorkspace historical isolation', () => {
     expect(workspace?.characters).toEqual([])
   })
 
+  it('keeps legacy Phase 7 assembly snapshots readable', () => {
+    const detail = baseDetail({
+      snapshot_schema_version: 1,
+      phase_number: 7,
+      phase_name: 'Video Generation, Assembly, and Final QA',
+      output_json: {
+        schema_name: 'cineforge.production_phase_snapshot',
+        snapshot_schema_version: 1,
+        phase_number: 7,
+        story_id: 'story-1',
+        project_id: 'project-1',
+        assembly: {
+          planned_runtime_sec: 30,
+          qa_state: 'not_evaluated',
+        },
+      },
+    })
+
+    const result = workspaceFromHistoricalDetail(detail, {
+      storyId: 'story-1',
+      projectId: 'project-1',
+      phaseNumber: 7,
+    })
+
+    expect(result.error).toBeNull()
+    expect(result.workspace?.completeness.complete).toBe(true)
+    expect(result.workspace?.picture?.planned_runtime_sec).toBe(30)
+    expect(result.workspace?.assembly?.planned_runtime_sec).toBe(30)
+  })
+
+  it('maps schema v2 picture and audio-delivery domains without conflating them', () => {
+    const phaseSeven = baseDetail({
+      snapshot_schema_version: 2,
+      phase_number: 7,
+      phase_name: 'Video Generation, Continuity, Assembly, and Picture Lock',
+      output_json: {
+        schema_name: 'cineforge.production_phase_snapshot',
+        snapshot_schema_version: 2,
+        phase_number: 7,
+        story_id: 'story-1',
+        project_id: 'project-1',
+        picture: { picture_locked: true, qa_state: 'passed' },
+      },
+    })
+    const phaseEight = baseDetail({
+      snapshot_schema_version: 2,
+      phase_number: 8,
+      phase_name: 'Foley, Audio Mix, Final Mux, and Delivery QA',
+      output_json: {
+        schema_name: 'cineforge.production_phase_snapshot',
+        snapshot_schema_version: 2,
+        phase_number: 8,
+        story_id: 'story-1',
+        project_id: 'project-1',
+        audio_delivery: { delivery_ready: true, qa_state: 'passed' },
+      },
+    })
+
+    const picture = workspaceFromHistoricalDetail(phaseSeven, {
+      storyId: 'story-1',
+      projectId: 'project-1',
+      phaseNumber: 7,
+    }).workspace
+    const audio = workspaceFromHistoricalDetail(phaseEight, {
+      storyId: 'story-1',
+      projectId: 'project-1',
+      phaseNumber: 8,
+    }).workspace
+
+    expect(picture?.picture?.picture_locked).toBe(true)
+    expect(picture?.audioDelivery).toBeNull()
+    expect(audio?.audioDelivery?.delivery_ready).toBe(true)
+    expect(audio?.picture).toBeNull()
+  })
+
   it('keeps current-draft aggregate metrics independent from historical workspace', () => {
     const aggregate = {
       revision: 'r1',

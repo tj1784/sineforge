@@ -5,6 +5,7 @@ import {
   type PhaseOnePackage,
   type PhaseVersionDetail,
   type PhaseVersionSummary,
+  type ProjectStoryboardSettings,
   type ProductionPipeline,
   type RuntimeCatalogWorkflowTemplate,
   type StartingImageGenerateRequest,
@@ -100,6 +101,7 @@ export function ProductionPhases({
   onNavigate,
 }: ProductionPhasesProps) {
   const [pipeline, setPipeline] = useState<ProductionPipeline | null>(null)
+  const [productionSettings, setProductionSettings] = useState<ProjectStoryboardSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -173,6 +175,22 @@ export function ProductionPhases({
     const timer = window.setTimeout(() => void load(), 0)
     return () => window.clearTimeout(timer)
   }, [load])
+
+  useEffect(() => {
+    let active = true
+    if (!projectId) {
+      setProductionSettings(null)
+      return () => { active = false }
+    }
+    void api.getSettings(projectId)
+      .then((settings) => {
+        if (active) setProductionSettings(settings)
+      })
+      .catch(() => {
+        if (active) setProductionSettings(null)
+      })
+    return () => { active = false }
+  }, [projectId])
 
   useEffect(() => {
     let active = true
@@ -361,11 +379,12 @@ export function ProductionPhases({
   }
 
   const handlePhaseKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const phaseCount = pipeline?.phases.length || 8
     let nextIndex: number
-    if (event.key === 'ArrowRight') nextIndex = (index + 1) % 7
-    else if (event.key === 'ArrowLeft') nextIndex = (index + 6) % 7
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % phaseCount
+    else if (event.key === 'ArrowLeft') nextIndex = (index + phaseCount - 1) % phaseCount
     else if (event.key === 'Home') nextIndex = 0
-    else if (event.key === 'End') nextIndex = 6
+    else if (event.key === 'End') nextIndex = phaseCount - 1
     else return
     event.preventDefault()
     selectPhase(nextIndex + 1, true)
@@ -701,7 +720,7 @@ export function ProductionPhases({
     )
   }
 
-  if (loading) return <LoadingState title="Loading the seven-phase production contract…" />
+  if (loading) return <LoadingState title="Loading the eight-phase production contract…" />
   if (!pipeline) return error ? <ErrorNotice message={error} /> : null
 
   const currentSnapshotMetrics = snapshotMetricsFromWorkspace(currentWorkspace)
@@ -724,17 +743,17 @@ export function ProductionPhases({
     <section className="production-contract" aria-labelledby="production-contract-title">
       <div className="production-contract-heading">
         <div>
-          <span className="eyebrow">EXACT SEVEN-PHASE PRODUCTION</span>
+          <span className="eyebrow">EXACT EIGHT-PHASE PRODUCTION</span>
           <h2 id="production-contract-title">From one prompt to a controlled film production</h2>
           <p>
-            All seven UI workspaces are available for review. Iteration history is stored in local SQLite
+            All eight UI workspaces are available for review. Iteration history is stored in local SQLite
             via the production API—not browser IndexedDB. Design navigation never launches media generation or rendering.
           </p>
         </div>
-        <span className="phase-count-pill">7 complete workspaces</span>
+        <span className="phase-count-pill">8 complete workspaces</span>
       </div>
 
-      <div className="production-phase-rail" role="tablist" aria-label="Seven production phases">
+      <div className="production-phase-rail" role="tablist" aria-label="Eight production phases">
         {pipeline.phases.map((phase, index) => {
           const count = phase.version_count
             ?? versionsByPhase[phase.phase_number]?.length
@@ -1303,6 +1322,8 @@ export function ProductionPhases({
             workspace={historical ? (incompleteReason ? null : historicalWorkspace) : currentWorkspace}
             historical={historical}
             incompleteReason={historical ? incompleteReason : null}
+            productionProfileKey={productionSettings?.production_profile_key}
+            stitchStage={productionSettings?.stitch_stage}
             onNavigate={onNavigate}
           />
         ) : null}

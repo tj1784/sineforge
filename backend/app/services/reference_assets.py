@@ -15,10 +15,13 @@ from __future__ import annotations
 
 import binascii
 import hashlib
+import json
 import mimetypes
 import os
 import re
+import shutil
 import struct
+import subprocess
 import uuid
 import wave
 import zlib
@@ -70,6 +73,7 @@ ASSET_KINDS = frozenset(
         "character_reference",
         "art_direction_reference",
         "starting_image",
+        "video_source",
         "voice_source",
         "story_document",
     }
@@ -112,6 +116,19 @@ KIND_POLICY: dict[str, dict] = {
         "extensions": frozenset({".wav", ".mp3", ".ogg", ".flac"}),
         "max_bytes": 50 * 1024 * 1024,
         "category": "audio",
+    },
+    "video_source": {
+        "mimes": frozenset(
+            {
+                "video/mp4",
+                "video/quicktime",
+                "video/x-matroska",
+                "video/webm",
+            }
+        ),
+        "extensions": frozenset({".mp4", ".mov", ".mkv", ".webm"}),
+        "max_bytes": 4 * 1024 * 1024 * 1024,
+        "category": "video",
     },
     "story_document": {
         "mimes": frozenset(
@@ -1082,6 +1099,259 @@ def upload_asset_from_fileobj(
         consent_confirmed=consent_confirmed,
         extra_metadata=extra_metadata,
     )
+
+
+def _probe_video_path(path: Path) -> dict:
+    ffprobe = shutil.which("ffprobe")
+    if ffprobe is None:
+        raise ReferenceAssetError(
+            "ffprobe is required to ingest a managed video source."
+        )
+    try:
+        result = subprocess.run(
+            [
+                ffprobe,
+                "-v",
+                "error",
+                "-print_format",
+                "json",
+                "-show_format",
+                "-show_streams",
+                str(path),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=60,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ReferenceAssetError("Video probe could not be completed.") from error
+    if result.returncode != 0:
+        detail = (result.stderr or "").strip()
+        raise ReferenceAssetError(
+            f"Video source failed ffprobe validation{f': {detail}' if detail else '.'}"
+        )
+    try:
+        payload = json.loads(result.stdout)
+    except (TypeError, json.JSONDecodeError) as error:
+        raise ReferenceAssetError("Video probe returned invalid JSON.") from error
+
+    streams = payload.get("streams")
+    if not isinstance(streams, list):
+        raise ReferenceAssetError("Video probe did not return a stream list.")
+    video_stream = next(
+        (
+            stream
+            for stream in streams
+            if isinstance(stream, dict) and stream.get("codec_type") == "video"
+        ),
+        None,
+    )
+    if not isinstance(video_stream, dict):
+        raise ReferenceAssetError("Uploaded media does not contain a video stream.")
+    width = int(video_stream.get("width") or 0)
+    height = int(video_stream.get("height") or 0)
+    if width <= 0 or height <= 0:
+        raise ReferenceAssetError("Video stream dimensions are missing or invalid.")
+
+    format_payload = payload.get("format")
+    format_payload = format_payload if isinstance(format_payload, dict) else {}
+    duration_value = format_payload.get("duration") or video_stream.get("duration")
+    try:
+        duration_sec = float(duration_value)
+    except (TypeError, ValueError) as error:
+        raise ReferenceAssetError("Video duration is missing or invalid.") from error
+    if not duration_sec > 0:
+        raise ReferenceAssetError("Video duration must be positive.")
+
+    audio_stream = next(
+        (
+            stream
+            for stream in streams
+            if isinstance(stream, dict) and stream.get("codec_type") == "audio"
+        ),
+        None,
+    )
+    return {
+        "width": width,
+        "height": height,
+        "duration_sec": duration_sec,
+        "metadata_json": {
+            "extraction": "ffprobe",
+            "technical_qa": "probe_passed",
+            "full_decode_required_before_picture_lock": True,
+            "video_stream": {
+                "codec_name": video_stream.get("codec_name"),
+                "codec_long_name": video_stream.get("codec_long_name"),
+                "profile": video_stream.get("profile"),
+                "pix_fmt": video_stream.get("pix_fmt"),
+                "avg_frame_rate": video_stream.get("avg_frame_rate"),
+                "r_frame_rate": video_stream.get("r_frame_rate"),
+                "time_base": video_stream.get("time_base"),
+                "nb_frames": video_stream.get("nb_frames"),
+            },
+            "audio_stream_present": audio_stream is not None,
+            "audio_stream": (
+                {
+                    "codec_name": audio_stream.get("codec_name"),
+                    "sample_rate": audio_stream.get("sample_rate"),
+                    "channels": audio_stream.get("channels"),
+                    "channel_layout": audio_stream.get("channel_layout"),
+                    "time_base": audio_stream.get("time_base"),
+                }
+                if isinstance(audio_stream, dict)
+                else None
+            ),
+        },
+    }
+
+
+def upload_video_asset_from_fileobj(
+    db: Session,
+    *,
+    project_id: UUID,
+    fileobj: BinaryIO,
+    original_filename: str | None,
+    content_type: str | None,
+    source_type: str = "user_upload",
+    max_read_bytes: int | None = None,
+) -> tuple[PlanningMediaAsset, bool]:
+    """Stream a bounded video into managed storage and persist probe evidence.
+
+    The file object is copied in chunks; the complete video is never loaded into
+    application memory. The original upload is retained byte-for-byte under a
+    generated managed name. Full decode remains a required Phase 7 QA gate.
+    """
+
+    _project_or_error(db, project_id)
+    kind = "video_source"
+    policy = KIND_POLICY[kind]
+    safe_name = _sanitize_original_filename(original_filename)
+    extension = _extension_for(safe_name, content_type)
+    mime_type = _normalize_mime(content_type, extension)
+    if extension not in policy["extensions"]:
+        raise ReferenceAssetError(
+            f"Extension '{extension or '(none)'}' is not allowed for video_source."
+        )
+    if not mime_type or mime_type not in policy["mimes"]:
+        raise ReferenceAssetError(
+            f"MIME type '{mime_type or '(none)'}' is not allowed for video_source."
+        )
+
+    limit = int(max_read_bytes or policy["max_bytes"])
+    if limit <= 0 or limit > int(policy["max_bytes"]):
+        raise ReferenceAssetError("Video upload byte limit is invalid.")
+
+    token = uuid.uuid4().hex
+    destination_dir = _kind_dir(project_id, kind)
+    partial_path = (destination_dir / f".{token}.partial").resolve()
+    final_path = (destination_dir / f"{token}{extension}").resolve()
+    root = managed_root()
+    for candidate in (partial_path, final_path):
+        try:
+            candidate.relative_to(root)
+        except ValueError as error:
+            raise ReferenceAssetError(
+                "Generated video path escapes managed storage."
+            ) from error
+
+    digest = hashlib.sha256()
+    received = 0
+    try:
+        with partial_path.open("xb") as handle:
+            while True:
+                chunk = fileobj.read(min(1024 * 1024, limit - received + 1))
+                if not chunk:
+                    break
+                received += len(chunk)
+                if received > limit:
+                    raise ReferenceAssetError(
+                        f"Upload exceeds the {limit}-byte video_source limit."
+                    )
+                digest.update(chunk)
+                handle.write(chunk)
+            handle.flush()
+            os.fsync(handle.fileno())
+        _validate_kind_and_payload(
+            kind,
+            size_bytes=received,
+            mime_type=mime_type,
+            extension=extension,
+        )
+        content_hash = digest.hexdigest()
+        if sha256_file(partial_path) != content_hash:
+            raise ReferenceAssetError(
+                "Managed video failed SHA-256 verification after streaming."
+            )
+        probe = _probe_video_path(partial_path)
+
+        existing = find_duplicate(db, project_id, kind, content_hash)
+        if existing is not None:
+            existing_path = resolve_managed_path(existing)
+            if (
+                not existing_path.is_file()
+                or sha256_file(existing_path) != content_hash
+            ):
+                raise ReferenceAssetError(
+                    "Matching managed video bytes are missing or changed; "
+                    "refusing implicit replacement."
+                )
+            partial_path.unlink(missing_ok=True)
+            _audit(
+                db,
+                entity_id=existing.id,
+                action="managed_video_duplicate_reused",
+                details={"sha256": content_hash, "size_bytes": received},
+            )
+            db.commit()
+            db.refresh(existing)
+            return existing, False
+
+        partial_path.replace(final_path)
+        asset = PlanningMediaAsset(
+            project_id=project_id,
+            kind=kind,
+            source_type=source_type,
+            managed_uri=build_managed_uri(
+                project_id, kind, final_path.name
+            ),
+            sha256=content_hash,
+            mime_type=mime_type,
+            width=probe["width"],
+            height=probe["height"],
+            duration_sec=probe["duration_sec"],
+            approval_state="draft",
+            metadata_json=probe["metadata_json"],
+            original_filename=safe_name,
+            size_bytes=received,
+        )
+        db.add(asset)
+        db.flush()
+        _audit(
+            db,
+            entity_id=asset.id,
+            action="managed_video_source_uploaded",
+            details={
+                "sha256": content_hash,
+                "size_bytes": received,
+                "mime_type": mime_type,
+                "duration_sec": probe["duration_sec"],
+                "width": probe["width"],
+                "height": probe["height"],
+                "full_decode_required_before_picture_lock": True,
+            },
+        )
+        db.commit()
+        db.refresh(asset)
+        return asset, True
+    except Exception:
+        db.rollback()
+        for candidate in (partial_path, final_path):
+            try:
+                candidate.unlink(missing_ok=True)
+            except OSError:
+                pass
+        raise
 
 
 def get_asset(

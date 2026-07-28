@@ -849,7 +849,7 @@
 
 .production-phase-rail {
   display: grid;
-  grid-template-columns: repeat(7, minmax(145px, 1fr));
+  grid-template-columns: repeat(8, minmax(145px, 1fr));
   gap: 7px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -2325,7 +2325,7 @@
 
 /* Gold responsive breakpoints for residual aliases */
 @media (max-width: 1500px) {
-  .production-phase-rail { grid-template-columns: repeat(7, minmax(170px, 1fr)); }
+  .production-phase-rail { grid-template-columns: repeat(8, minmax(170px, 1fr)); }
   .phase-metrics.six { grid-template-columns: repeat(3, 1fr); }
   .phase-frame-grid,
   .phase-start-frame-grid { grid-template-columns: repeat(3, 1fr); }
@@ -2360,7 +2360,7 @@
   .phase-count-pill,
   .phase-workspace-meta-pill { justify-self: start; }
   .production-phase-rail {
-    grid-template-columns: repeat(7, minmax(245px, 78vw));
+    grid-template-columns: repeat(8, minmax(245px, 78vw));
     margin-right: -14px;
     padding-right: 14px;
   }
@@ -2392,7 +2392,7 @@
 /* --- responsive phase rail (Sites-like, no bloat) --- */
 @media (max-width: 1200px) {
   .production-phase-rail {
-    grid-template-columns: repeat(7, minmax(160px, 1fr)) !important;
+    grid-template-columns: repeat(8, minmax(160px, 1fr)) !important;
   }
   .phase-metrics.six,
   .phase-one-metrics {
@@ -2401,7 +2401,7 @@
 }
 @media (max-width: 900px) {
   .production-phase-rail {
-    grid-template-columns: repeat(7, minmax(200px, 78vw)) !important;
+    grid-template-columns: repeat(8, minmax(200px, 78vw)) !important;
     overflow-x: auto !important;
   }
   .phase-metrics.six,

@@ -127,6 +127,9 @@ def test_workspace_api_creates_and_reloads_all_wizard_values(client: TestClient,
     assert settings["fps"] == 30
     assert settings["captions_enabled"] is False
     assert settings["audio_enabled"] is True
+    assert settings["production_profile_key"] == "ltx_base@1"
+    assert settings["production_profile_snapshot_json"]["execution_qualified"] is True
+    assert settings["stitch_stage"] == "phase7_before_audio"
     assert settings["speaking_rate"] == 1.15
     assert settings["prefer_hosted_providers"] is True
     assert settings["prefer_local_providers"] is True
@@ -142,6 +145,31 @@ def test_workspace_api_creates_and_reloads_all_wizard_values(client: TestClient,
     assert _count(db_session, Project) == 1
     assert _count(db_session, Story) == 1
     assert _count(db_session, ProjectStoryboardSettings) == 1
+
+
+def test_workspace_persists_wan_profile_without_claiming_runtime_qualification(
+    client: TestClient,
+) -> None:
+    response = client.post(
+        "/projects/workspace",
+        json=_payload(
+            idempotency_key="project-workspace-wan-profile-001",
+            production_profile_key="wan_base@1",
+            stitch_stage="phase8_before_foley",
+        ),
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    settings = client.get(
+        f"/projects/{body['project']['id']}/storyboard-settings"
+    ).json()
+    assert settings["production_profile_key"] == "wan_base@1"
+    assert settings["production_profile_snapshot_json"]["status"] == (
+        "qualification_required"
+    )
+    assert settings["production_profile_snapshot_json"]["execution_qualified"] is False
+    assert settings["stitch_stage"] == "phase8_before_foley"
 
 
 def test_workspace_preserves_chapter_creation_guidance(client: TestClient):

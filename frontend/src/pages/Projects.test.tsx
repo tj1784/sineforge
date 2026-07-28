@@ -63,6 +63,8 @@ describe('new project workspace', () => {
     fireEvent.change(screen.getByLabelText('Audience'), { target: { value: 'Families' } })
     fireEvent.change(screen.getByLabelText('Aspect ratio'), { target: { value: '2.39:1' } })
     fireEvent.change(screen.getByLabelText('Frame rate'), { target: { value: '30' } })
+    fireEvent.change(screen.getByLabelText(/Base-model profile/), { target: { value: 'wan_base@1' } })
+    fireEvent.change(screen.getByLabelText('Picture stitch stage'), { target: { value: 'phase8_before_foley' } })
     fireEvent.change(screen.getByLabelText('Privacy preference'), {
       target: { value: 'Hosted providers allowed' },
     })
@@ -82,6 +84,8 @@ describe('new project workspace', () => {
       fps: 30,
       captions_enabled: true,
       audio_enabled: true,
+      production_profile_key: 'wan_base@1',
+      stitch_stage: 'phase8_before_foley',
       speaking_rate: 1,
       prefer_hosted_providers: true,
       prefer_local_providers: true,

@@ -8,7 +8,28 @@ Reviewed implementation baseline: `codex/sulphur-comfy-home` at `894f59fc7d40c1b
 
 Default-branch comparison baseline: `master` at `40363216015cf3f25d7b2700ca4db6aeb49e59b0`
 
-Document status: architecture and implementation plan only; no WAN, Foley, database, or UI implementation is performed by this document
+Document status: approved architecture and implementation plan. The repository now
+contains the contract-first implementation described in the status table below;
+hardware-dependent render, Foley, FFmpeg, and admission work remains gated by the
+runtime qualification backlog.
+
+## Implementation status
+
+| Capability | Repository status | Runtime status |
+|---|---|---|
+| `ltx_base@1` compatibility profile | Implemented and regression tested | Qualified by the preserved legacy contract |
+| `wan_base@1` production profile | Implemented, versioned, visible, and fail-closed | `qualification_required`; not advertised as executable |
+| Exact eight-phase lifecycle | Implemented in ORM, schemas, services, API responses, frontend, and additive Alembic migration | No renderer is enabled merely by migrating |
+| Phase 7 subscene/EDL/picture-lock contracts | Implemented with exact frame math and plan-only APIs | WAN rendering and FFmpeg picture execution require local admission |
+| Managed existing/silent-video ingest | Implemented as bounded streaming into managed project storage with hash and `ffprobe` evidence | Full decode remains mandatory before picture lock |
+| Phase 7/8 stitch-stage choice | Persisted and exposed in settings/UI | The execution worker and durable run ledger remain gated |
+| Phase 8 Foley-window and audio-QA contracts | Implemented with rational PTS, 48 kHz sample ranges, deterministic attempt metadata, and plan-only APIs | Hunyuan generation, mix/master, final mux, and delivery execution require local admission |
+| Frontend Phase 7/8 workspaces | Implemented without fabricating generated media | Runtime-dependent controls remain visibly unavailable until evidence exists |
+
+The implementation deliberately separates “contract exists” from “renderer is
+qualified.” Any remaining item that requires exact local models, ComfyUI custom
+nodes, GPU/VRAM measurement, full media decode, or FFmpeg execution is recorded
+in `docs/IMPLEMENTATION_BACKLOG.md` with an evidence-based exit criterion.
 
 ## 1. Executive decision
 

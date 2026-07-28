@@ -134,7 +134,7 @@ def test_historical_versions_immutable_after_current_mutation(db_session: Sessio
     production_phases.get_pipeline(db_session, story.id)
 
     retained: dict[int, tuple[str, tuple]] = {}
-    for phase_number in range(1, 8):
+    for phase_number in range(1, 9):
         created = production_phases.create_phase_version(
             db_session,
             story.id,

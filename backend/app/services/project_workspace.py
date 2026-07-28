@@ -21,7 +21,10 @@ from backend.app.schemas.api import ProjectWorkspaceCreate
 from backend.app.schemas.production import PhaseApproveRequest, PhaseOneGenerationInput
 from backend.app.services import production_phases
 from backend.app.services.sulphur_storyboard_bootstrap import bootstrap_from_phase_one
-from backend.app.services.storyboard_settings import default_settings_values
+from backend.app.services.storyboard_settings import (
+    default_settings_values,
+    production_profile_settings_values,
+)
 
 
 class ProjectWorkspaceConflictError(ValueError):
@@ -145,6 +148,8 @@ def _new_settings(project_id, payload: ProjectWorkspaceCreate) -> ProjectStorybo
             "fps": payload.fps,
             "captions_enabled": payload.captions_enabled,
             "audio_enabled": payload.audio_enabled,
+            "production_profile_key": payload.production_profile_key,
+            "stitch_stage": payload.stitch_stage,
             "speaking_rate": payload.speaking_rate,
             "prefer_hosted_providers": payload.prefer_hosted_providers,
             "prefer_local_providers": payload.prefer_local_providers,
@@ -168,6 +173,7 @@ def _new_settings(project_id, payload: ProjectWorkspaceCreate) -> ProjectStorybo
         "bootstrap_phase_plan": payload.bootstrap_phase_plan,
         "auto_approve_phases_through": payload.auto_approve_phases_through,
     }
+    values.update(production_profile_settings_values(payload.production_profile_key))
     return ProjectStoryboardSettings(project_id=project_id, **values)
 
 

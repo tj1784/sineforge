@@ -54,6 +54,8 @@ export type ProjectWorkspaceCreatePayload = {
   fps: number
   captions_enabled: boolean
   audio_enabled: boolean
+  production_profile_key?: 'ltx_base@1' | 'wan_base@1'
+  stitch_stage?: 'phase7_before_audio' | 'phase8_before_foley'
   speaking_rate: number
   prefer_hosted_providers: boolean
   prefer_local_providers: boolean
@@ -791,6 +793,9 @@ export type ProjectStoryboardSettings = {
   fps: number
   captions_enabled: boolean
   audio_enabled: boolean
+  production_profile_key: 'ltx_base@1' | 'wan_base@1'
+  production_profile_snapshot_json: Record<string, unknown>
+  stitch_stage: 'phase7_before_audio' | 'phase8_before_foley'
   prefer_hosted_providers: boolean
   prefer_local_providers: boolean
   allow_model_download: boolean
@@ -1017,7 +1022,7 @@ export type ProductionPhase = {
 export type ProductionPipeline = {
   story_id: string
   project_id: string
-  exact_phase_count: 7
+  exact_phase_count: 8
   phases: ProductionPhase[]
   completion_message: string | null
 }
@@ -1898,6 +1903,22 @@ export const api = {
 
   listStartingImageAssets: (projectId: string) =>
     optionalRequest<PlanningMediaAssetList>(`/assets/projects/${projectId}?kind=starting_image`),
+  listVideoSourceAssets: (projectId: string) =>
+    optionalRequest<PlanningMediaAssetList>(`/assets/projects/${projectId}?kind=video_source`),
+  uploadVideoSourceAsset: (projectId: string, file: File) => {
+    const query = new URLSearchParams({
+      original_filename: file.name,
+      source_type: 'user_upload',
+    })
+    return optionalRequest<PlanningMediaAssetUpload>(
+      `/video/phase-7/projects/${projectId}/sources/upload?${query}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      },
+    )
+  },
   listArtDirectionReferenceAssets: (projectId: string) =>
     optionalRequest<PlanningMediaAssetList>(
       `/assets/projects/${projectId}?kind=art_direction_reference`,

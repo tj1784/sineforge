@@ -1,4 +1,4 @@
-"""Contracts for CineForge's exact seven-phase production lifecycle."""
+"""Contracts for CineForge's exact eight-phase production lifecycle."""
 
 from __future__ import annotations
 
@@ -170,7 +170,7 @@ class ProductionPhaseRead(BaseModel):
 class ProductionPipelineRead(BaseModel):
     story_id: UUID
     project_id: UUID
-    exact_phase_count: Literal[7] = 7
+    exact_phase_count: Literal[8] = 8
     phases: list[ProductionPhaseRead]
     completion_message: str | None = None
 

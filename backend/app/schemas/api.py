@@ -12,8 +12,12 @@ from backend.app.schemas.storyboard_settings import (
     DEFAULT_FPS,
     DEFAULT_PREVIEW_HEIGHT,
     DEFAULT_PREVIEW_WIDTH,
+    DEFAULT_PRODUCTION_PROFILE_KEY,
     DEFAULT_SPEAKING_RATE,
+    DEFAULT_STITCH_STAGE,
+    ProductionProfileKey,
     ProjectStoryboardSettingsRead,
+    StitchStage,
 )
 from backend.app.schemas.production import PhaseOneBaselineKey, ProductionPipelineRead
 
@@ -82,6 +86,8 @@ class ProjectWorkspaceCreate(BaseModel):
     fps: float = Field(default=DEFAULT_FPS, gt=0)
     captions_enabled: bool = True
     audio_enabled: bool = True
+    production_profile_key: ProductionProfileKey = DEFAULT_PRODUCTION_PROFILE_KEY
+    stitch_stage: StitchStage = DEFAULT_STITCH_STAGE
     speaking_rate: float = Field(default=DEFAULT_SPEAKING_RATE, gt=0)
     prefer_hosted_providers: bool = False
     prefer_local_providers: bool = True

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -17,6 +18,11 @@ DEFAULT_PREVIEW_HEIGHT = 720
 DEFAULT_FINAL_WIDTH = 1920
 DEFAULT_FINAL_HEIGHT = 1080
 DEFAULT_FPS = 24.0
+DEFAULT_PRODUCTION_PROFILE_KEY = "ltx_base@1"
+DEFAULT_STITCH_STAGE = "phase7_before_audio"
+
+ProductionProfileKey = Literal["ltx_base@1", "wan_base@1"]
+StitchStage = Literal["phase7_before_audio", "phase8_before_foley"]
 
 DEFAULT_CONTINUITY_POLICY: dict = {
     "require_starting_image_when_flagged": True,
@@ -65,6 +71,9 @@ class ProjectStoryboardSettingsBase(BaseModel):
     fps: float = Field(default=DEFAULT_FPS, gt=0)
     captions_enabled: bool = True
     audio_enabled: bool = True
+    production_profile_key: ProductionProfileKey = DEFAULT_PRODUCTION_PROFILE_KEY
+    production_profile_snapshot_json: dict = Field(default_factory=dict)
+    stitch_stage: StitchStage = DEFAULT_STITCH_STAGE
     prefer_hosted_providers: bool = False
     prefer_local_providers: bool = True
     allow_model_download: bool = False
