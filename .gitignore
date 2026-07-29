@@ -21,6 +21,8 @@ storage/backups/
 storage/exports/
 storage/headless_orchestrator/
 storage/local_jobs/
+storage/api_workflows/
+storage/api_workflow_archive/
 storage/planning_media/
 storage/projects/
 storage/runtime/

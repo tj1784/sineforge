@@ -604,6 +604,94 @@ export type RuntimeCatalogWorkflowTemplate = {
   claims: Record<string, boolean>
 }
 
+export type ApiCallerWorkflowSummary = {
+  id: string
+  name: string
+  version: string
+  description: string | null
+  source_kind: string | null
+  source_id: string | null
+  source_filename: string | null
+  node_count: number
+  sha256: string
+  created_at: string
+  updated_at: string
+}
+
+export type ApiCallerWorkflowDetail = ApiCallerWorkflowSummary & {
+  workflow: Record<string, ApiCallerWorkflowNode>
+}
+
+export type ApiCallerWorkflowNode = {
+  class_type: string
+  inputs: Record<string, unknown>
+  _meta?: {
+    title?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+export type ApiCallerEditableField = {
+  nodeId: string
+  classType: string
+  title: string
+  input: string
+  value: string | number | boolean
+  valueType: 'str' | 'int' | 'float' | 'bool' | string
+  label: string
+}
+
+export type ApiCallerAnalysis = {
+  ok: boolean
+  format: string
+  queueable: boolean
+  nodeCount: number
+  editable: ApiCallerEditableField[]
+  mediaTargets: ApiCallerEditableField[]
+  promptFields: ApiCallerEditableField[]
+  outputNodes: Array<{
+    nodeId: string
+    classType: string
+    title: string
+  }>
+  modelRefs: Array<{
+    nodeId: string
+    title: string
+    classType: string
+    input: string
+    name: string
+    folder: string
+  }>
+}
+
+export type ApiCallerRuntime = {
+  ok: boolean
+  comfy_url: string
+  runner_url: string
+  runner: {
+    status: string
+    reachable: boolean
+    comfy_connected: boolean
+    error?: string
+  }
+}
+
+export type ApiCallerImportResult = {
+  ok: boolean
+  imported: number
+  updated: number
+  skipped: number
+  workflows: ApiCallerWorkflowSummary[]
+}
+
+export type ApiCallerRunResult = Record<string, unknown> & {
+  ok?: boolean
+  jobId?: string
+  queueCount?: number
+  promptIds?: string[]
+}
+
 export type RuntimeCatalogSummary = {
   models: number
   model_variants: number
@@ -1103,6 +1191,63 @@ export type StartingImageGenerateResponse = {
   seed: number
 }
 
+export type ReferenceImageGenerateResponse = {
+  asset: PlanningMediaAsset
+  created: boolean
+  duplicate_of_existing: boolean
+  entity_type: string
+  entity_id: string | null
+  label: string
+  prompt_id: string | null
+  model_name: string
+  seed: number
+}
+
+export type PhaseFiveHandoffGenerateResponse = {
+  status: PhaseSixImageStatus
+  message: string
+  character_count: number
+  asset_count: number
+  scene_count: number
+  generated: {
+    characters: ReferenceImageGenerateResponse[]
+    assets: ReferenceImageGenerateResponse[]
+    scenes: StartingImageGenerateResponse[]
+  }
+}
+
+export type PhaseSevenVideoQueueRequest = {
+  requested_by?: string
+  seed?: number | null
+  workflow_label?: string | null
+  workflow_source?: string | null
+  workflow_api_json?: Record<string, unknown> | null
+}
+
+export type PhaseSevenVideoQueuedJob = {
+  shot_id: string
+  starting_image_asset_id: string
+  runner_job_id: string
+  shot_code: string
+  prompt: string
+  negative_prompt: string
+  seed: number
+  frame_count: number
+  input_image: string
+  output_prefix: string
+}
+
+export type PhaseSevenVideoQueueResponse = {
+  queued_count: number
+  blocked_count: number
+  required_count: number
+  message: string
+  runner_url: string
+  workflow_label: string
+  jobs: PhaseSevenVideoQueuedJob[]
+  blockers: string[]
+}
+
 export type VoiceProfileCreatePayload = {
   name: string
   setup_mode: VoiceSetupMode
@@ -1596,6 +1741,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ approved_by: requestedBy, notes: 'Phase 6 planning-image completion required.' }),
     }),
+  generatePhaseFiveHandoff: (
+    storyId: string,
+    payload: StartingImageGenerateRequest = {},
+  ) =>
+    request<PhaseFiveHandoffGenerateResponse>(
+      `/production/stories/${storyId}/phase6/images/handoff`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
   generateStartingImage: (
     storyId: string,
     shotId: string,
@@ -1603,6 +1759,17 @@ export const api = {
   ) =>
     request<StartingImageGenerateResponse>(
       `/production/stories/${storyId}/phase6/images/shots/${shotId}/generate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
+  queuePhaseSevenVideos: (
+    storyId: string,
+    payload: PhaseSevenVideoQueueRequest = {},
+  ) =>
+    request<PhaseSevenVideoQueueResponse>(
+      `/production/stories/${storyId}/phase7/videos/queue`,
       {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -1977,6 +2144,64 @@ export const api = {
     optionalRequest<LocalModelInventory>('/runtime-catalog/local-model-inventory'),
   listRuntimeWorkflowTemplates: () =>
     optionalRequest<RuntimeCatalogWorkflowTemplate[]>('/runtime-catalog/workflow-templates'),
+  listApiCallerWorkflows: () =>
+    request<ApiCallerWorkflowSummary[]>('/api-caller/workflows'),
+  getApiCallerWorkflow: (workflowId: string) =>
+    request<ApiCallerWorkflowDetail>(`/api-caller/workflows/${encodeURIComponent(workflowId)}`),
+  createApiCallerWorkflow: (payload: {
+    name: string
+    version?: string
+    description?: string | null
+    source_filename?: string | null
+    workflow: Record<string, unknown>
+  }) =>
+    request<ApiCallerWorkflowDetail>('/api-caller/workflows', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateApiCallerWorkflow: (
+    workflowId: string,
+    payload: {
+      name?: string
+      version?: string
+      description?: string | null
+      workflow?: Record<string, unknown>
+    },
+  ) =>
+    request<ApiCallerWorkflowDetail>(`/api-caller/workflows/${encodeURIComponent(workflowId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  removeApiCallerWorkflow: (workflowId: string) =>
+    request<{ ok: boolean; id: string; name: string; archived: boolean }>(
+      `/api-caller/workflows/${encodeURIComponent(workflowId)}`,
+      { method: 'DELETE' },
+    ),
+  analyzeApiCallerWorkflow: (workflow: Record<string, unknown>) =>
+    request<ApiCallerAnalysis>('/api-caller/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ workflow }),
+    }),
+  runApiCallerWorkflow: (payload: {
+    workflow: Record<string, unknown>
+    workflow_name: string
+    queue_count: number
+    merge_movie: boolean
+    vary_seed: boolean
+    save_latents: boolean
+  }) =>
+    request<ApiCallerRunResult>('/api-caller/run', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getApiCallerJob: (jobId: string) =>
+    request<Record<string, unknown>>(`/api-caller/jobs/${encodeURIComponent(jobId)}`),
+  getApiCallerRuntime: () => request<ApiCallerRuntime>('/api-caller/runtime'),
+  importApiCallerRunnerWorkflows: (workflowIds?: string[]) =>
+    request<ApiCallerImportResult>('/api-caller/import-runner', {
+      method: 'POST',
+      body: JSON.stringify({ workflow_ids: workflowIds ?? null }),
+    }),
 
   listProviderProfiles: () => request<ProviderProfile[]>('/storyboard-crud/provider-profiles'),
   listPlanningProviders: () => request<ProviderCatalogResponse>('/providers'),

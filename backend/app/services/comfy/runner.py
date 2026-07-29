@@ -77,6 +77,10 @@ class ComfyAPIRunnerClient:
         *,
         comfy_url: str,
         workflow_name: str = "cineforge",
+        queue_count: int = 1,
+        merge_movie: bool = False,
+        vary_seed: bool = False,
+        save_latents: bool = False,
     ) -> dict[str, Any]:
         """Submit only from an explicitly mutation-enabled controlled context."""
 
@@ -91,10 +95,10 @@ class ComfyAPIRunnerClient:
                 "comfyUrl": comfy_url.rstrip("/"),
                 "runMode": "direct",
                 "workflowName": workflow_name,
-                "queueCount": 1,
-                "mergeMovie": False,
-                "varySeed": False,
-                "saveLatents": False,
+                "queueCount": max(1, min(int(queue_count), 50)),
+                "mergeMovie": bool(merge_movie),
+                "varySeed": bool(vary_seed),
+                "saveLatents": bool(save_latents),
             },
         )
         response.raise_for_status()
@@ -124,6 +128,18 @@ class ComfyAPIRunnerClient:
 
     async def get_job(self, job_id: str) -> dict[str, Any]:
         response = await self._client.get(f"/api/job/{job_id}")
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {"ok": False}
+
+    async def list_static_workflows(self) -> dict[str, Any]:
+        response = await self._client.get("/api/static-workflows")
+        response.raise_for_status()
+        payload = response.json()
+        return payload if isinstance(payload, dict) else {"ok": False, "workflows": []}
+
+    async def get_static_workflow(self, workflow_id: str) -> dict[str, Any]:
+        response = await self._client.get(f"/api/static-workflows/{workflow_id}")
         response.raise_for_status()
         payload = response.json()
         return payload if isinstance(payload, dict) else {"ok": False}

@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from backend.app.api.routes import (
+    api_caller,
     audio,
     assets,
     campaigns,
@@ -23,6 +24,7 @@ from backend.app.api.routes import (
 
 
 api_router = APIRouter()
+api_router.include_router(api_caller.router)
 api_router.include_router(health.router)
 api_router.include_router(audio.router)
 api_router.include_router(storyboard_settings.router)

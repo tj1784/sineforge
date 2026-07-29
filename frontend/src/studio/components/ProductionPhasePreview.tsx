@@ -1213,6 +1213,27 @@ function PhaseSevenPreview({
     'idle' | 'uploading' | 'complete' | 'error'
   >('idle')
   const [videoUploadMessage, setVideoUploadMessage] = useState('')
+  const [videoQueueState, setVideoQueueState] = useState<
+    'idle' | 'queueing' | 'complete' | 'blocked' | 'error'
+  >('idle')
+  const [videoQueueMessage, setVideoQueueMessage] = useState('')
+  const startingAssetsById = useMemo(
+    () => new Map((workspace?.planningMedia ?? []).map((asset) => [asset.id, asset])),
+    [workspace],
+  )
+  const videoMissingImageRows = shots.filter((row) => !row.shot.starting_image_asset_id)
+  const videoUnapprovedImageRows = shots.filter((row) => {
+    const assetId = row.shot.starting_image_asset_id
+    if (!assetId) return false
+    return startingAssetsById.get(assetId)?.approval_state !== 'approved'
+  })
+  const videoQueueBlockedReason = !shots.length
+    ? 'No planned shots are available for video generation.'
+    : videoMissingImageRows.length
+      ? `${videoMissingImageRows.length} shot${videoMissingImageRows.length === 1 ? '' : 's'} still need a starting image.`
+      : videoUnapprovedImageRows.length
+        ? `${videoUnapprovedImageRows.length} starting image${videoUnapprovedImageRows.length === 1 ? '' : 's'} still need approval.`
+        : null
 
   async function uploadVideoSource() {
     if (!workspace?.projectId || !videoFile || historical) return
@@ -1239,6 +1260,29 @@ function PhaseSevenPreview({
     }
   }
 
+  async function queueVideoPrompts() {
+    if (!workspace?.storyId || historical || videoQueueBlockedReason) return
+    setVideoQueueState('queueing')
+    setVideoQueueMessage('Submitting all approved shot prompts to ComfyAPI Runner…')
+    try {
+      const result = await api.queuePhaseSevenVideos(workspace.storyId, {
+        requested_by: 'CineForge Phase 7 video handoff',
+      })
+      if (result.blocked_count || result.blockers.length) {
+        setVideoQueueState('blocked')
+        setVideoQueueMessage(`${result.message} ${result.blockers.slice(0, 3).join(' ')}`)
+        return
+      }
+      setVideoQueueState('complete')
+      setVideoQueueMessage(
+        `${result.message} Open ComfyAPI Runner to watch ${result.queued_count} job${result.queued_count === 1 ? '' : 's'}.`,
+      )
+    } catch (error) {
+      setVideoQueueState('error')
+      setVideoQueueMessage(error instanceof Error ? error.message : 'Video queue submission failed.')
+    }
+  }
+
   return (
     <div className="phase-workspace">
       <PhasePreviewHeader
@@ -1261,6 +1305,45 @@ function PhaseSevenPreview({
           detail="Phase 8 must consume an immutable picture-lock reference"
         />
       </div>
+
+      {!historical ? (
+        <section className="phase-final-qa" aria-label="Generate video prompts">
+          <header className="phase-subheading">
+            <div>
+              <span>LOCAL VIDEO HANDOFF</span>
+              <h4>Queue all approved image-to-video prompts</h4>
+              <p>
+                Once every planned shot has an approved starting image, this submits the full Phase 7 prompt batch
+                to ComfyAPI Runner. Audio, Foley, stitching, and picture lock stay separate.
+              </p>
+            </div>
+            <span
+              className="status-pill"
+              data-status={videoQueueState === 'complete' ? 'complete' : videoQueueBlockedReason ? 'blocked' : 'draft'}
+            >
+              {videoQueueState === 'queueing' ? 'queueing' : videoQueueBlockedReason ? 'blocked' : videoQueueState}
+            </span>
+          </header>
+          <div className="phase-footer-actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={Boolean(videoQueueBlockedReason) || videoQueueState === 'queueing'}
+              onClick={() => void queueVideoPrompts()}
+            >
+              {videoQueueState === 'queueing' ? 'Queueing video prompts…' : 'Generate video'}
+            </button>
+            <button type="button" className="btn secondary" onClick={() => onNavigate?.('images')}>
+              Review starting images
+            </button>
+            <button type="button" className="btn secondary" onClick={() => onNavigate?.('workflows')}>
+              Review workflow
+            </button>
+          </div>
+          {videoQueueBlockedReason ? <p role="status">{videoQueueBlockedReason}</p> : null}
+          {videoQueueMessage ? <p role="status">{videoQueueMessage}</p> : null}
+        </section>
+      ) : null}
 
       <div className="phase-inline-tabs phase-major-tabs" role="tablist" aria-label="Phase 7 picture-lock view">
         {(['timeline', 'review', 'manifest'] as const).map((tab) => (

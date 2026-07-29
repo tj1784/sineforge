@@ -179,8 +179,13 @@ export function ProductionPhases({
   useEffect(() => {
     let active = true
     if (!projectId) {
-      setProductionSettings(null)
-      return () => { active = false }
+      const timer = window.setTimeout(() => {
+        if (active) setProductionSettings(null)
+      }, 0)
+      return () => {
+        active = false
+        window.clearTimeout(timer)
+      }
     }
     void api.getSettings(projectId)
       .then((settings) => {
@@ -646,36 +651,35 @@ export function ProductionPhases({
         await loadPhaseHistory(5)
       }
       const workflowPayload = phaseFiveWorkflowPayload()
-      const prepared = await api.preparePhaseSixImages(storyId, 'CineForge Phase 5 workflow handoff')
       const rows = data?.chapters.flatMap((chapter) =>
         chapter.scenes.flatMap((scene) =>
           scene.shots.map((shot) => ({ chapter, scene, shot })),
         ),
       ) ?? []
+      const characterCount = data?.characters.length ?? 0
+      const estimatedAssetTargets = new Set(
+        rows
+          .map((row) => row.shot.location || row.scene.title)
+          .filter((value): value is string => Boolean(value)),
+      ).size || (rows.length ? 1 : 0)
       setQueueProgress({
         completed: 0,
-        total: rows.length,
-        message: prepared.message,
+        total: characterCount + estimatedAssetTargets + rows.length,
+        message: 'Submitting Phase 5 handoff: characters → reusable assets → scene starting images.',
       })
-      for (const [index, row] of rows.entries()) {
-        setQueueProgress({
-          completed: index,
-          total: rows.length,
-          message: `Submitting ${row.scene.title} / ${row.shot.title}`,
-        })
-        await api.generateStartingImage(storyId, row.shot.id, {
-          requested_by: 'CineForge Phase 5 workflow handoff',
-          model_name: 'flux2_dev_fp8mixed.safetensors',
-          ...workflowPayload,
-        })
-      }
+      const handoff = await api.generatePhaseFiveHandoff(storyId, {
+        requested_by: 'CineForge Phase 5 workflow handoff',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        ...workflowPayload,
+      })
+      const completedTotal = handoff.character_count + handoff.asset_count + handoff.scene_count
       setQueueProgress({
-        completed: rows.length,
-        total: rows.length,
-        message: `Submitted ${rows.length} starting-image candidate${rows.length === 1 ? '' : 's'}.`,
+        completed: completedTotal,
+        total: completedTotal,
+        message: handoff.message,
       })
       setApprovalNotice(
-        `Phase 5 workflow handoff complete: ${rows.length} starting-image candidate${rows.length === 1 ? '' : 's'} submitted for local generation.`,
+        `Phase 5 workflow handoff complete: ${handoff.character_count} character reference${handoff.character_count === 1 ? '' : 's'}, ${handoff.asset_count} reusable asset reference${handoff.asset_count === 1 ? '' : 's'}, and ${handoff.scene_count} scene starting image${handoff.scene_count === 1 ? '' : 's'} generated with attachment labels.`,
       )
       setWorkflowOpen(false)
       await load()
@@ -856,7 +860,7 @@ export function ProductionPhases({
             </b>
             <p>
               {selectedPhaseNumber === 5
-                ? 'Phase 5 approval opens workflow selection, then submits local starting-image generation for every shot. Voice, video, FFmpeg, and final assembly still remain separate review steps.'
+                ? 'Phase 5 approval opens workflow selection, then runs one local handoff batch: character references first, reusable asset references second, and scene starting images third. Scene images carry attachment labels for the characters and assets they use.'
                 : 'Approval records review of this planning snapshot only. It does not certify or start image, voice, video, ComfyUI, queue, or FFmpeg execution.'}
             </p>
             {phaseApprovalBlockedReason ? <small>{phaseApprovalBlockedReason}</small> : null}
@@ -878,7 +882,7 @@ export function ProductionPhases({
             onClick={() => void approveSelectedPhase()}
           >
             {approvingPhase && selectedPhaseNumber === 5
-              ? 'Submitting Phase 6 images…'
+              ? 'Submitting Phase 5 handoff…'
               : approvingPhase
                 ? `Approving Phase ${selectedPhaseNumber}…`
                 : selectedPhaseNumber === 5 && selectedPhase.lifecycle_state === 'approved'
@@ -899,7 +903,7 @@ export function ProductionPhases({
               <div>
                 <span className="eyebrow">PHASE 5 HANDOFF</span>
                 <h3 id="phase-five-workflow-title">Choose image workflow</h3>
-                <p>Submitted images will carry scene labels, character names, and character reference asset IDs in metadata.</p>
+                <p>Approval will submit one ordered batch: characters, reusable assets, then scene images. Scene image metadata will include labels that attach the image to the character and asset references it consumed.</p>
               </div>
               <button type="button" aria-label="Close workflow selector" onClick={() => setWorkflowOpen(false)} disabled={approvingPhase}>
                 ×
@@ -957,7 +961,7 @@ export function ProductionPhases({
                 Cancel
               </button>
               <button type="button" className="primary-button" disabled={approvingPhase} onClick={() => void approvePhaseFiveAndQueueImages()}>
-                {approvingPhase ? 'Submitting images…' : 'Approve and submit images'}
+                {approvingPhase ? 'Submitting handoff batch…' : 'Approve and submit handoff batch'}
               </button>
             </footer>
           </section>

@@ -14,6 +14,8 @@ export type PageId =
   | 'images'
   | 'routing'
   | 'workflows'
+  | 'api-caller'
+  | 'downloads'
   | 'exports'
   | 'settings'
 
@@ -49,6 +51,8 @@ const navItems: { id: PageId; label: string; icon: ShellIconName }[] = [
   { id: 'images', label: 'Starting images', icon: 'image' },
   { id: 'routing', label: 'Model routing', icon: 'cpu' },
   { id: 'workflows', label: 'Workflows', icon: 'layers' },
+  { id: 'api-caller', label: 'API Caller', icon: 'play' },
+  { id: 'downloads', label: 'Downloads', icon: 'download' },
   { id: 'exports', label: 'Exports', icon: 'download' },
 ]
 
@@ -63,6 +67,8 @@ const labels: Record<PageId | 'projects' | 'new-project', string> = {
   images: 'Starting Images',
   routing: 'Model Routing',
   workflows: 'Workflows',
+  'api-caller': 'API Caller',
+  downloads: 'Downloads',
   exports: 'Exports',
   settings: 'Project Settings',
 }

@@ -16,6 +16,8 @@ const PAGE_TO_ROUTE: Record<PageId, string> = {
   images: 'starting-images',
   routing: 'model-routing',
   workflows: 'workflows',
+  'api-caller': 'api-caller',
+  downloads: 'downloads',
   exports: 'exports',
   settings: 'settings',
 }
@@ -31,6 +33,8 @@ const ROUTE_TO_PAGE: Record<string, PageId> = {
   'model-routing': 'routing',
   routing: 'routing',
   workflows: 'workflows',
+  'api-caller': 'api-caller',
+  downloads: 'downloads',
   exports: 'exports',
   settings: 'settings',
 }

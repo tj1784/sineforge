@@ -17,6 +17,7 @@ vi.mock('../../api/client', () => ({
     listRuntimeWorkflowTemplates: vi.fn(),
     getSettings: vi.fn(),
     preparePhaseSixImages: vi.fn(),
+    generatePhaseFiveHandoff: vi.fn(),
     generateStartingImage: vi.fn(),
   },
 }))
@@ -357,6 +358,131 @@ function mockHistoryApis() {
     model_name: 'flux2_dev_fp8mixed.safetensors',
     seed: 123,
   })
+  vi.mocked(api.generatePhaseFiveHandoff).mockResolvedValue({
+    status: {
+      shot_count: 1,
+      required_count: 1,
+      assigned_count: 1,
+      approved_count: 0,
+      in_review_count: 1,
+      missing_count: 0,
+      complete: false,
+      phase_7_locked: false,
+      runtime_reachable: true,
+    },
+    message: 'Phase 5 handoff complete: 1 character reference, 1 reusable asset reference, and 1 scene starting image generated and labeled.',
+    character_count: 1,
+    asset_count: 1,
+    scene_count: 1,
+    generated: {
+      characters: [{
+        asset: {
+          id: 'asset-character-1',
+          project_id: 'project-1',
+          kind: 'character_reference',
+          source_type: 'comfyui_generated',
+          managed_uri: '/media/asset-character-1.png',
+          sha256: 'a'.repeat(64),
+          mime_type: 'image/png',
+          width: 1024,
+          height: 576,
+          duration_sec: null,
+          approval_state: 'in_review',
+          metadata_json: { label: 'CHAR-01 Lead Character' },
+          original_filename: 'CHAR_01_Lead_Character.png',
+          size_bytes: 123,
+          archived_at: null,
+          created_at: '2026-07-19T00:00:00Z',
+          updated_at: '2026-07-19T00:00:00Z',
+          is_duplicate: false,
+        },
+        created: true,
+        duplicate_of_existing: false,
+        entity_type: 'character',
+        entity_id: 'character-1',
+        label: 'CHAR-01 Lead Character',
+        prompt_id: 'prompt-character-1',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        seed: 123,
+      }],
+      assets: [{
+        asset: {
+          id: 'asset-location-1',
+          project_id: 'project-1',
+          kind: 'art_direction_reference',
+          source_type: 'comfyui_generated',
+          managed_uri: '/media/asset-location-1.png',
+          sha256: 'b'.repeat(64),
+          mime_type: 'image/png',
+          width: 1024,
+          height: 576,
+          duration_sec: null,
+          approval_state: 'in_review',
+          metadata_json: { label: 'LOC-01 Primary location' },
+          original_filename: 'LOC_01_Primary_location.png',
+          size_bytes: 123,
+          archived_at: null,
+          created_at: '2026-07-19T00:00:00Z',
+          updated_at: '2026-07-19T00:00:00Z',
+          is_duplicate: false,
+        },
+        created: true,
+        duplicate_of_existing: false,
+        entity_type: 'asset_reference',
+        entity_id: null,
+        label: 'LOC-01 Primary location',
+        prompt_id: 'prompt-location-1',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        seed: 1123,
+      }],
+      scenes: [{
+        asset: {
+          id: 'asset-1',
+          project_id: 'project-1',
+          kind: 'starting_image',
+          source_type: 'comfyui_generated',
+          managed_uri: '/media/asset-1.png',
+          sha256: 'f'.repeat(64),
+          mime_type: 'image/png',
+          width: 1024,
+          height: 576,
+          duration_sec: null,
+          approval_state: 'in_review',
+          metadata_json: {
+            label: 'S01A',
+            labels: {
+              characters: [{ label: 'CHAR-01 Lead Character', asset_ids: ['asset-character-1'] }],
+              assets: [{ label: 'LOC-01 Primary location', entity_id: 'asset-location-1' }],
+            },
+          },
+          original_filename: 'S01A_Opening_image.png',
+          size_bytes: 123,
+          archived_at: null,
+          created_at: '2026-07-19T00:00:00Z',
+          updated_at: '2026-07-19T00:00:00Z',
+          is_duplicate: false,
+        },
+        created: true,
+        duplicate_of_existing: false,
+        shot_id: 'shot-1',
+        previous_asset_id: null,
+        status: {
+          shot_count: 1,
+          required_count: 1,
+          assigned_count: 1,
+          approved_count: 0,
+          in_review_count: 1,
+          missing_count: 0,
+          complete: false,
+          phase_7_locked: false,
+          runtime_reachable: true,
+        },
+        prompt_id: 'prompt-1',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        seed: 2123,
+      }],
+    },
+  })
   vi.mocked(api.exportPhaseHistory).mockResolvedValue({
     schema_name: 'cineforge.phase-history',
     version: 1,
@@ -408,6 +534,47 @@ describe('ProductionPhases', () => {
     expect(screen.getByText('Phase 1 approved. Phase 2 is unlocked for planning.')).toBeTruthy()
     expect(screen.getByRole('tab', { name: /Script and Narrative Development/ }).textContent).toContain('approved')
     expect(screen.getByRole('tab', { name: /Scene and Shot Segmentation/ }).textContent).toContain('drafting')
+  })
+
+  it('submits Phase 5 as one ordered character-asset-scene handoff batch', async () => {
+    const phaseFiveReadyPipeline: ProductionPipeline = {
+      ...pipeline,
+      phases: pipeline.phases.map((phase) => phase.phase_number < 5
+        ? { ...phase, lifecycle_state: 'approved', approved_at: '2026-07-22T00:00:00Z', is_locked: false, locked_reason: null }
+        : phase.phase_number === 5
+          ? { ...phase, lifecycle_state: 'ready_for_review', is_locked: false, locked_reason: null }
+          : phase),
+    }
+    const phaseFiveApprovedPipeline: ProductionPipeline = {
+      ...phaseFiveReadyPipeline,
+      phases: phaseFiveReadyPipeline.phases.map((phase) => phase.phase_number === 5
+        ? { ...phase, lifecycle_state: 'approved', approved_at: '2026-07-22T00:00:00Z' }
+        : phase),
+    }
+    vi.mocked(api.getProductionPipeline).mockResolvedValue(phaseFiveReadyPipeline)
+    vi.mocked(api.approveProductionPhase).mockResolvedValue({
+      pipeline: phaseFiveApprovedPipeline,
+      phase: phaseFiveApprovedPipeline.phases[4],
+      message: 'Phase 5 approved.',
+    })
+    mockHistoryApis()
+
+    render(<ProductionPhases storyId="story-1" projectId="project-1" data={aggregate} />)
+
+    fireEvent.click(await screen.findByRole('tab', { name: /Production Prompt and Workflow Package/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Approve Phase 5 & choose workflow' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve and submit handoff batch' }))
+
+    await waitFor(() => expect(api.generatePhaseFiveHandoff).toHaveBeenCalledWith(
+      'story-1',
+      expect.objectContaining({
+        requested_by: 'CineForge Phase 5 workflow handoff',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+      }),
+    ))
+    expect(api.preparePhaseSixImages).not.toHaveBeenCalled()
+    expect(api.generateStartingImage).not.toHaveBeenCalled()
+    expect(await screen.findByText(/generated with attachment labels/i)).toBeTruthy()
   })
 
   it('shows exactly eight enabled phase tabs and opens every UI workspace', async () => {
