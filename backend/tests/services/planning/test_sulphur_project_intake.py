@@ -81,7 +81,7 @@ def test_sulphur_intake_preserves_full_prompt_and_plans_required_scenes(tmp_path
     assert intake.workspace_payload.prefer_local_providers is True
     assert intake.clip_plan.planned_scene_count == 16
     assert len(intake.clip_plan.scene_duration_plan_sec) == 16
-    assert sum(intake.clip_plan.scene_duration_plan_sec) == 125
+    assert sum(intake.clip_plan.scene_duration_plan_sec) == pytest.approx(125, abs=1e-9)
     assert all(6 <= item <= 10 for item in intake.clip_plan.scene_duration_plan_sec)
     assert "exactly 16 scenes" in (intake.workspace_payload.production_notes or "")
 
@@ -91,7 +91,7 @@ def test_scene_count_uses_ceiling_of_seconds_divided_by_eight():
 
     assert plan.planned_scene_count == 38
     assert len(plan.scene_duration_plan_sec) == 38
-    assert sum(plan.scene_duration_plan_sec) == 300
+    assert sum(plan.scene_duration_plan_sec) == pytest.approx(300, abs=1e-9)
     assert plan.durations_within_generation_range is True
 
 
@@ -136,7 +136,7 @@ def test_explicit_runtime_overrides_sulphur_fallback_arithmetic(tmp_path):
     assert intake.brief.target_duration_sec == 60
     assert intake.workspace_payload.target_duration_sec == 60
     assert intake.clip_plan.planned_scene_count == 8
-    assert sum(intake.clip_plan.scene_duration_plan_sec) == 60
+    assert sum(intake.clip_plan.scene_duration_plan_sec) == pytest.approx(60, abs=1e-9)
 
 
 def test_word_and_compound_runtimes_are_deterministic(tmp_path):
