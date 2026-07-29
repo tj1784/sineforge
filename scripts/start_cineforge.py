@@ -64,6 +64,18 @@ def apply_primary_workstation_defaults() -> None:
             / "Sulphur-2-base"
             / "sulphur_prompt_enhancer_model-q8_0.gguf"
         ),
+        "CINEFORGE_QWEN_MODEL_ID": (
+            "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-"
+            "neo-code-di-imatrix-max"
+        ),
+        "CINEFORGE_QWEN_MODEL_PATH": str(
+            Path.home()
+            / ".lmstudio"
+            / "models"
+            / "DavidAU"
+            / "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF"
+            / "Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf"
+        ),
     }
     for key, value in defaults.items():
         os.environ.setdefault(key, value)

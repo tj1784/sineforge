@@ -22,6 +22,10 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_settings
+from backend.app.services.lm_studio_models import (
+    get_active_lm_studio_model_filename,
+    get_active_lm_studio_model_id,
+)
 from backend.app.db.base import (
     AuditLog,
     Chapter,
@@ -551,6 +555,8 @@ def _apply_sulphur_phase_one_enhancement(
     """Use Sulphur when enabled, retaining the valid deterministic package on failure."""
 
     settings = get_settings()
+    active_model_id = get_active_lm_studio_model_id(settings)
+    active_model_file = get_active_lm_studio_model_filename(settings)
     if not (settings.sulphur_configured and settings.sulphur_phase_one_enabled):
         return package
 
@@ -568,8 +574,8 @@ def _apply_sulphur_phase_one_enhancement(
         creative_direction.update(
             {
                 "script_provider": "sulphur",
-                "script_model": settings.sulphur_model_id,
-                "script_model_file": settings.sulphur_model_path.name,
+                "script_model": active_model_id,
+                "script_model_file": active_model_file,
             }
         )
         enhanced_package["creative_direction"] = creative_direction
@@ -592,8 +598,8 @@ def _apply_sulphur_phase_one_enhancement(
         creative_direction.update(
             {
                 "script_provider": "deterministic_fallback",
-                "script_model": settings.sulphur_model_id,
-                "script_model_file": settings.sulphur_model_path.name,
+                "script_model": active_model_id,
+                "script_model_file": active_model_file,
             }
         )
         fallback["creative_direction"] = creative_direction

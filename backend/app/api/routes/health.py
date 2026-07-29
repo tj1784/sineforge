@@ -1,6 +1,5 @@
 import asyncio
 import re
-from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 from fastapi import APIRouter, HTTPException, Response, status
@@ -9,6 +8,10 @@ from backend.app.core.config import get_settings
 from backend.app.services.comfy.client import ComfyUIClient
 from backend.app.services.comfy.runner import ComfyAPIRunnerClient
 from backend.app.services.ffmpeg.service import FFmpegService
+from backend.app.services.lm_studio_models import (
+    LMStudioModelService,
+    get_active_lm_studio_model_id,
+)
 from backend.app.services.telemetry.gpu import GPUTelemetryService
 
 
@@ -66,89 +69,40 @@ async def health_comfy_api_runner() -> dict:
 @router.get("/health/sulphur")
 async def health_sulphur() -> dict:
     settings = get_settings()
+    active_model_id = get_active_lm_studio_model_id(settings)
     if not settings.sulphur_planning_enabled:
         return {
             "status": "disabled",
             "reachable": False,
             "model_loaded": False,
-            "model_id": settings.sulphur_model_id,
+            "model_id": active_model_id,
             "model_file": settings.sulphur_model_path.name,
         }
-    try:
-        parsed = urlsplit(settings.sulphur_base_url)
-        native_models_url = urlunsplit(
-            (parsed.scheme, parsed.netloc, "/api/v1/models", "", "")
-        )
-        async with httpx.AsyncClient(
-            timeout=httpx.Timeout(3.0),
-            follow_redirects=False,
-        ) as client:
-            response = await client.get(native_models_url)
-            response.raise_for_status()
-            payload = response.json()
-        entries = payload.get("models") if isinstance(payload, dict) else None
-        matching_model = next(
-            (
-                item
-                for item in (entries if isinstance(entries, list) else [])
-                if isinstance(item, dict)
-                and (
-                    item.get("key") == settings.sulphur_model_id
-                    or any(
-                        isinstance(instance, dict)
-                        and instance.get("id") == settings.sulphur_model_id
-                        for instance in (
-                            item.get("loaded_instances")
-                            if isinstance(item.get("loaded_instances"), list)
-                            else []
-                        )
-                    )
-                )
-            ),
-            None,
-        )
-        loaded_instances = (
-            matching_model.get("loaded_instances")
-            if isinstance(matching_model, dict)
-            and isinstance(matching_model.get("loaded_instances"), list)
-            else []
-        )
-        model_loaded = any(
-            isinstance(instance, dict)
-            and instance.get("id") == settings.sulphur_model_id
-            for instance in loaded_instances
-        )
-        loaded_config = (
-            loaded_instances[0].get("config")
-            if loaded_instances
-            and isinstance(loaded_instances[0], dict)
-            and isinstance(loaded_instances[0].get("config"), dict)
-            else {}
-        )
-        return {
-            "status": "ok" if model_loaded else "degraded",
-            "reachable": True,
-            "model_loaded": model_loaded,
-            "model_id": settings.sulphur_model_id,
-            "model_file": settings.sulphur_model_path.name,
-            "quantization": (
-                (matching_model.get("quantization") or {}).get("name")
-                if isinstance(matching_model, dict)
-                and isinstance(matching_model.get("quantization"), dict)
-                else None
-            ),
-            "context_length": loaded_config.get("context_length"),
-            "parallel": loaded_config.get("parallel"),
-        }
-    except (httpx.HTTPError, ValueError) as exc:
-        return {
-            "status": "unavailable",
-            "reachable": False,
-            "model_loaded": False,
-            "model_id": settings.sulphur_model_id,
-            "model_file": settings.sulphur_model_path.name,
-            "error": str(exc),
-        }
+    catalog = await LMStudioModelService(settings).catalog()
+    matching_model = next(
+        (model for model in catalog.models if model.selected),
+        None,
+    )
+    model_loaded = bool(matching_model and matching_model.loaded)
+    return {
+        "status": (
+            "unavailable"
+            if not catalog.reachable
+            else ("ok" if model_loaded else "degraded")
+        ),
+        "reachable": catalog.reachable,
+        "model_loaded": model_loaded,
+        "model_id": catalog.active_model_id,
+        "model_file": (
+            matching_model.filename
+            if matching_model and matching_model.filename
+            else settings.sulphur_model_path.name
+        ),
+        "quantization": matching_model.quantization if matching_model else None,
+        "context_length": matching_model.context_length if matching_model else None,
+        "parallel": matching_model.parallel if matching_model else None,
+        "error": catalog.error,
+    }
 
 
 @router.post("/runtime/comfyui/restart", status_code=status.HTTP_202_ACCEPTED)

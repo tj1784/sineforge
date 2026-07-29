@@ -7,6 +7,7 @@ from backend.app.api.routes import (
     campaigns,
     health,
     jobs,
+    lm_studio,
     orchestration_runs,
     projects,
     production,
@@ -25,6 +26,7 @@ from backend.app.api.routes import (
 
 api_router = APIRouter()
 api_router.include_router(api_caller.router)
+api_router.include_router(lm_studio.router)
 api_router.include_router(health.router)
 api_router.include_router(audio.router)
 api_router.include_router(storyboard_settings.router)

@@ -21,6 +21,7 @@ from backend.app.services.planning.sulphur_project_intake import (
     SulphurProjectIntakeError,
     build_sulphur_project_intake,
 )
+from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.services.project_workspace import (
     ProjectWorkspaceConflictError,
     ProjectWorkspaceResult,
@@ -100,7 +101,7 @@ def create_workspace_from_sulphur(
     workspace = workspace_to_response(db, result)
     return SulphurProjectWorkspaceRead(
         **workspace.model_dump(),
-        intake_model=get_settings().sulphur_model_id,
+        intake_model=get_active_lm_studio_model_id(),
         target_duration_sec=intake.clip_plan.target_duration_sec,
         planned_scene_count=intake.clip_plan.planned_scene_count,
     )

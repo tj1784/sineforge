@@ -258,6 +258,43 @@ export type Chapter = {
   scenes: Scene[]
 }
 
+export type LMStudioModel = {
+  model_id: string
+  key: string
+  display_name: string
+  filename: string | null
+  publisher: string | null
+  architecture: string | null
+  quantization: string | null
+  params_string: string | null
+  size_bytes: number | null
+  max_context_length: number | null
+  context_length: number | null
+  parallel: number | null
+  installed: boolean
+  loaded: boolean
+  selected: boolean
+  loaded_instance_ids: string[]
+}
+
+export type LMStudioModelCatalog = {
+  schema_name: 'runtime.lm_studio_models.v1'
+  status: string
+  reachable: boolean
+  active_model_id: string
+  configured_model_id: string
+  models: LMStudioModel[]
+  error: string | null
+}
+
+export type LMStudioModelActivation = {
+  status: string
+  active_model_id: string
+  loaded: boolean
+  load_time_seconds: number | null
+  model: LMStudioModel
+}
+
 export type Character = {
   id: string
   story_id?: string
@@ -1702,6 +1739,13 @@ export const api = {
   gpuHealth: () => request<HealthResponse>('/health/gpu'),
   ffmpegHealth: () => request<HealthResponse>('/health/ffmpeg'),
   runtimeStatus: () => request<RuntimeStatus>('/runtime/status'),
+  listLmStudioModels: () =>
+    request<LMStudioModelCatalog>('/runtime/lm-studio/models'),
+  activateLmStudioModel: (modelId: string) =>
+    request<LMStudioModelActivation>('/runtime/lm-studio/models/active', {
+      method: 'PUT',
+      body: JSON.stringify({ model_id: modelId }),
+    }),
   restartComfyUi: () =>
     request<ComfyRestartRequest>('/runtime/comfyui/restart', { method: 'POST' }),
   comfyRestartStatus: (restartId: string) =>

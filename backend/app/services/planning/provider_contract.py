@@ -35,6 +35,7 @@ from backend.app.schemas.providers import (
     RoutingValidationIssue,
 )
 from backend.app.services import storyboard_settings as storyboard_settings_service
+from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.services.planning.engine import DEFAULT_PIPELINE
 from backend.app.services.planning.errors import PlanningError
 from backend.app.services.planning.provider_registry import (
@@ -244,11 +245,12 @@ class ProviderConnectionTester:
                     )
                 payload = json.loads(content.decode("utf-8"))
                 entries = payload.get("models") if isinstance(payload, dict) else None
+                active_model_id = get_active_lm_studio_model_id(self.settings)
                 loaded = any(
                     isinstance(item, dict)
                     and any(
                         isinstance(instance, dict)
-                        and instance.get("id") == self.settings.sulphur_model_id
+                        and instance.get("id") == active_model_id
                         for instance in (
                             item.get("loaded_instances")
                             if isinstance(item.get("loaded_instances"), list)

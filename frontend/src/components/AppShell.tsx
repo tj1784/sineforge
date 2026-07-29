@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
+import { api, type LMStudioModelCatalog } from '../api/client'
 import {
   getShellTopbarActions,
   subscribeShellTopbarActions,
@@ -96,6 +97,11 @@ function initials(name: string) {
       .map((part) => part[0]?.toUpperCase())
       .join('') || 'CF'
   )
+}
+
+function formatModelSize(sizeBytes: number | null) {
+  if (!sizeBytes) return null
+  return `${(sizeBytes / 1024 ** 3).toFixed(1)} GB`
 }
 
 /**
@@ -208,6 +214,10 @@ export function AppShell({
   const [projectMenu, setProjectMenu] = useState(false)
   const [profile, setProfile] = useState(false)
   const [runtime, setRuntime] = useState(false)
+  const [modelCatalog, setModelCatalog] = useState<LMStudioModelCatalog | null>(null)
+  const [modelCatalogLoading, setModelCatalogLoading] = useState(true)
+  const [modelChanging, setModelChanging] = useState(false)
+  const [modelError, setModelError] = useState<string | null>(null)
   const [shellActions, setShellActions] = useState<ShellTopbarActions>(() => getShellTopbarActions())
   const navId = useId()
   const isStudio = view === 'studio'
@@ -224,8 +234,34 @@ export function AppShell({
     backendStatus === 'ok' || backendStatus === 'ready'
       ? 'Local backend ok'
       : `Local backend ${backendStatus}`
+  const activeModel = modelCatalog?.models.find(
+    (model) =>
+      model.selected ||
+      model.model_id === modelCatalog.active_model_id ||
+      model.loaded_instance_ids.includes(modelCatalog.active_model_id),
+  )
 
   useEffect(() => subscribeShellTopbarActions(() => setShellActions(getShellTopbarActions())), [])
+
+  useEffect(() => {
+    let cancelled = false
+    api
+      .listLmStudioModels()
+      .then((catalog) => {
+        if (!cancelled) setModelCatalog(catalog)
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setModelError(error instanceof Error ? error.message : 'LM Studio model list is unavailable.')
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setModelCatalogLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [runtime])
 
   useEffect(() => {
     if (!mobile && !projectMenu && !profile && !runtime) return
@@ -278,6 +314,29 @@ export function AppShell({
     setProjectMenu(false)
     setProfile(false)
     setRuntime(false)
+  }
+
+  const selectPlanningModel = async (modelId: string) => {
+    if (
+      !modelCatalog ||
+      (modelId === modelCatalog.active_model_id && activeModel?.loaded)
+    ) {
+      return
+    }
+    setModelChanging(true)
+    setModelError(null)
+    try {
+      await api.activateLmStudioModel(modelId)
+      const refreshed = await api.listLmStudioModels()
+      setModelCatalog(refreshed)
+      onRefreshStatus?.()
+    } catch (error) {
+      setModelError(
+        error instanceof Error ? error.message : 'LM Studio could not load the selected model.',
+      )
+    } finally {
+      setModelChanging(false)
+    }
   }
 
   return (
@@ -428,6 +487,56 @@ export function AppShell({
                 Sineforge keeps public submission gated while supervising the approved local
                 runtimes. Backend status: {runtimeStatusDetail}.
               </p>
+              <div className="runtime-model-toggle">
+                <label htmlFor="runtime-planning-model">
+                  <span>Planning model</span>
+                  <small>
+                    {activeModel?.loaded
+                      ? 'Loaded in LM Studio'
+                      : modelCatalog?.reachable
+                        ? 'Select to load'
+                        : 'Start LM Studio to switch'}
+                  </small>
+                </label>
+                <select
+                  id="runtime-planning-model"
+                  aria-label="Active LM Studio planning model"
+                  value={modelCatalog?.active_model_id ?? ''}
+                  disabled={
+                    modelCatalogLoading ||
+                    modelChanging ||
+                    !modelCatalog?.reachable
+                  }
+                  onChange={(event) => void selectPlanningModel(event.target.value)}
+                >
+                  {modelCatalogLoading && !modelCatalog ? (
+                    <option value="">Loading local models…</option>
+                  ) : null}
+                  {modelCatalog?.models.map((model) => (
+                    <option
+                      key={`${model.key}:${model.model_id}`}
+                      value={model.model_id}
+                      disabled={!model.installed}
+                    >
+                      {model.display_name}
+                      {model.loaded ? ' · loaded' : ''}
+                    </option>
+                  ))}
+                </select>
+                {activeModel ? (
+                  <p className="runtime-model-meta" title={activeModel.filename ?? undefined}>
+                    {[activeModel.quantization, formatModelSize(activeModel.size_bytes)]
+                      .filter(Boolean)
+                      .join(' · ')}
+                    {modelChanging ? ' · Loading model…' : ''}
+                  </p>
+                ) : null}
+                {modelError || modelCatalog?.error ? (
+                  <p className="runtime-model-error" role="status">
+                    {modelError ?? 'LM Studio is offline. The saved selection is unchanged.'}
+                  </p>
+                ) : null}
+              </div>
               <a
                 href="http://127.0.0.1:8022"
                 target="_blank"
@@ -559,6 +668,53 @@ export function AppShell({
           </div>
           {/* Only real actions are presented; project fields persist through their API forms. */}
           <div className="top-actions">
+            {isStudio ? (
+              <label
+                className="shell-model-toggle"
+                title={
+                  modelError ??
+                  modelCatalog?.error ??
+                  activeModel?.filename ??
+                  'Choose the LM Studio planning model'
+                }
+              >
+                <Icon name="cpu" size={15} />
+                <select
+                  aria-label="Active LM Studio planning model"
+                  value={modelCatalog?.active_model_id ?? ''}
+                  disabled={
+                    modelCatalogLoading ||
+                    modelChanging ||
+                    !modelCatalog?.reachable
+                  }
+                  onChange={(event) => void selectPlanningModel(event.target.value)}
+                >
+                  {!modelCatalog ? (
+                    <option value="">Loading local models…</option>
+                  ) : null}
+                  {modelCatalog?.models.map((model) => (
+                    <option
+                      key={`top:${model.key}:${model.model_id}`}
+                      value={model.model_id}
+                      disabled={!model.installed}
+                    >
+                      {model.display_name}
+                      {model.loaded ? ' · loaded' : ''}
+                    </option>
+                  ))}
+                </select>
+                <i
+                  className={
+                    modelChanging
+                      ? 'loading'
+                      : activeModel?.loaded
+                        ? 'loaded'
+                        : 'offline'
+                  }
+                  aria-hidden="true"
+                />
+              </label>
+            ) : null}
             {view === 'projects' ? (
               <button type="button" className="btn primary" onClick={onCreateProject}>
                 <Icon name="plus" size={15} />

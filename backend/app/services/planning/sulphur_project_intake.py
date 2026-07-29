@@ -12,6 +12,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.core.config import Settings, get_settings
+from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.schemas.api import ProjectWorkspaceCreate, SulphurProjectPromptCreate
 from backend.app.services.clip_planning import (
     MAX_CLIP_DURATION_SEC,
@@ -220,8 +221,9 @@ def build_sulphur_project_intake(
         raise SulphurProjectIntakeError("Sulphur is not configured or its GGUF is unavailable")
 
     prompt = request.prompt.strip()
+    active_model_id = get_active_lm_studio_model_id(cfg)
     body = {
-        "model": cfg.sulphur_model_id,
+        "model": active_model_id,
         "temperature": 0.1,
         "max_tokens": 1800,
         "messages": [
@@ -367,7 +369,7 @@ def build_sulphur_project_intake(
         hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         clip_plan.target_duration_sec,
         clip_plan.planned_scene_count,
-        cfg.sulphur_model_id,
+        active_model_id,
     )
     return SulphurProjectIntakeResult(
         brief=brief,

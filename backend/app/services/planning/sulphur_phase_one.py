@@ -8,6 +8,7 @@ from typing import Any
 import httpx
 
 from backend.app.core.config import Settings, get_settings
+from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.services.clip_planning import (
     MAX_CLIP_DURATION_SEC,
     MIN_CLIP_DURATION_SEC,
@@ -141,7 +142,7 @@ def enhance_phase_one_package(
         ],
     }
     body = {
-        "model": cfg.sulphur_model_id,
+        "model": get_active_lm_studio_model_id(cfg),
         "temperature": 0.35,
         "max_tokens": 4096,
         "messages": [

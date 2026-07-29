@@ -19,6 +19,18 @@ DEFAULT_SULPHUR_MODEL_PATH = (
     / "Sulphur-2-base"
     / "sulphur_prompt_enhancer_model-q8_0.gguf"
 )
+DEFAULT_QWEN_MODEL_PATH = (
+    Path.home()
+    / ".lmstudio"
+    / "models"
+    / "DavidAU"
+    / "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF"
+    / "Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf"
+)
+DEFAULT_QWEN_MODEL_ID = (
+    "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-"
+    "neo-code-di-imatrix-max"
+)
 
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,199}$")
 _FORBIDDEN_URL_CHARS = set(";|`$\n\r&<>")
@@ -78,6 +90,8 @@ class Settings(BaseSettings):
     sulphur_base_url: str = "http://127.0.0.1:1234/v1"
     sulphur_model_id: str = "sulphur-2-base"
     sulphur_model_path: Path = Field(default=DEFAULT_SULPHUR_MODEL_PATH)
+    qwen_model_id: str = DEFAULT_QWEN_MODEL_ID
+    qwen_model_path: Path = Field(default=DEFAULT_QWEN_MODEL_PATH)
     sulphur_timeout_sec: float = Field(default=300.0, ge=1.0, le=900.0)
     sulphur_wall_time_sec: float = Field(default=420.0, ge=1.0, le=1200.0)
     sulphur_transport_retries: int = Field(default=1, ge=0, le=3)
@@ -144,6 +158,7 @@ class Settings(BaseSettings):
         "openai_logical_model_terra",
         "openai_logical_model_sol",
         "sulphur_model_id",
+        "qwen_model_id",
     )
     @classmethod
     def validate_logical_model_id(cls, value: str) -> str:
@@ -171,9 +186,9 @@ class Settings(BaseSettings):
             raise ValueError("logical model identifier must not look like an executable path")
         return cleaned
 
-    @field_validator("sulphur_model_path", mode="before")
+    @field_validator("sulphur_model_path", "qwen_model_path", mode="before")
     @classmethod
-    def resolve_sulphur_model_path(cls, value: str | Path) -> Path:
+    def resolve_local_model_path(cls, value: str | Path) -> Path:
         return Path(value).expanduser().resolve()
 
     @property

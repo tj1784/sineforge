@@ -3757,3 +3757,137 @@
     flex-direction: column;
   }
 }
+.runtime-pop {
+  width: 340px;
+  right: auto;
+}
+
+.runtime-model-toggle {
+  display: grid;
+  gap: 7px;
+  margin: 11px 0 8px;
+  padding: 10px;
+  border: 1px solid rgb(255 255 255 / 9%);
+  border-radius: 10px;
+  background: #1b1d20;
+}
+
+.runtime-model-toggle label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #e8eaed;
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.runtime-model-toggle label small {
+  color: #8f949c;
+  font-size: 8px;
+  font-weight: 500;
+}
+
+.runtime-model-toggle select {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+  border: 1px solid #43474e;
+  border-radius: 8px;
+  background: #24272b;
+  color: #e8eaed;
+  padding: 0 30px 0 9px;
+  font: inherit;
+  font-size: 10px;
+  text-overflow: ellipsis;
+}
+
+.runtime-model-toggle select:focus-visible {
+  outline: 2px solid #a8c7fa;
+  outline-offset: 2px;
+}
+
+.runtime-model-toggle select:disabled {
+  cursor: wait;
+  color: #92979f;
+  opacity: 0.78;
+}
+
+.runtime-model-toggle .runtime-model-meta,
+.runtime-model-toggle .runtime-model-error {
+  margin: 0;
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.runtime-model-toggle .runtime-model-meta {
+  color: #a8c7fa;
+}
+
+.runtime-model-toggle .runtime-model-error {
+  color: #e8b36a;
+}
+
+.shell-model-toggle {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 250px) auto;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 9px;
+  border: 1px solid #3b3e44;
+  border-radius: 9px;
+  background: #232528;
+  color: #a8c7fa;
+}
+
+.shell-model-toggle select {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #dfe3e8;
+  font: inherit;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+
+.shell-model-toggle select:disabled {
+  color: #8d929a;
+}
+
+.shell-model-toggle > i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7d838b;
+}
+
+.shell-model-toggle > i.loaded {
+  background: #a8c7fa;
+  box-shadow: 0 0 8px rgb(168 199 250 / 45%);
+}
+
+.shell-model-toggle > i.loading {
+  background: #e8b36a;
+  animation: shell-model-pulse 1s ease-in-out infinite;
+}
+
+@keyframes shell-model-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (max-width: 1180px) {
+  .shell-model-toggle {
+    grid-template-columns: auto minmax(90px, 165px) auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell-model-toggle {
+    display: none;
+  }
+}

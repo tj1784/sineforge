@@ -87,17 +87,22 @@ The startup orchestrator must:
 
 Auto-start does not by itself enable generation. Image generation additionally requires an enabled backend worker/submission path, a validated workflow manifest compatible with live `/object_info`, registered model evidence, output collection, and provenance persistence. Video generation remains a separately gated phase.
 
-### Sulphur and ComfyAPI Runner
+### Local planning models and ComfyAPI Runner
 
-The primary workstation launcher verifies the exact local
-`sulphur_prompt_enhancer_model-q8_0.gguf`, starts LM Studio's loopback API on
-`127.0.0.1:1234`, and loads the model with full GPU offload when it is not
-already loaded. Sulphur has the highest automatic local planning priority, so
-script structure, story planning, shot planning, and prompt-package tasks use
-it unless a story has an explicit manual provider assignment. Phase 1 also
-requests a structured Sulphur script enhancement and retains the deterministic
-source-faithful package if the model response does not pass the existing QA
-contract.
+The primary workstation launcher recognizes the local
+`sulphur_prompt_enhancer_model-q8_0.gguf` and Qwen 3.6 40B Q4_K_S GGUF, starts
+LM Studio's loopback API on `127.0.0.1:1234`, and loads the saved SineForge
+planning-model selection with full GPU offload. The Studio top bar and Local AI
+panel expose the same model toggle. A switch unloads only the prior SineForge
+planning model from memory before loading its replacement; it never downloads,
+moves, or deletes either GGUF. The choice is stored under the ignored local
+`storage/runtime/` directory and is restored on the next supervised startup.
+
+The selected local model has the highest automatic planning priority, so script
+structure, story planning, shot planning, and prompt-package tasks use it unless
+a story has an explicit manual provider assignment. Phase 1 also requests a
+structured local script enhancement and retains the deterministic source-faithful
+package if the model response does not pass the existing QA contract.
 
 The Projects homepage composer sends one complete creative message to the local
 Sulphur model. Sulphur extracts a validated title, runtime, audience, genre,
