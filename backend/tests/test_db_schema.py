@@ -132,7 +132,7 @@ def test_storyboard_phase1_tables_exist_in_metadata():
     assert STORYBOARD_PHASE1_TABLES.issubset(set(Base.metadata.tables))
 
 
-def test_seven_phase_production_tables_exist_in_metadata():
+def test_eight_phase_production_tables_exist_in_metadata():
     assert PRODUCTION_CONTRACT_TABLES.issubset(set(Base.metadata.tables))
 
 

@@ -5,7 +5,10 @@ import {
   type PhaseOnePackage,
   type PhaseVersionDetail,
   type PhaseVersionSummary,
+  type ProjectStoryboardSettings,
   type ProductionPipeline,
+  type RuntimeCatalogWorkflowTemplate,
+  type StartingImageGenerateRequest,
   type StoryboardAggregate,
 } from '../../api/client'
 import type { PageId } from '../../components/AppShell'
@@ -38,6 +41,13 @@ type EditablePhaseOne = Pick<
 
 /** Canonical Phase 1 script package schema from the production API. */
 const PHASE_ONE_PACKAGE_SCHEMA = 'cineforge.phase_one_script_package'
+const DEFAULT_PHASE_FIVE_WORKFLOW = '__configured_phase6_flux2__'
+
+type QueueProgress = {
+  completed: number
+  total: number
+  message: string
+}
 
 function isPhaseOnePackage(value: unknown): value is PhaseOnePackage {
   if (!value || typeof value !== 'object') return false
@@ -91,6 +101,7 @@ export function ProductionPhases({
   onNavigate,
 }: ProductionPhasesProps) {
   const [pipeline, setPipeline] = useState<ProductionPipeline | null>(null)
+  const [productionSettings, setProductionSettings] = useState<ProjectStoryboardSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -110,7 +121,16 @@ export function ProductionPhases({
   const [iterationNotes, setIterationNotes] = useState('')
   const [savingIteration, setSavingIteration] = useState(false)
   const [approvingPhase, setApprovingPhase] = useState(false)
+  const [workingPhaseNumber, setWorkingPhaseNumber] = useState<number | null>(null)
   const [approvalNotice, setApprovalNotice] = useState<string | null>(null)
+  const [workflowOpen, setWorkflowOpen] = useState(false)
+  const [workflowTemplates, setWorkflowTemplates] = useState<RuntimeCatalogWorkflowTemplate[]>([])
+  const [workflowSelection, setWorkflowSelection] = useState(DEFAULT_PHASE_FIVE_WORKFLOW)
+  const [workflowLoading, setWorkflowLoading] = useState(false)
+  const [workflowError, setWorkflowError] = useState<string | null>(null)
+  const [workflowUploadName, setWorkflowUploadName] = useState('')
+  const [workflowUploadJson, setWorkflowUploadJson] = useState<Record<string, unknown> | null>(null)
+  const [queueProgress, setQueueProgress] = useState<QueueProgress | null>(null)
   /** When the pipeline head is a non-package snapshot, hold the last script package from history. */
   const [packageFallback, setPackageFallback] = useState<PhaseOnePackage | null>(null)
   const phaseTabs = useRef<Array<HTMLButtonElement | null>>([])
@@ -158,6 +178,27 @@ export function ProductionPhases({
 
   useEffect(() => {
     let active = true
+    if (!projectId) {
+      const timer = window.setTimeout(() => {
+        if (active) setProductionSettings(null)
+      }, 0)
+      return () => {
+        active = false
+        window.clearTimeout(timer)
+      }
+    }
+    void api.getSettings(projectId)
+      .then((settings) => {
+        if (active) setProductionSettings(settings)
+      })
+      .catch(() => {
+        if (active) setProductionSettings(null)
+      })
+    return () => { active = false }
+  }, [projectId])
+
+  useEffect(() => {
+    let active = true
     // Async history list load when the project/story/phase scope changes.
     void (async () => {
       if (!pipeline) return
@@ -184,6 +225,7 @@ export function ProductionPhases({
   const phaseHistory = versionsByPhase[selectedPhaseNumber] ?? []
   const selectedIterationId = selectedByPhase[selectedPhaseNumber] ?? ''
   const selectedIteration = phaseHistory.find((item) => item.id === selectedIterationId) ?? null
+  const phaseOneRegenerateIteration = selectedPhaseNumber === 1 && !selectedIteration
 
   useEffect(() => {
     let active = true
@@ -230,14 +272,14 @@ export function ProductionPhases({
   useEffect(() => {
     const handleShortcut = (event: globalThis.KeyboardEvent) => {
       if (event.defaultPrevented || document.querySelector('[role="dialog"]')) return
-      if (!historyOpen && !createOpen && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 's') {
+      if (!historyOpen && !createOpen && !workflowOpen && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 's') {
         event.preventDefault()
         setCreateOpen(true)
       }
     }
     window.addEventListener('keydown', handleShortcut)
     return () => window.removeEventListener('keydown', handleShortcut)
-  }, [createOpen, historyOpen])
+  }, [createOpen, historyOpen, workflowOpen])
 
   const phaseOne = pipeline?.phases.find((phase) => phase.phase_number === 1) ?? null
   const historical = Boolean(selectedIterationId && loadedDetail && !historyError)
@@ -342,11 +384,12 @@ export function ProductionPhases({
   }
 
   const handlePhaseKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const phaseCount = pipeline?.phases.length || 8
     let nextIndex: number
-    if (event.key === 'ArrowRight') nextIndex = (index + 1) % 7
-    else if (event.key === 'ArrowLeft') nextIndex = (index + 6) % 7
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % phaseCount
+    else if (event.key === 'ArrowLeft') nextIndex = (index + phaseCount - 1) % phaseCount
     else if (event.key === 'Home') nextIndex = 0
-    else if (event.key === 'End') nextIndex = 6
+    else if (event.key === 'End') nextIndex = phaseCount - 1
     else return
     event.preventDefault()
     selectPhase(nextIndex + 1, true)
@@ -414,8 +457,39 @@ export function ProductionPhases({
       return
     }
     setSavingIteration(true)
+    setWorkingPhaseNumber(selectedPhaseNumber)
     setHistoryError(null)
     try {
+      if (selectedPhaseNumber === 1 && !selectedIteration && data?.story) {
+        const result = await api.generatePhaseOne(storyId, {
+          original_prompt:
+            data.story.base_story
+            || packageData?.detailed_treatment
+            || packageData?.complete_script
+            || packageData?.short_synopsis
+            || data.story.title,
+          target_duration_sec: Number(data.story.target_duration_sec || packageData?.duration_analysis.target_duration_sec || 300),
+          audience: data.story.audience ?? null,
+          genre: data.story.genre ?? null,
+          tone: data.story.tone ?? null,
+          language: 'English',
+          visual_style: data.story.visual_style ?? null,
+          requested_by: `CineForge UI reviewer: ${label}`,
+        })
+        setPipeline(result.pipeline)
+        const versions = await loadPhaseHistory(1)
+        const latest = versions.at(-1)
+        setSelectedByPhase((current) => ({
+          ...current,
+          1: latest?.id,
+        }))
+        setLoadedDetail(null)
+        setApprovalNotice(result.completion_message)
+        setIterationLabel('')
+        setIterationNotes('')
+        setCreateOpen(false)
+        return
+      }
       const created = await api.createPhaseVersion(storyId, selectedPhaseNumber, {
         label,
         notes: iterationNotes,
@@ -458,12 +532,41 @@ export function ProductionPhases({
       )
     } finally {
       setSavingIteration(false)
+      setWorkingPhaseNumber(null)
     }
   }
 
+  const loadWorkflowTemplates = async () => {
+    setWorkflowLoading(true)
+    setWorkflowError(null)
+    try {
+      const templates = await api.listRuntimeWorkflowTemplates()
+      setWorkflowTemplates(templates ?? [])
+    } catch (caught) {
+      setWorkflowError(
+        caught instanceof Error ? caught.message : 'Unable to load runtime workflow templates.',
+      )
+    } finally {
+      setWorkflowLoading(false)
+    }
+  }
+
+  const openPhaseFiveWorkflowPicker = async () => {
+    setWorkflowOpen(true)
+    setWorkflowError(null)
+    setQueueProgress(null)
+    await loadWorkflowTemplates()
+  }
+
   const approveSelectedPhase = async () => {
-    if (!selectedPhase || historical || selectedPhase.lifecycle_state === 'approved') return
+    if (!selectedPhase || historical) return
+    if (selectedPhaseNumber === 5) {
+      await openPhaseFiveWorkflowPicker()
+      return
+    }
+    if (selectedPhase.lifecycle_state === 'approved') return
     setApprovingPhase(true)
+    setWorkingPhaseNumber(selectedPhaseNumber)
     setApprovalNotice(null)
     setError(null)
     try {
@@ -478,6 +581,115 @@ export function ProductionPhases({
       setError(caught instanceof Error ? caught.message : `Unable to approve Phase ${selectedPhaseNumber}.`)
     } finally {
       setApprovingPhase(false)
+      setWorkingPhaseNumber(null)
+    }
+  }
+
+  const handleWorkflowUpload = async (file: File | null) => {
+    setWorkflowError(null)
+    setWorkflowUploadJson(null)
+    setWorkflowUploadName('')
+    if (!file) return
+    try {
+      const text = await file.text()
+      const parsed = JSON.parse(text) as unknown
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw new Error('Workflow JSON must be a ComfyUI API object.')
+      }
+      setWorkflowUploadJson(parsed as Record<string, unknown>)
+      setWorkflowUploadName(file.name)
+    } catch (caught) {
+      setWorkflowError(
+        caught instanceof Error ? caught.message : 'Unable to read the uploaded workflow JSON.',
+      )
+    }
+  }
+
+  const phaseFiveWorkflowPayload = (): Pick<
+    StartingImageGenerateRequest,
+    'workflow_template_id' | 'workflow_label' | 'workflow_source' | 'workflow_api_json'
+  > => {
+    if (workflowUploadJson) {
+      return {
+        workflow_template_id: null,
+        workflow_label: workflowUploadName || 'Uploaded ComfyUI API workflow',
+        workflow_source: 'uploaded_api_json',
+        workflow_api_json: workflowUploadJson,
+      }
+    }
+    const selected = workflowTemplates.find((template) => template.id === workflowSelection)
+    if (selected) {
+      return {
+        workflow_template_id: selected.id,
+        workflow_label: `${selected.name} v${selected.version}`,
+        workflow_source: 'runtime_catalog_template',
+        workflow_api_json: null,
+      }
+    }
+    return {
+      workflow_template_id: null,
+      workflow_label: 'Configured Flux2 API spine',
+      workflow_source: 'configured_phase6_flux2_api_spine',
+      workflow_api_json: null,
+    }
+  }
+
+  const approvePhaseFiveAndQueueImages = async () => {
+    if (!selectedPhase || historical) return
+    setApprovingPhase(true)
+    setWorkingPhaseNumber(5)
+    setWorkflowError(null)
+    setApprovalNotice(null)
+    setError(null)
+    try {
+      if (selectedPhase.lifecycle_state !== 'approved') {
+        const result = await api.approveProductionPhase(storyId, 5, {
+          approved_by: 'CineForge QA',
+          notes: 'QA approved the Phase 5 prompt and workflow package. Workflow selection follows for Phase 6 local image generation.',
+        })
+        setPipeline(result.pipeline)
+        await loadPhaseHistory(5)
+      }
+      const workflowPayload = phaseFiveWorkflowPayload()
+      const rows = data?.chapters.flatMap((chapter) =>
+        chapter.scenes.flatMap((scene) =>
+          scene.shots.map((shot) => ({ chapter, scene, shot })),
+        ),
+      ) ?? []
+      const characterCount = data?.characters.length ?? 0
+      const estimatedAssetTargets = new Set(
+        rows
+          .map((row) => row.shot.location || row.scene.title)
+          .filter((value): value is string => Boolean(value)),
+      ).size || (rows.length ? 1 : 0)
+      setQueueProgress({
+        completed: 0,
+        total: characterCount + estimatedAssetTargets + rows.length,
+        message: 'Submitting Phase 5 handoff: characters → reusable assets → scene starting images.',
+      })
+      const handoff = await api.generatePhaseFiveHandoff(storyId, {
+        requested_by: 'CineForge Phase 5 workflow handoff',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        ...workflowPayload,
+      })
+      const completedTotal = handoff.character_count + handoff.asset_count + handoff.scene_count
+      setQueueProgress({
+        completed: completedTotal,
+        total: completedTotal,
+        message: handoff.message,
+      })
+      setApprovalNotice(
+        `Phase 5 workflow handoff complete: ${handoff.character_count} character reference${handoff.character_count === 1 ? '' : 's'}, ${handoff.asset_count} reusable asset reference${handoff.asset_count === 1 ? '' : 's'}, and ${handoff.scene_count} scene starting image${handoff.scene_count === 1 ? '' : 's'} generated with attachment labels.`,
+      )
+      setWorkflowOpen(false)
+      await load()
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : 'Unable to approve Phase 5 and submit the image batch.'
+      setWorkflowError(message)
+      setError(message)
+    } finally {
+      setApprovingPhase(false)
+      setWorkingPhaseNumber(null)
     }
   }
 
@@ -512,7 +724,7 @@ export function ProductionPhases({
     )
   }
 
-  if (loading) return <LoadingState title="Loading the seven-phase production contract…" />
+  if (loading) return <LoadingState title="Loading the eight-phase production contract…" />
   if (!pipeline) return error ? <ErrorNotice message={error} /> : null
 
   const currentSnapshotMetrics = snapshotMetricsFromWorkspace(currentWorkspace)
@@ -535,17 +747,17 @@ export function ProductionPhases({
     <section className="production-contract" aria-labelledby="production-contract-title">
       <div className="production-contract-heading">
         <div>
-          <span className="eyebrow">EXACT SEVEN-PHASE PRODUCTION</span>
+          <span className="eyebrow">EXACT EIGHT-PHASE PRODUCTION</span>
           <h2 id="production-contract-title">From one prompt to a controlled film production</h2>
           <p>
-            All seven UI workspaces are available for review. Iteration history is stored in local SQLite
+            All eight UI workspaces are available for review. Iteration history is stored in local SQLite
             via the production API—not browser IndexedDB. Design navigation never launches media generation or rendering.
           </p>
         </div>
-        <span className="phase-count-pill">7 complete workspaces</span>
+        <span className="phase-count-pill">8 complete workspaces</span>
       </div>
 
-      <div className="production-phase-rail" role="tablist" aria-label="Seven production phases">
+      <div className="production-phase-rail" role="tablist" aria-label="Eight production phases">
         {pipeline.phases.map((phase, index) => {
           const count = phase.version_count
             ?? versionsByPhase[phase.phase_number]?.length
@@ -561,7 +773,11 @@ export function ProductionPhases({
               aria-selected={selectedPhaseNumber === phase.phase_number}
               aria-controls={`production-phase-panel-${phase.phase_number}`}
               tabIndex={selectedPhaseNumber === phase.phase_number ? 0 : -1}
-              className={selectedPhaseNumber === phase.phase_number ? 'current' : ''}
+              aria-busy={workingPhaseNumber === phase.phase_number ? 'true' : undefined}
+              className={[
+                selectedPhaseNumber === phase.phase_number ? 'current' : '',
+                workingPhaseNumber === phase.phase_number ? 'working' : '',
+              ].filter(Boolean).join(' ')}
               onClick={() => selectPhase(phase.phase_number)}
               onKeyDown={(event) => handlePhaseKeyDown(event, index)}
             >
@@ -643,29 +859,113 @@ export function ProductionPhases({
                 : `Phase ${selectedPhaseNumber} awaits QA approval`}
             </b>
             <p>
-              Approval records review of this planning snapshot only. It never certifies or starts image,
-              voice, video, ComfyUI, queue, or FFmpeg execution.
+              {selectedPhaseNumber === 5
+                ? 'Phase 5 approval opens workflow selection, then runs one local handoff batch: character references first, reusable asset references second, and scene starting images third. Scene images carry attachment labels for the characters and assets they use.'
+                : 'Approval records review of this planning snapshot only. It does not certify or start image, voice, video, ComfyUI, queue, or FFmpeg execution.'}
             </p>
             {phaseApprovalBlockedReason ? <small>{phaseApprovalBlockedReason}</small> : null}
             {approvalNotice ? <small role="status">{approvalNotice}</small> : null}
+            {queueProgress ? (
+              <small role="status">
+                {queueProgress.message} {queueProgress.total ? `(${queueProgress.completed}/${queueProgress.total})` : ''}
+              </small>
+            ) : null}
           </div>
           <button
             type="button"
             className="btn primary"
             disabled={
               approvingPhase
-              || selectedPhase.lifecycle_state === 'approved'
+              || (selectedPhase.lifecycle_state === 'approved' && selectedPhaseNumber !== 5)
               || Boolean(phaseApprovalBlockedReason)
             }
             onClick={() => void approveSelectedPhase()}
           >
-            {approvingPhase
-              ? `Approving Phase ${selectedPhaseNumber}…`
-              : selectedPhase.lifecycle_state === 'approved'
-                ? `Phase ${selectedPhaseNumber} planning approved`
-                : `Approve Phase ${selectedPhaseNumber} planning snapshot`}
+            {approvingPhase && selectedPhaseNumber === 5
+              ? 'Submitting Phase 5 handoff…'
+              : approvingPhase
+                ? `Approving Phase ${selectedPhaseNumber}…`
+                : selectedPhaseNumber === 5 && selectedPhase.lifecycle_state === 'approved'
+                  ? 'Select workflow & queue images'
+                  : selectedPhaseNumber === 5
+                    ? 'Approve Phase 5 & choose workflow'
+                    : selectedPhase.lifecycle_state === 'approved'
+                      ? `Phase ${selectedPhaseNumber} planning approved`
+                      : `Approve Phase ${selectedPhaseNumber} planning snapshot`}
           </button>
         </section>
+      ) : null}
+
+      {workflowOpen ? (
+        <div className="phase-workflow-modal" role="dialog" aria-modal="true" aria-labelledby="phase-five-workflow-title">
+          <section>
+            <header>
+              <div>
+                <span className="eyebrow">PHASE 5 HANDOFF</span>
+                <h3 id="phase-five-workflow-title">Choose image workflow</h3>
+                <p>Approval will submit one ordered batch: characters, reusable assets, then scene images. Scene image metadata will include labels that attach the image to the character and asset references it consumed.</p>
+              </div>
+              <button type="button" aria-label="Close workflow selector" onClick={() => setWorkflowOpen(false)} disabled={approvingPhase}>
+                ×
+              </button>
+            </header>
+            {workflowError ? <div className="phase-history-error" role="alert"><b>Workflow error</b><p>{workflowError}</p></div> : null}
+            <label>
+              <span>Static workflow</span>
+              <select
+                value={workflowSelection}
+                disabled={approvingPhase || workflowLoading || Boolean(workflowUploadJson)}
+                onChange={(event) => setWorkflowSelection(event.target.value)}
+              >
+                <option value={DEFAULT_PHASE_FIVE_WORKFLOW}>Configured Flux2 API spine</option>
+                {workflowTemplates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name} v{template.version}
+                  </option>
+                ))}
+              </select>
+              <small>{workflowLoading ? 'Loading templates…' : `${workflowTemplates.length} runtime template${workflowTemplates.length === 1 ? '' : 's'} available`}</small>
+            </label>
+            <label>
+              <span>Upload API workflow</span>
+              <input
+                type="file"
+                accept="application/json,.json"
+                disabled={approvingPhase}
+                onChange={(event) => void handleWorkflowUpload(event.currentTarget.files?.[0] ?? null)}
+              />
+              <small>{workflowUploadName || 'Optional ComfyUI API JSON; uploaded workflow overrides the static selection.'}</small>
+            </label>
+            {workflowUploadJson ? (
+              <button
+                type="button"
+                className="secondary-button"
+                disabled={approvingPhase}
+                onClick={() => {
+                  setWorkflowUploadJson(null)
+                  setWorkflowUploadName('')
+                }}
+              >
+                Clear uploaded workflow
+              </button>
+            ) : null}
+            {queueProgress ? (
+              <div className="phase-queue-progress" role="status">
+                <span style={{ width: `${queueProgress.total ? Math.round((queueProgress.completed / queueProgress.total) * 100) : 0}%` }} />
+                <b>{queueProgress.message}</b>
+                <small>{queueProgress.completed}/{queueProgress.total}</small>
+              </div>
+            ) : null}
+            <footer>
+              <button type="button" className="secondary-button" disabled={approvingPhase} onClick={() => setWorkflowOpen(false)}>
+                Cancel
+              </button>
+              <button type="button" className="primary-button" disabled={approvingPhase} onClick={() => void approvePhaseFiveAndQueueImages()}>
+                {approvingPhase ? 'Submitting handoff batch…' : 'Approve and submit handoff batch'}
+              </button>
+            </footer>
+          </section>
+        </div>
       ) : null}
 
       {historical && selectedIteration ? (
@@ -851,6 +1151,11 @@ export function ProductionPhases({
                       <article className="phase-metric">
                         <span>Target runtime</span>
                         <strong>{targetSec ? formatDuration(targetSec) : '—'}</strong>
+                        {packageData.planned_scene_count ? (
+                          <small>
+                            {packageData.planned_scene_count} scenes · 8s nominal · 6–10s clips
+                          </small>
+                        ) : null}
                       </article>
                       <article className="phase-metric">
                         <span>Planned runtime</span>
@@ -1021,6 +1326,8 @@ export function ProductionPhases({
             workspace={historical ? (incompleteReason ? null : historicalWorkspace) : currentWorkspace}
             historical={historical}
             incompleteReason={historical ? incompleteReason : null}
+            productionProfileKey={productionSettings?.production_profile_key}
+            stitchStage={productionSettings?.stitch_stage}
             onNavigate={onNavigate}
           />
         ) : null}
@@ -1036,13 +1343,16 @@ export function ProductionPhases({
             onClick={(event) => event.stopPropagation()}
           >
             <header>
-              <h3 id="retain-iteration-title">Retain Phase {selectedPhaseNumber} iteration</h3>
+              <h3 id="retain-iteration-title">
+                {phaseOneRegenerateIteration ? 'Generate' : 'Retain'} Phase {selectedPhaseNumber} iteration
+              </h3>
               <button type="button" aria-label="Close" disabled={savingIteration} onClick={() => setCreateOpen(false)}>×</button>
             </header>
             <div className="phase-iteration-form">
               <p>
-                This captures the complete <b>current draft</b> from SQLite-backed backend records—not the visible historical copy.
-                Existing iterations are never changed.
+                {phaseOneRegenerateIteration
+                  ? 'This reruns Sulphur for Phase 1 using the current story prompt, then stores the generated package in SQLite history. Existing iterations are never changed.'
+                  : 'This captures the complete current draft from SQLite-backed backend records—not the visible historical copy. Existing iterations are never changed.'}
               </p>
               <label>
                 Iteration name
@@ -1069,7 +1379,9 @@ export function ProductionPhases({
               <div className="modal-actions">
                 <button type="button" className="secondary-button" disabled={savingIteration} onClick={() => setCreateOpen(false)}>Cancel</button>
                 <button type="button" className="primary-button" disabled={savingIteration} onClick={() => void saveIteration()}>
-                  {savingIteration ? 'Retaining…' : 'Retain current draft'}
+                  {savingIteration
+                    ? (phaseOneRegenerateIteration ? 'Generating…' : 'Retaining…')
+                    : (phaseOneRegenerateIteration ? 'Generate new iteration' : 'Retain current draft')}
                 </button>
               </div>
             </div>

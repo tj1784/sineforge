@@ -20,13 +20,19 @@ from backend.app.schemas.production import (
     ProductionPipelineRead,
 )
 from backend.app.schemas.image_generation import (
+    PhaseFiveHandoffGenerateResponse,
     PhaseSixImagePrepareResponse,
     PhaseSixImageStatus,
     StartingImageGenerateRequest,
     StartingImageGenerateResponse,
 )
+from backend.app.schemas.video_generation import (
+    PhaseSevenVideoQueueRequest,
+    PhaseSevenVideoQueueResponse,
+)
 from backend.app.services import production_phases
 from backend.app.services import phase_six_images
+from backend.app.services import phase_seven_videos
 
 
 router = APIRouter(prefix="/production", tags=["production"])
@@ -212,6 +218,39 @@ def prepare_phase_six_images(
 
 
 @router.post(
+    "/stories/{story_id}/phase6/images/handoff",
+    response_model=PhaseFiveHandoffGenerateResponse,
+)
+def generate_phase_five_image_handoff(
+    story_id: UUID,
+    payload: StartingImageGenerateRequest | None = None,
+    db: Session = Depends(get_db),
+) -> PhaseFiveHandoffGenerateResponse:
+    request_payload = payload or StartingImageGenerateRequest(
+        requested_by="CineForge Phase 5 workflow handoff"
+    )
+    try:
+        result = phase_six_images.generate_phase_five_handoff(
+            db,
+            story_id,
+            requested_by=request_payload.requested_by,
+            seed=request_payload.seed,
+            model_name=request_payload.model_name or phase_six_images.DEFAULT_FLUX_IMAGE_MODEL,
+            workflow_template_id=request_payload.workflow_template_id,
+            workflow_label=request_payload.workflow_label,
+            workflow_source=request_payload.workflow_source,
+            workflow_api_json=request_payload.workflow_api_json,
+        )
+        return PhaseFiveHandoffGenerateResponse(**result)
+    except phase_six_images.PhaseSixImageError as exc:
+        db.rollback()
+        raise _error(phase_six_images.PhaseSixImageError(str(exc))) from exc
+    except Exception as exc:
+        db.rollback()
+        raise _error(phase_six_images.PhaseSixImageError(str(exc))) from exc
+
+
+@router.post(
     "/stories/{story_id}/phase6/images/shots/{shot_id}/generate",
     response_model=StartingImageGenerateResponse,
 )
@@ -230,6 +269,10 @@ def generate_phase_six_starting_image(
             requested_by=request_payload.requested_by,
             seed=request_payload.seed,
             model_name=request_payload.model_name or phase_six_images.DEFAULT_FLUX_IMAGE_MODEL,
+            workflow_template_id=request_payload.workflow_template_id,
+            workflow_label=request_payload.workflow_label,
+            workflow_source=request_payload.workflow_source,
+            workflow_api_json=request_payload.workflow_api_json,
         )
         return StartingImageGenerateResponse(**result)
     except phase_six_images.PhaseSixImageError as exc:
@@ -238,3 +281,32 @@ def generate_phase_six_starting_image(
     except Exception as exc:
         db.rollback()
         raise _error(phase_six_images.PhaseSixImageError(str(exc))) from exc
+
+
+@router.post(
+    "/stories/{story_id}/phase7/videos/queue",
+    response_model=PhaseSevenVideoQueueResponse,
+)
+def queue_phase_seven_videos(
+    story_id: UUID,
+    payload: PhaseSevenVideoQueueRequest | None = None,
+    db: Session = Depends(get_db),
+) -> PhaseSevenVideoQueueResponse:
+    request_payload = payload or PhaseSevenVideoQueueRequest()
+    try:
+        result = phase_seven_videos.queue_story_videos(
+            db,
+            story_id,
+            requested_by=request_payload.requested_by,
+            seed=request_payload.seed,
+            workflow_label=request_payload.workflow_label,
+            workflow_source=request_payload.workflow_source,
+            workflow_api_json=request_payload.workflow_api_json,
+        )
+        return PhaseSevenVideoQueueResponse(**result)
+    except phase_seven_videos.PhaseSevenVideoError as exc:
+        db.rollback()
+        raise _error(production_phases.ProductionPhaseError(str(exc))) from exc
+    except Exception as exc:
+        db.rollback()
+        raise _error(production_phases.ProductionPhaseError(str(exc))) from exc

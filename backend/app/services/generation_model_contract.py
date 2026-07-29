@@ -10,13 +10,22 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any, Literal
 
+from backend.app.services.production_profiles import (
+    DEFAULT_PRODUCTION_PROFILE_REF,
+    LEGACY_LTX_VIDEO_MODEL,
+    LEGACY_LTX_VIDEO_MODEL_KEY,
+    ProductionProfile,
+    resolve_production_profile,
+)
+
 PLANNING_IMAGE_MODEL_KEY = "flux2_dev_fp8mixed"
 EXPERIMENTAL_PLANNING_IMAGE_MODEL_KEY = "flux2_dev"
-VIDEO_MODEL_KEY = "ltx2_3_22b_distilled_1_1_fp8"
+VIDEO_MODEL_KEY = LEGACY_LTX_VIDEO_MODEL_KEY
 
 PLANNING_IMAGE_MODEL = "flux2_dev_fp8mixed.safetensors"
 EXPERIMENTAL_PLANNING_IMAGE_MODEL = "flux2_dev.safetensors"
-VIDEO_MODEL = "ltx-2.3-22b-distilled-1.1-fp8.safetensors"
+VIDEO_MODEL = LEGACY_LTX_VIDEO_MODEL
+VIDEO_PRODUCTION_PROFILE = DEFAULT_PRODUCTION_PROFILE_REF
 
 APPROVED_BASE_MODELS = frozenset(
     {PLANNING_IMAGE_MODEL, EXPERIMENTAL_PLANNING_IMAGE_MODEL, VIDEO_MODEL}
@@ -43,6 +52,7 @@ BASE_MODEL_LOADER_TYPES = frozenset(
         "UNETLoaderGGUF",
         "CheckpointLoaderNF4",
         "LTXVLoader",
+        "WanVideoModelLoader",
     }
 )
 BASE_MODEL_INPUT_NAMES = frozenset(
@@ -51,7 +61,10 @@ BASE_MODEL_INPUT_NAMES = frozenset(
 
 
 def require_approved_base_model(
-    modality: Literal["image", "video"], model_name: str
+    modality: Literal["image", "video"],
+    model_name: str,
+    *,
+    production_profile: str | ProductionProfile | None = None,
 ) -> None:
     if modality == "image":
         normalized = model_name.replace("\\", "/").split("/")[-1].lower()
@@ -60,18 +73,31 @@ def require_approved_base_model(
         expected = ", ".join(sorted(APPROVED_IMAGE_BASE_MODELS))
         raise ValueError(f"Planning images require a Flux-family local model such as {expected}; got {model_name}.")
 
-    expected = APPROVED_BASE_MODEL_BY_MODALITY[modality]
-    if model_name != expected:
-        sentence = f"Video generation requires {expected}"
-        raise ValueError(f"{sentence}; got {model_name}.")
+    profile = resolve_production_profile(production_profile)
+    if production_profile is None:
+        # Retain the exact legacy error contract for unscoped callers.
+        expected = APPROVED_BASE_MODEL_BY_MODALITY[modality]
+        if model_name != expected:
+            sentence = f"Video generation requires {expected}"
+            raise ValueError(f"{sentence}; got {model_name}.")
+        return
+    profile.require_video_model(model_name)
 
 
 def require_approved_planning_image_model(model_name: str) -> None:
     require_approved_base_model("image", model_name)
 
 
-def require_approved_video_model(model_name: str) -> None:
-    require_approved_base_model("video", model_name)
+def require_approved_video_model(
+    model_name: str,
+    *,
+    production_profile: str | ProductionProfile | None = None,
+) -> None:
+    require_approved_base_model(
+        "video",
+        model_name,
+        production_profile=production_profile,
+    )
 
 
 def _iter_api_nodes(workflow: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
@@ -130,6 +156,7 @@ def validate_workflow_base_models(
     modality: Literal["image", "video"],
     *,
     require_reference: bool = True,
+    production_profile: str | ProductionProfile | None = None,
 ) -> tuple[str, ...]:
     """Fail closed when a workflow selects a non-product base model."""
 
@@ -137,5 +164,9 @@ def validate_workflow_base_models(
     if require_reference and not references:
         raise ValueError("Workflow does not expose an auditable base-model reference.")
     for reference in references:
-        require_approved_base_model(modality, reference)
+        require_approved_base_model(
+            modality,
+            reference,
+            production_profile=production_profile,
+        )
     return references

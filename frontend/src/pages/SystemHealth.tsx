@@ -8,6 +8,8 @@ type HealthState = {
   root: RootStatus | null
   backend: HealthResponse | null
   comfy: HealthResponse | null
+  runner: HealthResponse | null
+  sulphur: HealthResponse | null
   gpu: HealthResponse | null
   ffmpeg: HealthResponse | null
 }
@@ -21,6 +23,8 @@ export function SystemHealth() {
     root: null,
     backend: null,
     comfy: null,
+    runner: null,
+    sulphur: null,
     gpu: null,
     ffmpeg: null,
   })
@@ -34,15 +38,17 @@ export function SystemHealth() {
       setLoading(true)
       setError(null)
       try {
-        const [root, backend, comfy, gpu, ffmpeg] = await Promise.all([
+        const [root, backend, comfy, runner, sulphur, gpu, ffmpeg] = await Promise.all([
           api.rootStatus(),
           api.health(),
           api.comfyHealth(),
+          api.comfyApiRunnerHealth(),
+          api.sulphurHealth(),
           api.gpuHealth(),
           api.ffmpegHealth(),
         ])
         if (!cancelled) {
-          setHealth({ root, backend, comfy, gpu, ffmpeg })
+          setHealth({ root, backend, comfy, runner, sulphur, gpu, ffmpeg })
         }
       } catch (err) {
         if (!cancelled) {
@@ -89,6 +95,18 @@ export function SystemHealth() {
           status={statusOf(health.comfy)}
           detail="External ComfyUI reachability only; no prompt submission."
           meta="GET /health/comfy"
+        />
+        <StatusCard
+          title="ComfyAPI Runner"
+          status={statusOf(health.runner)}
+          detail="Local API-format workflow runner and its ComfyUI connection."
+          meta="GET /health/comfy-api-runner"
+        />
+        <StatusCard
+          title="Sulphur"
+          status={statusOf(health.sulphur)}
+          detail="Local script and prompt enhancer model served by LM Studio."
+          meta="GET /health/sulphur"
         />
         <StatusCard
           title="GPU"

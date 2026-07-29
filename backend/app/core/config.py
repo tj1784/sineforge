@@ -1,6 +1,8 @@
 import re
 from functools import lru_cache
+from ipaddress import ip_address
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -9,6 +11,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_STORAGE_ROOT = (REPO_ROOT / "storage").resolve()
 DEFAULT_DATABASE_URL = f"sqlite:///{(DEFAULT_STORAGE_ROOT / 'cineforge_local.db').as_posix()}"
+DEFAULT_SULPHUR_MODEL_PATH = (
+    Path.home()
+    / ".lmstudio"
+    / "models"
+    / "SulphurAI"
+    / "Sulphur-2-base"
+    / "sulphur_prompt_enhancer_model-q8_0.gguf"
+)
+DEFAULT_QWEN_MODEL_PATH = (
+    Path.home()
+    / ".lmstudio"
+    / "models"
+    / "DavidAU"
+    / "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF"
+    / "Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf"
+)
+DEFAULT_QWEN_MODEL_ID = (
+    "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-"
+    "neo-code-di-imatrix-max"
+)
 
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,199}$")
 _FORBIDDEN_URL_CHARS = set(";|`$\n\r&<>")
@@ -24,7 +46,8 @@ class Settings(BaseSettings):
     env: str = "local"
     log_level: str = "INFO"
     database_url: str = DEFAULT_DATABASE_URL
-    comfyui_base_url: AnyHttpUrl = "http://127.0.0.1:8188"
+    comfyui_base_url: AnyHttpUrl = "http://127.0.0.1:8888"
+    comfy_api_runner_base_url: AnyHttpUrl = "http://127.0.0.1:8022"
     storage_root: Path = Field(default=DEFAULT_STORAGE_ROOT)
     allow_absolute_input_paths: bool = False
     queue_worker_enabled: bool = False
@@ -57,6 +80,24 @@ class Settings(BaseSettings):
     openai_logical_model_terra: str = "gpt-4o"
     openai_logical_model_sol: str = "gpt-4.1"
 
+    # ------------------------------------------------------------------
+    # Local Sulphur planning and prompt/script enhancement through LM Studio
+    # ------------------------------------------------------------------
+    # Disabled in library/test contexts. The trusted workstation launcher
+    # enables these settings for the supervised local stack.
+    sulphur_planning_enabled: bool = False
+    sulphur_phase_one_enabled: bool = False
+    sulphur_base_url: str = "http://127.0.0.1:1234/v1"
+    sulphur_model_id: str = "sulphur-2-base"
+    sulphur_model_path: Path = Field(default=DEFAULT_SULPHUR_MODEL_PATH)
+    qwen_model_id: str = DEFAULT_QWEN_MODEL_ID
+    qwen_model_path: Path = Field(default=DEFAULT_QWEN_MODEL_PATH)
+    sulphur_timeout_sec: float = Field(default=300.0, ge=1.0, le=900.0)
+    sulphur_wall_time_sec: float = Field(default=420.0, ge=1.0, le=1200.0)
+    sulphur_transport_retries: int = Field(default=1, ge=0, le=3)
+    sulphur_max_response_bytes: int = Field(default=1_048_576, ge=1024, le=8_388_608)
+    sulphur_repair_instruction_limit: int = Field(default=12, ge=0, le=20)
+
     @field_validator("storage_root", mode="before")
     @classmethod
     def resolve_storage_root(cls, value: str | Path) -> Path:
@@ -80,23 +121,44 @@ class Settings(BaseSettings):
             database_path = REPO_ROOT / database_path
         return f"{prefix}{database_path.resolve().as_posix()}"
 
-    @field_validator("openai_base_url")
+    @field_validator("openai_base_url", "sulphur_base_url")
     @classmethod
-    def validate_openai_base_url(cls, value: str) -> str:
+    def validate_provider_base_url(cls, value: str) -> str:
         cleaned = (value or "").strip().rstrip("/")
         if not cleaned.startswith(("http://", "https://")):
-            raise ValueError("openai_base_url must be an http(s) URL")
+            raise ValueError("provider base URL must be an http(s) URL")
         if any(ch in cleaned for ch in _FORBIDDEN_URL_CHARS):
-            raise ValueError("openai_base_url contains forbidden characters")
+            raise ValueError("provider base URL contains forbidden characters")
         # Reject shell/executable path shapes — HTTP endpoints only.
         if cleaned.lower().startswith(("file:", "ftp:")):
-            raise ValueError("openai_base_url must be an http(s) URL")
+            raise ValueError("provider base URL must be an http(s) URL")
         return cleaned
+
+    @field_validator("sulphur_base_url")
+    @classmethod
+    def validate_sulphur_loopback_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        try:
+            is_loopback = ip_address(parsed.hostname or "").is_loopback
+        except ValueError:
+            is_loopback = (parsed.hostname or "").lower() == "localhost"
+        if (
+            parsed.scheme != "http"
+            or not is_loopback
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError("sulphur_base_url must remain an HTTP loopback API URL")
+        return value
 
     @field_validator(
         "openai_logical_model_luna",
         "openai_logical_model_terra",
         "openai_logical_model_sol",
+        "sulphur_model_id",
+        "qwen_model_id",
     )
     @classmethod
     def validate_logical_model_id(cls, value: str) -> str:
@@ -124,6 +186,11 @@ class Settings(BaseSettings):
             raise ValueError("logical model identifier must not look like an executable path")
         return cleaned
 
+    @field_validator("sulphur_model_path", "qwen_model_path", mode="before")
+    @classmethod
+    def resolve_local_model_path(cls, value: str | Path) -> Path:
+        return Path(value).expanduser().resolve()
+
     @property
     def openai_configured(self) -> bool:
         """True when the OpenAI planning adapter may be constructed."""
@@ -133,6 +200,15 @@ class Settings(BaseSettings):
             return False
         secret = self.openai_api_key.get_secret_value()
         return bool(secret and secret.strip())
+
+    @property
+    def sulphur_configured(self) -> bool:
+        """True when the approved local Sulphur model may serve planning."""
+        return (
+            self.sulphur_planning_enabled
+            and self.sulphur_model_path.is_file()
+            and self.sulphur_model_path.suffix.casefold() == ".gguf"
+        )
 
     @property
     def workflow_template_root(self) -> Path:

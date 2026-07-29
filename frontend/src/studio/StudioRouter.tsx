@@ -10,6 +10,8 @@ import { VoicesPage } from './pages/VoicesPage'
 import { ImagesPage } from './pages/ImagesPage'
 import { RoutingPage } from './pages/RoutingPage'
 import { WorkflowsPage } from './pages/WorkflowsPage'
+import { ApiCallerPage } from './pages/ApiCallerPage'
+import { DownloadsPage } from './pages/DownloadsPage'
 import { ExportsPage } from './pages/ExportsPage'
 import { SettingsPage } from './pages/SettingsPage'
 
@@ -46,6 +48,14 @@ const PAGE_META: Record<PageId, { title: string; description: string }> = {
     title: 'Workflows',
     description: 'Factual workflow-template catalog, admission evidence, and production routing.',
   },
+  'api-caller': {
+    title: 'API Caller',
+    description: 'Mutable local API workflow library, right-panel input editor, validation, and explicit queue submission.',
+  },
+  downloads: {
+    title: 'Downloads',
+    description: 'Pinned model download candidates, verified local files, and source references.',
+  },
   exports: {
     title: 'Exports',
     description: 'Planning exports plus the final assembly, manifest, and provenance destination.',
@@ -73,6 +83,8 @@ export function StudioRouter({ page }: { page: PageId }) {
     images: <ImagesPage />,
     routing: <RoutingPage />,
     workflows: <WorkflowsPage />,
+    'api-caller': <ApiCallerPage />,
+    downloads: <DownloadsPage />,
     exports: <ExportsPage />,
     settings: <SettingsPage />,
   }[page]

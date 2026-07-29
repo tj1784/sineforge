@@ -50,6 +50,9 @@ def test_get_settings_returns_defaults_without_persisting(db_session):
     assert row.prefer_local_providers is True
     assert row.allow_rendering is True
     assert row.allow_model_download is True
+    assert row.production_profile_key == "ltx_base@1"
+    assert row.production_profile_snapshot_json["execution_qualified"] is True
+    assert row.stitch_stage == "phase7_before_audio"
     assert row.voice_policy_json["allow_placeholder_for_approval"] is True
     assert row.approval_policy_json["require_prompt_package_or_exception"] is True
     assert row.approval_policy_json["require_model_recommendation_or_exception"] is True
@@ -100,6 +103,28 @@ def test_put_settings_stale_version_conflicts(db_session):
     )
     with pytest.raises(settings_service.StoryboardSettingsConflictError):
         settings_service.put_settings(db_session, project.id, payload)
+
+
+def test_put_settings_persists_canonical_wan_planning_snapshot(db_session):
+    project = _project(db_session)
+    created = settings_service.get_or_create_settings(db_session, project.id)
+
+    updated = settings_service.put_settings(
+        db_session,
+        project.id,
+        ProjectStoryboardSettingsUpdate(
+            production_profile_key="wan_base@1",
+            production_profile_snapshot_json={"forged": True},
+            stitch_stage="phase8_before_foley",
+            expected_settings_version=created.settings_version,
+        ),
+    )
+
+    assert updated.production_profile_key == "wan_base@1"
+    assert updated.production_profile_snapshot_json["status"] == "qualification_required"
+    assert updated.production_profile_snapshot_json["execution_qualified"] is False
+    assert "forged" not in updated.production_profile_snapshot_json
+    assert updated.stitch_stage == "phase8_before_foley"
 
 
 def test_put_settings_rejects_unknown_project(db_session):

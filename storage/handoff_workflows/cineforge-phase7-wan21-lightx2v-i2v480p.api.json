@@ -1,0 +1,209 @@
+{
+  "1": {
+    "class_type": "UnetLoaderGGUF",
+    "inputs": {
+      "unet_name": "WAN\\2.1\\I2V\\Lightx2v\\lightx2v4stepGgufQ4KMWan21_i2v480P.gguf"
+    },
+    "_meta": {
+      "title": "WAN 2.1 Lightx2v GGUF"
+    }
+  },
+  "2": {
+    "class_type": "wanBlockSwap",
+    "inputs": {
+      "model": [
+        "1",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "WAN block swap"
+    }
+  },
+  "3": {
+    "class_type": "ModelSamplingSD3",
+    "inputs": {
+      "model": [
+        "2",
+        0
+      ],
+      "shift": 8.0
+    },
+    "_meta": {
+      "title": "WAN sampling shift"
+    }
+  },
+  "4": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+      "type": "wan",
+      "device": "default"
+    },
+    "_meta": {
+      "title": "WAN UMT5 encoder"
+    }
+  },
+  "5": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "[PROJECT_ID:23e4f49a-4d70-400f-ad2b-d37baac75dfc] [STORY_ID:b0b4f87e-1bfa-490f-970b-7448751e0422] [CHARACTER_ID:f1fb0990-aef4-49fe-a6b9-f7e1458334ad] [CHARACTER_TAG:character:daniel-reyes:lead:v1] [CHARACTER_REF_ASSET_ID:1880145d-60f6-4afd-bd1d-874ab7cf566d] [VEHICLE_TAG:asset:dark-graphite-compact-sedan:v1] [VEHICLE_REF_ASSET_ID:69a93470-e4de-443f-ba7c-8e4884b7cf04] [SCENE_NUMBER:04] [SHOT_TAG:shot:drive-home:04a:v1] [STARTING_IMAGE_ASSET_ID:8f4edca4-9a9a-43c7-89ce-62d22f96deb5] Inside the same left-hand-drive car, Daniel settles into the driver seat, pulls the seat belt across his chest until it clicks, then starts the engine. Dashboard illumination wakes softly; locked passenger-side medium camera. Photoreal contemporary live-action cinema. Preserve the exact approved starting frame, Daniel Reyes identity, wardrobe, messenger bag, wet blue-hour weather, and the same dark-graphite compact fastback. Natural human motion, realistic weight and inertia, restrained camera movement, physically plausible reflections, consistent lighting and geography.",
+      "clip": [
+        "4",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Positive video prompt — edit per shot"
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "static frozen frame, identity drift, different person, changed age, changed hair, changed facial hair, wardrobe change, necktie, missing messenger bag, different vehicle, changed car color, changed car body style, right-hand-drive interior, extra people, duplicated person, duplicate limbs, malformed hands, fused fingers, distorted face, waxy skin, plastic skin, illustration, anime, CGI look, low detail, blur, overprocessed HDR, oversaturation, text, captions, logos, watermark, camera discontinuity, teleportation, impossible reflections, day-night mismatch, changing weather, jerky motion, flicker, warping, melting",
+      "clip": [
+        "4",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Negative video prompt — continuity guardrails"
+    }
+  },
+  "7": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    },
+    "_meta": {
+      "title": "WAN VAE"
+    }
+  },
+  "8": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "cineforge\\23e4f49a-4d70-400f-ad2b-d37baac75dfc\\phase7\\s04a_approved.png"
+    },
+    "_meta": {
+      "title": "Starting image — replace/upload per shot"
+    },
+    "is_changed": [
+      "ca86b7edec331f9ee6b7fca1f05584ff31281cb24ee731e1df12e77faad53d96"
+    ]
+  },
+  "9": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "8",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 832,
+      "height": 480,
+      "crop": "center"
+    },
+    "_meta": {
+      "title": "WAN 480p frame"
+    }
+  },
+  "10": {
+    "class_type": "WanImageToVideo",
+    "inputs": {
+      "positive": [
+        "5",
+        0
+      ],
+      "negative": [
+        "6",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ],
+      "start_image": [
+        "9",
+        0
+      ],
+      "width": 832,
+      "height": 480,
+      "length": 121,
+      "batch_size": 1
+    },
+    "_meta": {
+      "title": "WAN I2V conditioning"
+    }
+  },
+  "11": {
+    "class_type": "KSamplerAdvanced",
+    "inputs": {
+      "model": [
+        "3",
+        0
+      ],
+      "add_noise": "enable",
+      "noise_seed": 260728104,
+      "steps": 4,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "10",
+        1
+      ],
+      "latent_image": [
+        "10",
+        2
+      ],
+      "start_at_step": 0,
+      "end_at_step": 4,
+      "return_with_leftover_noise": "disable"
+    },
+    "_meta": {
+      "title": "Lightx2v four-step sample"
+    }
+  },
+  "12": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "11",
+        0
+      ],
+      "vae": [
+        "7",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Decode WAN frames"
+    }
+  },
+  "13": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": [
+        "12",
+        0
+      ],
+      "frame_rate": 16.0,
+      "loop_count": 0,
+      "filename_prefix": "cineforge\\manual\\phase7_wan\\wan_i2v_clip",
+      "format": "video/h264-mp4",
+      "pingpong": false,
+      "save_output": true,
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_metadata": true,
+      "trim_to_audio": false
+    },
+    "_meta": {
+      "title": "Save WAN 2.1 LightX2V clip"
+    }
+  }
+}

@@ -31,6 +31,19 @@ export type ProjectWorkspaceCreatePayload = {
   narration_dialogue_preference?: string | null
   source_fidelity_constraints?: string | null
   content_constraints?: string | null
+  requested_chapter_count?: number
+  chapter_intake?: Array<{
+    order_index: number
+    title: string
+    summary?: string | null
+    source_prompt?: string | null
+    target_duration_sec?: number | null
+    narrative_purpose?: string | null
+    dramatic_progression?: string | null
+    production_notes?: string | null
+  }>
+  bootstrap_phase_plan?: boolean
+  auto_approve_phases_through?: number | null
   run_phase_one?: boolean
   comparison_baseline?: 'transfiguration_phase_one' | null
   aspect_ratio: string
@@ -41,6 +54,8 @@ export type ProjectWorkspaceCreatePayload = {
   fps: number
   captions_enabled: boolean
   audio_enabled: boolean
+  production_profile_key?: 'ltx_base@1' | 'wan_base@1'
+  stitch_stage?: 'phase7_before_audio' | 'phase8_before_foley'
   speaking_rate: number
   prefer_hosted_providers: boolean
   prefer_local_providers: boolean
@@ -91,6 +106,15 @@ export type RuntimeStatus = {
   environment: string
   current_phase: string
   comfyui: HealthResponse
+  comfy_api_runner: HealthResponse
+  sulphur: HealthResponse & {
+    model_loaded?: boolean
+    model_id?: string
+    model_file?: string
+    quantization?: string
+    context_length?: number
+    parallel?: number
+  }
   object_info: {
     status: string
     available: boolean
@@ -104,9 +128,14 @@ export type RuntimeStatus = {
     submission_enabled: boolean
     controlled_submission_enabled: boolean
     public_submission_enabled: boolean
+    api_runner_available: boolean
     supported_states: string[]
   }
   disabled_actions: Record<string, string>
+  links: {
+    comfyui: string
+    comfy_api_runner: string
+  }
 }
 
 export type Story = {
@@ -222,8 +251,48 @@ export type Chapter = {
   order_index: number
   title: string
   summary: string | null
+  narrative_purpose?: string | null
+  target_duration_sec?: number | null
+  dramatic_progression?: string | null
   duration_sec: number
   scenes: Scene[]
+}
+
+export type LMStudioModel = {
+  model_id: string
+  key: string
+  display_name: string
+  filename: string | null
+  publisher: string | null
+  architecture: string | null
+  quantization: string | null
+  params_string: string | null
+  size_bytes: number | null
+  max_context_length: number | null
+  context_length: number | null
+  parallel: number | null
+  installed: boolean
+  loaded: boolean
+  selected: boolean
+  loaded_instance_ids: string[]
+}
+
+export type LMStudioModelCatalog = {
+  schema_name: 'runtime.lm_studio_models.v1'
+  status: string
+  reachable: boolean
+  active_model_id: string
+  configured_model_id: string
+  models: LMStudioModel[]
+  error: string | null
+}
+
+export type LMStudioModelActivation = {
+  status: string
+  active_model_id: string
+  loaded: boolean
+  load_time_seconds: number | null
+  model: LMStudioModel
 }
 
 export type Character = {
@@ -572,6 +641,94 @@ export type RuntimeCatalogWorkflowTemplate = {
   claims: Record<string, boolean>
 }
 
+export type ApiCallerWorkflowSummary = {
+  id: string
+  name: string
+  version: string
+  description: string | null
+  source_kind: string | null
+  source_id: string | null
+  source_filename: string | null
+  node_count: number
+  sha256: string
+  created_at: string
+  updated_at: string
+}
+
+export type ApiCallerWorkflowDetail = ApiCallerWorkflowSummary & {
+  workflow: Record<string, ApiCallerWorkflowNode>
+}
+
+export type ApiCallerWorkflowNode = {
+  class_type: string
+  inputs: Record<string, unknown>
+  _meta?: {
+    title?: string
+    [key: string]: unknown
+  }
+  [key: string]: unknown
+}
+
+export type ApiCallerEditableField = {
+  nodeId: string
+  classType: string
+  title: string
+  input: string
+  value: string | number | boolean
+  valueType: 'str' | 'int' | 'float' | 'bool' | string
+  label: string
+}
+
+export type ApiCallerAnalysis = {
+  ok: boolean
+  format: string
+  queueable: boolean
+  nodeCount: number
+  editable: ApiCallerEditableField[]
+  mediaTargets: ApiCallerEditableField[]
+  promptFields: ApiCallerEditableField[]
+  outputNodes: Array<{
+    nodeId: string
+    classType: string
+    title: string
+  }>
+  modelRefs: Array<{
+    nodeId: string
+    title: string
+    classType: string
+    input: string
+    name: string
+    folder: string
+  }>
+}
+
+export type ApiCallerRuntime = {
+  ok: boolean
+  comfy_url: string
+  runner_url: string
+  runner: {
+    status: string
+    reachable: boolean
+    comfy_connected: boolean
+    error?: string
+  }
+}
+
+export type ApiCallerImportResult = {
+  ok: boolean
+  imported: number
+  updated: number
+  skipped: number
+  workflows: ApiCallerWorkflowSummary[]
+}
+
+export type ApiCallerRunResult = Record<string, unknown> & {
+  ok?: boolean
+  jobId?: string
+  queueCount?: number
+  promptIds?: string[]
+}
+
 export type RuntimeCatalogSummary = {
   models: number
   model_variants: number
@@ -589,6 +746,14 @@ export type RuntimeCatalog = {
   workflow_templates: RuntimeCatalogWorkflowTemplate[]
   quantizations: unknown[]
   loras: unknown[]
+}
+
+export type LocalModelInventory = {
+  status: 'available' | 'partial' | 'unavailable' | string
+  source_url: string
+  total_count: number
+  categories: Record<string, string[]>
+  errors: Record<string, string>
 }
 
 export type ProviderExecutionMode = 'disabled' | 'manual' | 'assisted' | 'automatic'
@@ -753,6 +918,9 @@ export type ProjectStoryboardSettings = {
   fps: number
   captions_enabled: boolean
   audio_enabled: boolean
+  production_profile_key: 'ltx_base@1' | 'wan_base@1'
+  production_profile_snapshot_json: Record<string, unknown>
+  stitch_stage: 'phase7_before_audio' | 'phase8_before_foley'
   prefer_hosted_providers: boolean
   prefer_local_providers: boolean
   allow_model_download: boolean
@@ -774,6 +942,27 @@ export type ProjectWorkspace = {
   settings: ProjectStoryboardSettings
   idempotent_replay: boolean
   production_pipeline: ProductionPipeline | null
+}
+
+export type SulphurProjectWorkspace = ProjectWorkspace & {
+  intake_provider: 'sulphur'
+  intake_model: string
+  source_prompt_preserved: true
+  target_duration_sec: number
+  planned_scene_count: number
+  nominal_scene_duration_sec: 8
+  clip_duration_range_sec: [6, 10]
+}
+
+export type ComfyRestartRequest = {
+  restart_id: string
+  status: string
+  message: string
+}
+
+export type ComfyRestartStatus = ComfyRestartRequest & {
+  complete: boolean
+  failed: boolean
 }
 
 export type PhaseLifecycleState =
@@ -813,6 +1002,10 @@ export type PhaseOnePackage = {
   dramatic_escalation: string[]
   narrative_structure: Record<'opening' | 'middle' | 'climax' | 'resolution', string>
   pacing_plan: Array<Record<string, string | number>>
+  planned_scene_count?: number
+  nominal_scene_duration_sec?: number
+  clip_duration_range_sec?: [number, number]
+  scene_duration_plan_sec?: number[]
   duration_analysis: PhaseOneDurationAnalysis
   script_word_count: number
   source_fidelity_notes: string[]
@@ -835,6 +1028,23 @@ export type PhaseOnePackage = {
     review_items: string[]
     note: string
   }
+}
+
+export type PhaseOneGenerationPayload = {
+  original_prompt: string
+  target_duration_sec: number
+  audience?: string | null
+  genre?: string | null
+  tone?: string | null
+  language?: string
+  visual_style?: string | null
+  narration_dialogue_preference?: string | null
+  source_fidelity_constraints?: string | null
+  content_constraints?: string | null
+  requested_chapter_count?: number
+  chapter_intake?: Record<string, unknown>[]
+  comparison_baseline?: string | null
+  requested_by?: string | null
 }
 
 export type ProductionQAReport = {
@@ -937,7 +1147,7 @@ export type ProductionPhase = {
 export type ProductionPipeline = {
   story_id: string
   project_id: string
-  exact_phase_count: 7
+  exact_phase_count: 8
   phases: ProductionPhase[]
   completion_message: string | null
 }
@@ -1000,6 +1210,10 @@ export type StartingImageGenerateRequest = {
   requested_by?: string
   seed?: number | null
   model_name?: string | null
+  workflow_template_id?: string | null
+  workflow_label?: string | null
+  workflow_source?: string | null
+  workflow_api_json?: Record<string, unknown> | null
 }
 
 export type StartingImageGenerateResponse = {
@@ -1012,6 +1226,63 @@ export type StartingImageGenerateResponse = {
   prompt_id: string | null
   model_name: string
   seed: number
+}
+
+export type ReferenceImageGenerateResponse = {
+  asset: PlanningMediaAsset
+  created: boolean
+  duplicate_of_existing: boolean
+  entity_type: string
+  entity_id: string | null
+  label: string
+  prompt_id: string | null
+  model_name: string
+  seed: number
+}
+
+export type PhaseFiveHandoffGenerateResponse = {
+  status: PhaseSixImageStatus
+  message: string
+  character_count: number
+  asset_count: number
+  scene_count: number
+  generated: {
+    characters: ReferenceImageGenerateResponse[]
+    assets: ReferenceImageGenerateResponse[]
+    scenes: StartingImageGenerateResponse[]
+  }
+}
+
+export type PhaseSevenVideoQueueRequest = {
+  requested_by?: string
+  seed?: number | null
+  workflow_label?: string | null
+  workflow_source?: string | null
+  workflow_api_json?: Record<string, unknown> | null
+}
+
+export type PhaseSevenVideoQueuedJob = {
+  shot_id: string
+  starting_image_asset_id: string
+  runner_job_id: string
+  shot_code: string
+  prompt: string
+  negative_prompt: string
+  seed: number
+  frame_count: number
+  input_image: string
+  output_prefix: string
+}
+
+export type PhaseSevenVideoQueueResponse = {
+  queued_count: number
+  blocked_count: number
+  required_count: number
+  message: string
+  runner_url: string
+  workflow_label: string
+  jobs: PhaseSevenVideoQueuedJob[]
+  blockers: string[]
 }
 
 export type VoiceProfileCreatePayload = {
@@ -1463,18 +1734,41 @@ export const api = {
   rootStatus: () => request<RootStatus>('/'),
   health: () => request<HealthResponse>('/health'),
   comfyHealth: () => request<HealthResponse>('/health/comfy'),
+  comfyApiRunnerHealth: () => request<HealthResponse>('/health/comfy-api-runner'),
+  sulphurHealth: () => request<HealthResponse>('/health/sulphur'),
   gpuHealth: () => request<HealthResponse>('/health/gpu'),
   ffmpegHealth: () => request<HealthResponse>('/health/ffmpeg'),
   runtimeStatus: () => request<RuntimeStatus>('/runtime/status'),
+  listLmStudioModels: () =>
+    request<LMStudioModelCatalog>('/runtime/lm-studio/models'),
+  activateLmStudioModel: (modelId: string) =>
+    request<LMStudioModelActivation>('/runtime/lm-studio/models/active', {
+      method: 'PUT',
+      body: JSON.stringify({ model_id: modelId }),
+    }),
+  restartComfyUi: () =>
+    request<ComfyRestartRequest>('/runtime/comfyui/restart', { method: 'POST' }),
+  comfyRestartStatus: (restartId: string) =>
+    request<ComfyRestartStatus>(`/runtime/comfyui/restart/${encodeURIComponent(restartId)}`),
 
   listProjects: () => request<Project[]>('/projects'),
   createProject: (payload: { name: string; description?: string | null }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(payload) }),
   createProjectWorkspace: (payload: ProjectWorkspaceCreatePayload) =>
     request<ProjectWorkspace>('/projects/workspace', { method: 'POST', body: JSON.stringify(payload) }),
+  createProjectFromSulphur: (payload: { idempotency_key: string; prompt: string }) =>
+    request<SulphurProjectWorkspace>('/projects/sulphur-intake', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   getProject: (projectId: string) => request<Project>(`/projects/${projectId}`),
   getProductionPipeline: (storyId: string) =>
     request<ProductionPipeline>(`/production/stories/${storyId}`),
+  generatePhaseOne: (storyId: string, payload: PhaseOneGenerationPayload) =>
+    request<PhaseOneMutationResponse>(`/production/stories/${storyId}/phases/1/generate`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   approveProductionPhase: (
     storyId: string,
     phaseNumber: number,
@@ -1491,6 +1785,17 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ approved_by: requestedBy, notes: 'Phase 6 planning-image completion required.' }),
     }),
+  generatePhaseFiveHandoff: (
+    storyId: string,
+    payload: StartingImageGenerateRequest = {},
+  ) =>
+    request<PhaseFiveHandoffGenerateResponse>(
+      `/production/stories/${storyId}/phase6/images/handoff`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
   generateStartingImage: (
     storyId: string,
     shotId: string,
@@ -1498,6 +1803,17 @@ export const api = {
   ) =>
     request<StartingImageGenerateResponse>(
       `/production/stories/${storyId}/phase6/images/shots/${shotId}/generate`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
+  queuePhaseSevenVideos: (
+    storyId: string,
+    payload: PhaseSevenVideoQueueRequest = {},
+  ) =>
+    request<PhaseSevenVideoQueueResponse>(
+      `/production/stories/${storyId}/phase7/videos/queue`,
       {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -1616,8 +1932,15 @@ export const api = {
       }),
     }),
 
-  createChapter: (storyId: string, payload: { title: string; summary?: string; order_index: number }) =>
-    request(`/storyboard/stories/${storyId}/chapters`, { method: 'POST', body: JSON.stringify(payload) }),
+  createChapter: (storyId: string, payload: {
+    title: string
+    summary?: string | null
+    order_index: number
+    narrative_purpose?: string | null
+    target_duration_sec?: number | null
+    dramatic_progression?: string | null
+  }) =>
+    request<Chapter>(`/storyboard/stories/${storyId}/chapters`, { method: 'POST', body: JSON.stringify(payload) }),
   updateChapter: (chapterId: string, payload: Record<string, unknown>) =>
     request(`/storyboard/chapters/${chapterId}`, { method: 'PATCH', body: JSON.stringify(payload) }),
   deleteChapter: (chapterId: string, reason?: string) =>
@@ -1791,6 +2114,22 @@ export const api = {
 
   listStartingImageAssets: (projectId: string) =>
     optionalRequest<PlanningMediaAssetList>(`/assets/projects/${projectId}?kind=starting_image`),
+  listVideoSourceAssets: (projectId: string) =>
+    optionalRequest<PlanningMediaAssetList>(`/assets/projects/${projectId}?kind=video_source`),
+  uploadVideoSourceAsset: (projectId: string, file: File) => {
+    const query = new URLSearchParams({
+      original_filename: file.name,
+      source_type: 'user_upload',
+    })
+    return optionalRequest<PlanningMediaAssetUpload>(
+      `/video/phase-7/projects/${projectId}/sources/upload?${query}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      },
+    )
+  },
   listArtDirectionReferenceAssets: (projectId: string) =>
     optionalRequest<PlanningMediaAssetList>(
       `/assets/projects/${projectId}?kind=art_direction_reference`,
@@ -1845,8 +2184,68 @@ export const api = {
     optionalRequest<void>(`/assets/character-references/${linkId}`, { method: 'DELETE' }),
 
   runtimeCatalog: () => optionalRequest<RuntimeCatalog>('/runtime-catalog'),
+  localModelInventory: () =>
+    optionalRequest<LocalModelInventory>('/runtime-catalog/local-model-inventory'),
   listRuntimeWorkflowTemplates: () =>
     optionalRequest<RuntimeCatalogWorkflowTemplate[]>('/runtime-catalog/workflow-templates'),
+  listApiCallerWorkflows: () =>
+    request<ApiCallerWorkflowSummary[]>('/api-caller/workflows'),
+  getApiCallerWorkflow: (workflowId: string) =>
+    request<ApiCallerWorkflowDetail>(`/api-caller/workflows/${encodeURIComponent(workflowId)}`),
+  createApiCallerWorkflow: (payload: {
+    name: string
+    version?: string
+    description?: string | null
+    source_filename?: string | null
+    workflow: Record<string, unknown>
+  }) =>
+    request<ApiCallerWorkflowDetail>('/api-caller/workflows', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateApiCallerWorkflow: (
+    workflowId: string,
+    payload: {
+      name?: string
+      version?: string
+      description?: string | null
+      workflow?: Record<string, unknown>
+    },
+  ) =>
+    request<ApiCallerWorkflowDetail>(`/api-caller/workflows/${encodeURIComponent(workflowId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(payload),
+    }),
+  removeApiCallerWorkflow: (workflowId: string) =>
+    request<{ ok: boolean; id: string; name: string; archived: boolean }>(
+      `/api-caller/workflows/${encodeURIComponent(workflowId)}`,
+      { method: 'DELETE' },
+    ),
+  analyzeApiCallerWorkflow: (workflow: Record<string, unknown>) =>
+    request<ApiCallerAnalysis>('/api-caller/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ workflow }),
+    }),
+  runApiCallerWorkflow: (payload: {
+    workflow: Record<string, unknown>
+    workflow_name: string
+    queue_count: number
+    merge_movie: boolean
+    vary_seed: boolean
+    save_latents: boolean
+  }) =>
+    request<ApiCallerRunResult>('/api-caller/run', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getApiCallerJob: (jobId: string) =>
+    request<Record<string, unknown>>(`/api-caller/jobs/${encodeURIComponent(jobId)}`),
+  getApiCallerRuntime: () => request<ApiCallerRuntime>('/api-caller/runtime'),
+  importApiCallerRunnerWorkflows: (workflowIds?: string[]) =>
+    request<ApiCallerImportResult>('/api-caller/import-runner', {
+      method: 'POST',
+      body: JSON.stringify({ workflow_ids: workflowIds ?? null }),
+    }),
 
   listProviderProfiles: () => request<ProviderProfile[]>('/storyboard-crud/provider-profiles'),
   listPlanningProviders: () => request<ProviderCatalogResponse>('/providers'),

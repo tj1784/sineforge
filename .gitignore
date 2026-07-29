@@ -17,8 +17,12 @@ storage/assets/*
 storage/inputs/*
 storage/benchmarks/*.json
 storage/benchmarks/*.jsonl
+storage/backups/
+storage/exports/
 storage/headless_orchestrator/
 storage/local_jobs/
+storage/api_workflows/
+storage/api_workflow_archive/
 storage/planning_media/
 storage/projects/
 storage/runtime/
@@ -33,6 +37,19 @@ frontend/*.cjs
 frontend/shot-live.js
 storage/runtime/supervisor/
 _gitignored_quarantine/
+
+# Local AI model weights and ComfyUI mirrors. Track metadata in
+# Models/LOCAL_MODEL_RESOURCES.md, not the multi-GB artifacts themselves.
+*.safetensors
+*.ckpt
+*.gguf
+*.onnx
+*.pt
+*.pth
+Models/local/
+LoRAs/local/
+ComfyUI/models/
+
 !storage/**/.gitkeep
 !storage/workflow_templates/**
 !storage/workflow_templates/example_smoke/**

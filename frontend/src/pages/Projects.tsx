@@ -5,11 +5,14 @@ import {
   type PhaseASnapshot,
   type Project,
   type Story,
+  type SulphurProjectWorkspace,
 } from '../api/client'
 import { projectCoverUrl } from '../studio/mediaUrls'
 import { EmptyState, ErrorNotice } from '../components/Cards'
 import { PageHeader } from '../components/Page'
 import { StudioHomeHero } from '../components/StudioHomeHero'
+import { ChapterIntakeForm } from '../components/ChapterIntakeForm'
+import { makeChapterIntakeDraft, type ChapterIntakeDraft } from '../components/chapterIntake'
 import type { PageId } from '../components/AppShell'
 /* PIXEL: Sites project-card density (also loaded last from main.tsx). */
 import '../projects-sites-density.css'
@@ -43,6 +46,8 @@ type ProjectDraft = {
   sourceMode: SourceMode
   baseStory: string
   targetRuntime: number
+  requestedChapterCount: number
+  chapterIntake: ChapterIntakeDraft[]
   audience: string
   genre: string
   tone: string
@@ -50,6 +55,8 @@ type ProjectDraft = {
   visualStyle: string
   aspectRatio: string
   fps: number
+  productionProfileKey: 'ltx_base@1' | 'wan_base@1'
+  stitchStage: 'phase7_before_audio' | 'phase8_before_foley'
   orchestrationMode: string
   privacy: string
   qualityPreference: string
@@ -61,12 +68,23 @@ type ProjectDraft = {
   contentConstraints: string
 }
 
+const DEFAULT_CHAPTER_COUNT = 3
+const MAX_CHAPTER_COUNT = 50
+
+function makeChapterIntakes(count: number, targetRuntime: number): ChapterIntakeDraft[] {
+  const safeCount = Math.max(1, Math.min(MAX_CHAPTER_COUNT, Math.round(count) || 1))
+  const targetDurationSec = Math.max(6, Math.round((targetRuntime || 300) / safeCount))
+  return Array.from({ length: safeCount }, (_, index) => makeChapterIntakeDraft(index, targetDurationSec))
+}
+
 const EMPTY_DRAFT: ProjectDraft = {
   name: '',
   description: '',
   sourceMode: 'story',
   baseStory: '',
   targetRuntime: 300,
+  requestedChapterCount: DEFAULT_CHAPTER_COUNT,
+  chapterIntake: makeChapterIntakes(DEFAULT_CHAPTER_COUNT, 300),
   audience: 'General audience',
   genre: 'Cinematic narrative',
   tone: 'Grounded, cinematic, human',
@@ -74,6 +92,8 @@ const EMPTY_DRAFT: ProjectDraft = {
   visualStyle: 'Photoreal cinematic realism',
   aspectRatio: '16:9',
   fps: 24,
+  productionProfileKey: 'ltx_base@1',
+  stitchStage: 'phase7_before_audio',
   orchestrationMode: 'Hybrid',
   privacy: 'Prefer local for bulk work',
   qualityPreference: 'Quality weighted',
@@ -109,6 +129,10 @@ function projectInitials(name: string) {
 
 function formatRuntime(seconds: number) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
+}
+
+function chapterCode(index: number) {
+  return `CH${String(index + 1).padStart(2, '0')}`
 }
 
 function formatUpdated(value: string) {
@@ -235,6 +259,14 @@ function ProjectList({
     <div className="page projects-page">
       {onNavigateStudio ? (
         <StudioHomeHero
+          onCreateProject={async (prompt, idempotencyKey): Promise<SulphurProjectWorkspace> => {
+            const workspace = await api.createProjectFromSulphur({
+              idempotency_key: idempotencyKey,
+              prompt,
+            })
+            onOpenProject?.(workspace.project.id, workspace.project.name)
+            return workspace
+          }}
           onNavigateStudio={(page) => {
             const target =
               summaries.find(({ project }) => project.id === currentProjectId)?.project ??
@@ -388,6 +420,55 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
     update('targetRuntime', Math.max(6, Math.min(3600, Math.max(0, nextMinutes) * 60 + Math.max(0, Math.min(59, nextSeconds)))))
   }
 
+  const setChapterCount = (value: number) => {
+    const nextCount = Math.max(1, Math.min(MAX_CHAPTER_COUNT, Math.round(value) || 1))
+    setDraft((current) => {
+      const nextIntake = [...current.chapterIntake]
+      const targetDurationSec = Math.max(6, Math.round(current.targetRuntime / nextCount))
+      const previousDefaultDuration = Math.max(6, Math.round(current.targetRuntime / current.requestedChapterCount))
+      const untouchedChapterDefaults = nextIntake.slice(0, current.requestedChapterCount).every((chapter, index) => (
+        chapter.title === `Chapter ${index + 1}` &&
+        !chapter.summary.trim() &&
+        !chapter.sourcePrompt.trim() &&
+        !chapter.narrativePurpose.trim() &&
+        !chapter.dramaticProgression.trim() &&
+        !chapter.productionNotes.trim() &&
+        chapter.targetDurationSec === previousDefaultDuration
+      ))
+      for (let index = nextIntake.length; index < nextCount; index += 1) {
+        nextIntake.push(makeChapterIntakeDraft(index, targetDurationSec))
+      }
+      if (untouchedChapterDefaults) {
+        for (let index = 0; index < nextCount; index += 1) {
+          nextIntake[index] = {
+            ...(nextIntake[index] ?? makeChapterIntakeDraft(index, targetDurationSec)),
+            title: `Chapter ${index + 1}`,
+            targetDurationSec,
+          }
+        }
+      }
+      return {
+        ...current,
+        requestedChapterCount: nextCount,
+        chapterIntake: nextIntake,
+      }
+    })
+  }
+
+  const updateChapterIntake = <Key extends keyof ChapterIntakeDraft>(
+    index: number,
+    key: Key,
+    value: ChapterIntakeDraft[Key],
+  ) => {
+    setDraft((current) => {
+      const chapterIntake = [...current.chapterIntake]
+      const fallbackDuration = Math.max(6, Math.round(current.targetRuntime / current.requestedChapterCount))
+      const currentChapter = chapterIntake[index] ?? makeChapterIntakeDraft(index, fallbackDuration)
+      chapterIntake[index] = { ...currentChapter, [key]: value }
+      return { ...current, chapterIntake }
+    })
+  }
+
   const validate = () => {
     if (step === 2 && draft.sourceMode !== 'blank' && !draft.baseStory.trim()) {
       setError(draft.sourceMode === 'import' ? 'Choose a source file or paste its contents.' : 'Add the source story, script, or treatment.')
@@ -419,6 +500,16 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
       const hostedAllowed = draft.privacy === 'Hosted providers allowed'
       const autoTitle = !draft.name.trim()
       const workingTitle = draft.name.trim() || 'CineForge Production'
+      const chapterIntake = draft.chapterIntake.slice(0, draft.requestedChapterCount).map((chapter, index) => ({
+        order_index: index,
+        title: chapter.title.trim() || `Chapter ${index + 1}`,
+        summary: chapter.summary.trim() || null,
+        source_prompt: chapter.sourcePrompt.trim() || null,
+        target_duration_sec: chapter.targetDurationSec,
+        narrative_purpose: chapter.narrativePurpose.trim() || null,
+        dramatic_progression: chapter.dramaticProgression.trim() || null,
+        production_notes: chapter.productionNotes.trim() || null,
+      }))
       const workspace = await api.createProjectWorkspace({
         idempotency_key: idempotencyKey.current,
         name: workingTitle,
@@ -438,6 +529,8 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
         narration_dialogue_preference: draft.narrationDialoguePreference.trim() || null,
         source_fidelity_constraints: draft.sourceFidelityConstraints.trim() || null,
         content_constraints: draft.contentConstraints.trim() || null,
+        requested_chapter_count: draft.requestedChapterCount,
+        chapter_intake: chapterIntake,
         run_phase_one: draft.sourceMode !== 'blank',
         aspect_ratio: draft.aspectRatio,
         preview_width: dimensions.preview[0],
@@ -447,6 +540,8 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
         fps: draft.fps,
         captions_enabled: true,
         audio_enabled: true,
+        production_profile_key: draft.productionProfileKey,
+        stitch_stage: draft.stitchStage,
         speaking_rate: 1,
         prefer_hosted_providers: hostedAllowed,
         prefer_local_providers: draft.privacy !== 'Hosted providers allowed' || draft.orchestrationMode === 'Hybrid',
@@ -465,6 +560,13 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
       setSaving(false)
     }
   }
+
+  const visibleChapterIntake = Array.from(
+    { length: draft.requestedChapterCount },
+    (_, index) => draft.chapterIntake[index] ?? makeChapterIntakeDraft(index, Math.max(6, Math.round(draft.targetRuntime / draft.requestedChapterCount))),
+  )
+  const chapterDurationTotal = visibleChapterIntake.reduce((total, chapter) => total + chapter.targetDurationSec, 0)
+  const chapterRuntimeDelta = chapterDurationTotal - draft.targetRuntime
 
   return (
     <form className="page new-project-page" onSubmit={createProject}>
@@ -514,6 +616,53 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                 <label>Seconds<input type="number" min="0" max="59" value={seconds} onChange={(event) => setRuntime(minutes, Number(event.target.value))} /></label>
                 <div><span>Target runtime</span><b>{formatRuntime(draft.targetRuntime)}</b><small>Storyboard duration must reconcile exactly before approval.</small></div>
               </div>
+              <div className="chapter-plan-panel">
+                <header className="chapter-plan-head">
+                  <div>
+                    <span className="eyebrow">CHAPTER INTAKE</span>
+                    <h3>Plan chapters before Phase 1</h3>
+                    <p>Each chapter uses the same three-part intake pattern: foundation, story and timing, then production defaults.</p>
+                  </div>
+                  <label className="chapter-count-control">
+                    <span>Chapters</span>
+                    <input
+                      aria-label="Number of chapters"
+                      type="number"
+                      min="1"
+                      max={MAX_CHAPTER_COUNT}
+                      value={draft.requestedChapterCount}
+                      onChange={(event) => setChapterCount(Number(event.target.value))}
+                    />
+                  </label>
+                </header>
+                <div className="chapter-plan-summary">
+                  <div>
+                    <span>Chapter targets</span>
+                    <b>{formatRuntime(chapterDurationTotal)}</b>
+                  </div>
+                  <small>
+                    {chapterRuntimeDelta === 0
+                      ? 'Chapter timing matches the project runtime.'
+                      : `${chapterRuntimeDelta > 0 ? '+' : '-'}${formatRuntime(Math.abs(chapterRuntimeDelta))} from the project target.`}
+                  </small>
+                </div>
+                <div className="chapter-plan-list">
+                  {visibleChapterIntake.map((chapter, index) => (
+                    <details key={index} open={index < 3}>
+                      <summary>
+                        <span>{chapterCode(index)}</span>
+                        <b>{chapter.title.trim() || `Chapter ${index + 1}`}</b>
+                        <small>{formatRuntime(chapter.targetDurationSec)}</small>
+                      </summary>
+                      <ChapterIntakeForm
+                        draft={chapter}
+                        index={index}
+                        onChange={(key, value) => updateChapterIntake(index, key, value)}
+                      />
+                    </details>
+                  ))}
+                </div>
+              </div>
             </div>
           ) : null}
 
@@ -529,6 +678,31 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                 <label className="full-span">Visual style<input value={draft.visualStyle} onChange={(event) => update('visualStyle', event.target.value)} /></label>
                 <label>Aspect ratio<select value={draft.aspectRatio} onChange={(event) => update('aspectRatio', event.target.value)}><option>16:9</option><option>9:16</option><option>2.39:1</option><option>1:1</option></select></label>
                 <label>Frame rate<select value={draft.fps} onChange={(event) => update('fps', Number(event.target.value))}><option value="24">24 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
+                <label>
+                  Base-model profile
+                  <select
+                    value={draft.productionProfileKey}
+                    onChange={(event) => update('productionProfileKey', event.target.value as ProjectDraft['productionProfileKey'])}
+                  >
+                    <option value="ltx_base@1">LTX Base v1 · qualified compatibility profile</option>
+                    <option value="wan_base@1">WAN Base v1 · runtime qualification required</option>
+                  </select>
+                  <small>
+                    {draft.productionProfileKey === 'wan_base@1'
+                      ? 'WAN is saved with the project but rendering stays fail-closed until its exact workflow, models, nodes, and workstation pass admission.'
+                      : 'Preserves the current LTX rendering contract and remains the qualified default.'}
+                  </small>
+                </label>
+                <label>
+                  Picture stitch stage
+                  <select
+                    value={draft.stitchStage}
+                    onChange={(event) => update('stitchStage', event.target.value as ProjectDraft['stitchStage'])}
+                  >
+                    <option value="phase7_before_audio">Phase 7 · stitch and lock before audio</option>
+                    <option value="phase8_before_foley">Phase 8 · materialize locked EDL before Foley</option>
+                  </select>
+                </label>
                 <label>Orchestration<select value={draft.orchestrationMode} onChange={(event) => update('orchestrationMode', event.target.value)}><option>Hybrid</option><option>Automatic</option><option>Manual</option></select></label>
                 <label>Privacy preference<select value={draft.privacy} onChange={(event) => update('privacy', event.target.value)}><option>Prefer local for bulk work</option><option>Hosted providers allowed</option><option>Local only</option></select></label>
                 <label>Quality preference<select value={draft.qualityPreference} onChange={(event) => update('qualityPreference', event.target.value)}><option>Quality weighted</option><option>Balanced</option><option>Speed weighted</option></select></label>
@@ -555,16 +729,18 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
           <dl>
             <div><dt>Source</dt><dd>{SOURCE_OPTIONS.find((option) => option.id === draft.sourceMode)?.title.replace('Start from a ', '')}</dd></div>
             <div><dt>Target runtime</dt><dd>{formatRuntime(draft.targetRuntime)}</dd></div><div><dt>Output</dt><dd>{draft.aspectRatio} · {draft.fps} fps</dd></div>
+            <div><dt>Chapters</dt><dd>{draft.requestedChapterCount}</dd></div>
+            <div><dt>Base model</dt><dd>{draft.productionProfileKey === 'wan_base@1' ? 'WAN Base v1 · qualification required' : 'LTX Base v1'}</dd></div>
             <div><dt>Mode</dt><dd>{draft.orchestrationMode}</dd></div><div><dt>Visual style</dt><dd>{draft.visualStyle}</dd></div>
           </dl>
-          <div className="creation-boundary"><span>▣</span><p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–7 stay locked. No image, voice, video, ComfyUI, FFmpeg, model-download, or render job can start.</p></div>
+          <div className="creation-boundary"><span>▣</span><p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–8 stay locked. No image, voice, video, audio, ComfyUI, FFmpeg, model-download, or render job can start.</p></div>
         </aside>
       </div>
       {saving ? (
         <div className="phase-one-progress" role="status" aria-live="polite">
           <div className="phase-one-progress-card">
             <span className="phase-one-spinner" aria-hidden="true" />
-            <div><span className="eyebrow">PHASE 1 OF EXACTLY 7</span><h2>Building your complete script</h2><p>CineForge is drafting the narrative package and running Phase 1 QA. Approval is never automatic.</p></div>
+            <div><span className="eyebrow">PHASE 1 OF EXACTLY 8</span><h2>Building your complete script</h2><p>CineForge is drafting the narrative package and running Phase 1 QA. Approval is never automatic.</p></div>
             <ol>
               <li className="active"><b>1</b><span>Script and Narrative Development<small>Drafting · QA pending</small></span></li>
               {[
@@ -573,7 +749,8 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                 'Location and Key-Asset Development',
                 'Production Prompt and Workflow Package',
                 'Image and Voice Generation and Mapping',
-                'Video Generation, Assembly, and Final QA',
+                'Video Generation, Continuity, Assembly, and Picture Lock',
+                'Foley, Audio Mix, Final Mux, and Delivery QA',
               ].map((name, index) => <li key={name}><b>{index + 2}</b><span>{name}<small>Locked · not started</small></span></li>)}
             </ol>
           </div>

@@ -118,6 +118,9 @@ export type SnapshotWorkspace = {
   taskAssignments: Array<Record<string, unknown>>
   providerProfiles: Array<Record<string, unknown>>
   planningMedia: SnapshotMediaRef[]
+  picture: Record<string, unknown> | null
+  audioDelivery: Record<string, unknown> | null
+  /** Phase-scoped compatibility view: picture for Phase 7, audio delivery for Phase 8. */
   assembly: Record<string, unknown> | null
   targetDurationSec: number
   completeness: SnapshotCompleteness
@@ -130,7 +133,8 @@ const REQUIRED_DOMAINS: Record<number, string[]> = {
   4: ['locations'],
   5: ['prompts'],
   6: ['media'],
-  7: ['assembly'],
+  7: ['picture'],
+  8: ['audio_delivery'],
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -202,7 +206,14 @@ export function assessSnapshotCompleteness(
       reason: 'Legacy snapshot is incomplete for Phase 1 narrative content.',
     }
   }
-  const missing = requiredDomainsForPhase(phaseNumber).filter((domain) => !asRecord(output[domain]))
+  const requiredDomains = requiredDomainsForPhase(phaseNumber)
+  const legacyPhaseSeven =
+    phaseNumber === 7 &&
+    schemaVersion === 1 &&
+    Boolean(asRecord(output.assembly))
+  const missing = legacyPhaseSeven
+    ? []
+    : requiredDomains.filter((domain) => !asRecord(output[domain]))
   if (missing.length) {
     return {
       complete: false,
@@ -233,7 +244,10 @@ export function validateHistoricalDetail(
   if (detail.phase_number !== expected.phaseNumber) {
     return 'The retained iteration belongs to a different production phase.'
   }
-  if (detail.snapshot_schema_version != null && detail.snapshot_schema_version !== 1) {
+  if (
+    detail.snapshot_schema_version != null &&
+    ![1, 2].includes(detail.snapshot_schema_version)
+  ) {
     return `Unsupported snapshot schema version ${detail.snapshot_schema_version}.`
   }
   if (!detail.output_hash || !/^[a-f0-9]{64}$/i.test(detail.output_hash)) {
@@ -338,6 +352,8 @@ export function workspaceFromHistoricalDetail(
         taskAssignments: [],
         providerProfiles: [],
         planningMedia: [],
+        picture: null,
+        audioDelivery: null,
         assembly: null,
         targetDurationSec: 0,
         completeness,
@@ -352,7 +368,14 @@ export function workspaceFromHistoricalDetail(
   const locationsDomain = asRecord(output.locations) ?? {}
   const prompts = asRecord(output.prompts)
   const media = asRecord(output.media)
-  const assembly = asRecord(output.assembly)
+  const legacyAssembly = asRecord(output.assembly)
+  const picture = asRecord(output.picture) ?? (
+    expected.phaseNumber === 7 ? legacyAssembly : null
+  )
+  const audioDelivery = asRecord(output.audio_delivery)
+  const assembly = expected.phaseNumber === 8
+    ? audioDelivery
+    : picture ?? legacyAssembly
 
   const chapters = asArray(structure.chapters).map((item) => {
     const row = asRecord(item) ?? {}
@@ -465,6 +488,8 @@ export function workspaceFromHistoricalDetail(
       taskAssignments: asArray(prompts?.task_assignments).map((item) => asRecord(item) ?? {}),
       providerProfiles: asArray(prompts?.provider_profiles).map((item) => asRecord(item) ?? {}),
       planningMedia,
+      picture,
+      audioDelivery,
       assembly,
       targetDurationSec: num(narrative?.target_duration_sec),
       completeness,
@@ -584,13 +609,44 @@ export function workspaceFromAggregate(
     taskAssignments: [],
     providerProfiles: [],
     planningMedia: [],
-    assembly: {
+    picture: {
       planned_shot_count: shots.length,
       planned_runtime_sec: shots.reduce((total, shot) => total + Number(shot.duration_sec || 0), 0),
-      export_ready: false,
-      final_output: null,
+      picture_locked: false,
+      picture_lock: null,
+      canonical_edl: null,
       qa_state: 'not_evaluated',
     },
+    audioDelivery: {
+      picture_lock_required: true,
+      foley_windows: [],
+      stems: [],
+      mix_master: null,
+      final_output: null,
+      delivery_ready: false,
+      qa_state: 'not_evaluated',
+    },
+    assembly: phaseNumber === 8
+      ? {
+          picture_lock_required: true,
+          foley_windows: [],
+          stems: [],
+          mix_master: null,
+          final_output: null,
+          delivery_ready: false,
+          qa_state: 'not_evaluated',
+        }
+      : {
+          planned_shot_count: shots.length,
+          planned_runtime_sec: shots.reduce(
+            (total, shot) => total + Number(shot.duration_sec || 0),
+            0,
+          ),
+          picture_locked: false,
+          picture_lock: null,
+          canonical_edl: null,
+          qa_state: 'not_evaluated',
+        },
     targetDurationSec: Number(data.story.target_duration_sec || 0),
     completeness: {
       complete: true,

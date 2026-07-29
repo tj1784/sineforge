@@ -41,6 +41,9 @@ const DEFAULT_DRAFT: ProjectStoryboardSettingsUpdate = {
   fps: 24,
   captions_enabled: true,
   audio_enabled: true,
+  production_profile_key: 'ltx_base@1',
+  production_profile_snapshot_json: {},
+  stitch_stage: 'phase7_before_audio',
   prefer_hosted_providers: false,
   prefer_local_providers: true,
   allow_model_download: true,
@@ -66,6 +69,9 @@ function editableSettings(settings: ProjectStoryboardSettings): ProjectStoryboar
     fps: settings.fps,
     captions_enabled: settings.captions_enabled,
     audio_enabled: settings.audio_enabled,
+    production_profile_key: settings.production_profile_key,
+    production_profile_snapshot_json: settings.production_profile_snapshot_json,
+    stitch_stage: settings.stitch_stage,
     prefer_hosted_providers: settings.prefer_hosted_providers,
     prefer_local_providers: settings.prefer_local_providers,
     allow_model_download: settings.allow_model_download,
@@ -188,6 +194,43 @@ export function SettingsPage() {
       </div>
 
       {error ? <ErrorState detail={error} onRetry={() => void load()} /> : null}
+
+      <div className="split-2">
+        <label>
+          Video production profile
+          <select
+            value={draft.production_profile_key}
+            onChange={(event) => setDraft({
+              ...draft,
+              production_profile_key: event.target.value as ProjectStoryboardSettingsUpdate['production_profile_key'],
+            })}
+            disabled={savingDisabled}
+          >
+            <option value="ltx_base@1">LTX Base v1</option>
+            <option value="wan_base@1">WAN Base v1 · qualification required</option>
+          </select>
+          <small>
+            {draft.production_profile_key === 'wan_base@1'
+              ? 'WAN is a persisted planning selection; this UI does not claim that its runtime has been qualified.'
+              : 'Preserves the current LTX compatibility profile.'}
+          </small>
+        </label>
+        <label>
+          Stitch stage
+          <select
+            value={draft.stitch_stage}
+            onChange={(event) => setDraft({
+              ...draft,
+              stitch_stage: event.target.value as ProjectStoryboardSettingsUpdate['stitch_stage'],
+            })}
+            disabled={savingDisabled}
+          >
+            <option value="phase7_before_audio">Phase 7 · stitch before audio</option>
+            <option value="phase8_before_foley">Phase 8 · defer stitch before Foley</option>
+          </select>
+          <small>Phase 7 picture lock remains the required immutable input to final audio delivery.</small>
+        </label>
+      </div>
 
       <div className="split-2">
         <label>

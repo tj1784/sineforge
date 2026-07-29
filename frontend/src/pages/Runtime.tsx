@@ -49,11 +49,30 @@ export function Runtime() {
     <div className="page">
       <PageHeader
         eyebrow="Runtime"
-        title="ComfyUI readiness boundary"
-        description="Runtime status shows the current backend capability while keeping public prompt, WebSocket, history, output, and FFmpeg execution paths unavailable."
+        title="Local AI runtime"
+        description="Sineforge supervises ComfyUI, ComfyAPI Runner, and the local Sulphur prompt/script model while retaining controlled workflow validation and queue boundaries."
       />
 
       {error ? <ErrorNotice message={error} /> : null}
+
+      <div className="page-actions" aria-label="Local runtime shortcuts">
+        <a
+          className="btn primary"
+          href={runtime?.links.comfy_api_runner ?? 'http://127.0.0.1:8022'}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open ComfyAPI Runner
+        </a>
+        <a
+          className="btn secondary"
+          href={runtime?.links.comfyui ?? 'http://127.0.0.1:8888'}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open ComfyUI
+        </a>
+      </div>
 
       <section className="grid three">
         <StatusCard
@@ -61,6 +80,26 @@ export function Runtime() {
           status={String(runtime?.comfyui.status ?? 'unavailable')}
           detail={loading ? 'Checking...' : 'Health probe against the external ComfyUI HTTP root.'}
           meta="GET /health/comfy via /runtime/status"
+        />
+        <StatusCard
+          title="ComfyAPI Runner"
+          status={String(runtime?.comfy_api_runner.status ?? 'unavailable')}
+          detail={
+            runtime?.queue.api_runner_available
+              ? 'Runner is connected to ComfyUI and ready for validated API-format workflows.'
+              : 'Runner is starting or cannot reach ComfyUI.'
+          }
+          meta="GET /health/comfy-api-runner"
+        />
+        <StatusCard
+          title="Sulphur"
+          status={String(runtime?.sulphur.status ?? 'unavailable')}
+          detail={
+            runtime?.sulphur.model_loaded
+              ? `${runtime.sulphur.model_file ?? runtime.sulphur.model_id ?? 'Local model'} is loaded for scripts and prompts.`
+              : 'Local Sulphur model is starting or not loaded.'
+          }
+          meta="LM Studio · 127.0.0.1:1234"
         />
         <StatusCard
           title="object_info"
@@ -88,7 +127,8 @@ export function Runtime() {
         <p>
           Backend capability: controlled worker submission{' '}
           {runtime?.queue.controlled_submission_enabled ? 'enabled' : 'disabled'}. User-facing generation{' '}
-          {runtime?.queue.public_submission_enabled ? 'enabled' : 'disabled'}.
+          {runtime?.queue.public_submission_enabled ? 'enabled' : 'disabled'}. ComfyAPI Runner{' '}
+          {runtime?.queue.api_runner_available ? 'connected' : 'unavailable'}.
         </p>
       </section>
 

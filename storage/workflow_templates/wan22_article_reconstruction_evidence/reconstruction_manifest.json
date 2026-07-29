@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "name": "article-wan22-long-video-reconstruction",
+  "provenance": {
+    "flux_workflow": "recovered_exactly_from_png_metadata",
+    "wan_workflows": "official_comfyui_reference_not_author_original",
+    "long_video_process": "article_derived",
+    "duration_and_interpolation": "forensic_inference_from_six_transcoded_mp4_files"
+  },
+  "flux_anchor": {
+    "ui_workflow": "eb118731-a38f-49e0-b539-d98d86710f58_workflow_1.json",
+    "api_workflow": "eb118731-a38f-49e0-b539-d98d86710f58_prompt_1.json",
+    "parameters": "eb118731-a38f-49e0-b539-d98d86710f58_parameters_1.txt",
+    "operative_seed": 12139619121598
+  },
+  "wan_reference_workflows": {
+    "i2v": "official_video_wan2_2_14B_i2v.json",
+    "first_last_frame": "official_video_wan2_2_14B_flf2v.json",
+    "hybrid_5b": "official_video_wan2_2_5B_ti2v.json"
+  },
+  "profiles": {
+    "quality": {
+      "steps": 20,
+      "cfg": 4.0,
+      "high_to_low_expert_split_step": 10,
+      "model_sampling_shift": 8.0,
+      "sampler": "euler",
+      "scheduler": "simple",
+      "fps": 16,
+      "frames": 81,
+      "lightx2v_enabled": false
+    },
+    "fast_lightx2v": {
+      "steps": 4,
+      "cfg": 1.0,
+      "high_to_low_expert_split_step": 2,
+      "model_sampling_shift": 5.0,
+      "sampler": "euler",
+      "scheduler": "simple",
+      "fps": 16,
+      "frames": 81,
+      "lightx2v_enabled": true
+    }
+  },
+  "continuation": {
+    "handoff": "last_usable_accepted_frame",
+    "remove_duplicate_boundary_frames": 1,
+    "preserve_accepted_prefix": true,
+    "best_of_n_default": 3,
+    "reanchor_interval_segments": 3,
+    "do_not_chain_across_editorial_scene_cut": true
+  },
+  "postprocess": {
+    "assemble_before_upscale": true,
+    "interpolation_multiplier": 2,
+    "foley_after_picture_lock": true
+  },
+  "runtime_validation_required": [
+    "active_comfyui_object_info",
+    "model_filename_resolution",
+    "custom_node_availability",
+    "api_format_export",
+    "one_segment_smoke_test",
+    "two_segment_boundary_test"
+  ]
+}

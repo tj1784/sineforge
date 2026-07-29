@@ -18,12 +18,18 @@ from backend.app.schemas.storyboard_settings import (
     DEFAULT_FPS,
     DEFAULT_PREVIEW_HEIGHT,
     DEFAULT_PREVIEW_WIDTH,
+    DEFAULT_PRODUCTION_PROFILE_KEY,
     DEFAULT_PROMPTING_POLICY,
     DEFAULT_SHOT_DURATION_MAX_SEC,
     DEFAULT_SHOT_DURATION_MIN_SEC,
     DEFAULT_SPEAKING_RATE,
+    DEFAULT_STITCH_STAGE,
     DEFAULT_VOICE_POLICY,
     ProjectStoryboardSettingsUpdate,
+)
+from backend.app.services.production_profiles import (
+    ProductionProfile,
+    select_production_profile,
 )
 
 
@@ -35,6 +41,52 @@ class StoryboardSettingsConflictError(Exception):
     pass
 
 
+def _profile_snapshot(profile: ProductionProfile) -> dict:
+    return {
+        "ref": profile.ref,
+        "key": profile.key,
+        "version": profile.version,
+        "display_name": profile.display_name,
+        "model_family": profile.model_family,
+        "status": profile.status,
+        "execution_qualified": profile.execution_qualified,
+        "approved_video_model_keys": sorted(profile.approved_video_model_keys),
+        "approved_video_models": sorted(profile.approved_video_models),
+        "capabilities": {
+            "text_to_video": profile.capabilities.text_to_video,
+            "image_to_video": profile.capabilities.image_to_video,
+            "video_to_video": profile.capabilities.video_to_video,
+            "continuation": profile.capabilities.continuation,
+            "native_audio": profile.capabilities.native_audio,
+            "external_foley": profile.capabilities.external_foley,
+            "high_low_noise_pair": profile.capabilities.high_low_noise_pair,
+        },
+        "frame_policy": {
+            "frame_multiple": profile.frame_policy.frame_multiple,
+            "frame_remainder": profile.frame_policy.frame_remainder,
+            "nominal_segment_duration_sec": (
+                profile.frame_policy.nominal_segment_duration_sec
+            ),
+            "min_segment_duration_sec": profile.frame_policy.min_segment_duration_sec,
+            "max_segment_duration_sec": profile.frame_policy.max_segment_duration_sec,
+            "min_subscene_duration_sec": profile.frame_policy.min_subscene_duration_sec,
+            "max_subscene_duration_sec": profile.frame_policy.max_subscene_duration_sec,
+            "allow_shorter_subscene_with_reason": (
+                profile.frame_policy.allow_shorter_subscene_with_reason
+            ),
+        },
+        "qualification_notes": list(profile.qualification_notes),
+    }
+
+
+def production_profile_settings_values(profile_ref: str | None) -> dict:
+    profile = select_production_profile(profile_ref, allow_unqualified=True)
+    return {
+        "production_profile_key": profile.ref,
+        "production_profile_snapshot_json": _profile_snapshot(profile),
+    }
+
+
 def _project_or_error(db: Session, project_id: UUID) -> Project:
     project = db.get(Project, project_id)
     if project is None:
@@ -43,7 +95,7 @@ def _project_or_error(db: Session, project_id: UUID) -> Project:
 
 
 def default_settings_values() -> dict:
-    return {
+    values = {
         "shot_duration_min_sec": DEFAULT_SHOT_DURATION_MIN_SEC,
         "shot_duration_max_sec": DEFAULT_SHOT_DURATION_MAX_SEC,
         "continuity_policy_json": dict(DEFAULT_CONTINUITY_POLICY),
@@ -59,6 +111,7 @@ def default_settings_values() -> dict:
         "fps": DEFAULT_FPS,
         "captions_enabled": True,
         "audio_enabled": True,
+        "stitch_stage": DEFAULT_STITCH_STAGE,
         "prefer_hosted_providers": False,
         "prefer_local_providers": True,
         "allow_model_download": True,
@@ -67,6 +120,8 @@ def default_settings_values() -> dict:
         "require_production_plan_approval": True,
         "settings_version": 1,
     }
+    values.update(production_profile_settings_values(DEFAULT_PRODUCTION_PROFILE_KEY))
+    return values
 
 
 def get_settings_row(db: Session, project_id: UUID) -> ProjectStoryboardSettings | None:
@@ -115,7 +170,10 @@ def put_settings(
         .with_for_update()
         .execution_options(populate_existing=True)
     )
-    data = payload.model_dump(exclude={"expected_settings_version"})
+    data = payload.model_dump(
+        exclude={"expected_settings_version", "production_profile_snapshot_json"}
+    )
+    data.update(production_profile_settings_values(payload.production_profile_key))
 
     if row is None:
         if payload.expected_settings_version is not None:
@@ -164,6 +222,11 @@ def settings_public_dict(row: ProjectStoryboardSettings) -> dict:
         "fps": float(row.fps),
         "captions_enabled": bool(row.captions_enabled),
         "audio_enabled": bool(row.audio_enabled),
+        "production_profile_key": row.production_profile_key,
+        "production_profile_snapshot_json": dict(
+            row.production_profile_snapshot_json or {}
+        ),
+        "stitch_stage": row.stitch_stage,
         "prefer_hosted_providers": bool(row.prefer_hosted_providers),
         "prefer_local_providers": bool(row.prefer_local_providers),
         "allow_model_download": bool(row.allow_model_download),
@@ -194,6 +257,11 @@ def settings_snapshot_fragment(row: ProjectStoryboardSettings | None) -> dict | 
         "fps": float(row.fps),
         "captions_enabled": bool(row.captions_enabled),
         "audio_enabled": bool(row.audio_enabled),
+        "production_profile_key": row.production_profile_key,
+        "production_profile_snapshot_json": dict(
+            row.production_profile_snapshot_json or {}
+        ),
+        "stitch_stage": row.stitch_stage,
         "prefer_hosted_providers": bool(row.prefer_hosted_providers),
         "prefer_local_providers": bool(row.prefer_local_providers),
         "allow_model_download": bool(row.allow_model_download),

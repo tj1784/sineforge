@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 
 import type { PageId } from '../../components/AppShell'
-import type { ProductionPhase } from '../../api/client'
+import { api, type ProductionPhase } from '../../api/client'
 import {
   type SnapshotCharacter,
   type SnapshotScene,
@@ -16,6 +16,8 @@ type PreviewProps = {
   workspace: SnapshotWorkspace | null
   historical: boolean
   incompleteReason?: string | null
+  productionProfileKey?: 'ltx_base@1' | 'wan_base@1'
+  stitchStage?: 'phase7_before_audio' | 'phase8_before_foley'
   onNavigate?: (page: PageId) => void
 }
 
@@ -97,6 +99,44 @@ function lifecycleLabel(value: string) {
 
 function editorLabel(label: string, historical: boolean) {
   return historical ? `Open current ${label}` : label
+}
+
+function productionProfilePresentation(profileKey: string | undefined) {
+  if (profileKey === 'wan_base@1') {
+    return {
+      label: 'WAN Base v1',
+      detail: 'Persisted selection · runtime qualification required',
+    }
+  }
+  if (profileKey === 'ltx_base@1') {
+    return {
+      label: 'LTX Base v1',
+      detail: 'Persisted compatibility profile',
+    }
+  }
+  return {
+    label: 'Not recorded',
+    detail: 'No persisted production profile is available',
+  }
+}
+
+function stitchStagePresentation(stitchStage: string | undefined) {
+  if (stitchStage === 'phase8_before_foley') {
+    return {
+      label: 'Phase 8',
+      detail: 'Picture stitch is deferred until the audio/delivery phase',
+    }
+  }
+  if (stitchStage === 'phase7_before_audio') {
+    return {
+      label: 'Phase 7',
+      detail: 'Lock and stitch picture before audio generation',
+    }
+  }
+  return {
+    label: 'Not recorded',
+    detail: 'No persisted stitch stage is available',
+  }
 }
 
 function continuityStatus(value: string | null | undefined): string {
@@ -1147,19 +1187,101 @@ function PhaseSixPreview({ phase, workspace, historical, onNavigate }: PreviewPr
   )
 }
 
-function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: PreviewProps) {
+function PhaseSevenPreview({
+  phase,
+  workspace,
+  historical,
+  productionProfileKey,
+  stitchStage,
+  onNavigate,
+}: PreviewProps) {
   const scenes = useMemo(() => buildSceneRows(workspace), [workspace])
   const shots = useMemo(() => buildShotRows(scenes), [scenes])
-  const plannedFromShots = shots.reduce((total, row) => total + Number(row.shot.duration_sec || 0), 0)
-  const planned = Number(workspace?.assembly?.planned_runtime_sec ?? plannedFromShots)
-  const [assemblyTab, setAssemblyTab] = useState<'timeline' | 'review' | 'manifest'>('timeline')
-  const qaState = String(workspace?.assembly?.qa_state || 'not_evaluated')
-  const manifest = (workspace?.assembly?.manifest && typeof workspace.assembly.manifest === 'object')
-    ? workspace.assembly.manifest as Record<string, unknown>
-    : null
-  const voiceShots = shots.filter((row) => row.shot.narration_text)
-  const finalPresent = Boolean(workspace?.assembly?.final_output)
-  const endLabel = formatDuration(planned || workspace?.targetDurationSec || 0)
+  const planned = shots.reduce((total, row) => total + Number(row.shot.duration_sec || 0), 0)
+  const [pictureTab, setPictureTab] = useState<'timeline' | 'review' | 'manifest'>('timeline')
+  const picture = workspace?.picture ?? workspace?.assembly
+  const profile = productionProfilePresentation(
+    historical ? String(picture?.production_profile_key || '') : productionProfileKey,
+  )
+  const stitch = stitchStagePresentation(
+    historical ? String(picture?.stitch_stage || '') : stitchStage,
+  )
+  const pictureLocked = Boolean(picture?.picture_locked)
+  const qaState = String(picture?.qa_state || 'not_evaluated')
+  const [videoFile, setVideoFile] = useState<File | null>(null)
+  const [videoUploadState, setVideoUploadState] = useState<
+    'idle' | 'uploading' | 'complete' | 'error'
+  >('idle')
+  const [videoUploadMessage, setVideoUploadMessage] = useState('')
+  const [videoQueueState, setVideoQueueState] = useState<
+    'idle' | 'queueing' | 'complete' | 'blocked' | 'error'
+  >('idle')
+  const [videoQueueMessage, setVideoQueueMessage] = useState('')
+  const startingAssetsById = useMemo(
+    () => new Map((workspace?.planningMedia ?? []).map((asset) => [asset.id, asset])),
+    [workspace],
+  )
+  const videoMissingImageRows = shots.filter((row) => !row.shot.starting_image_asset_id)
+  const videoUnapprovedImageRows = shots.filter((row) => {
+    const assetId = row.shot.starting_image_asset_id
+    if (!assetId) return false
+    return startingAssetsById.get(assetId)?.approval_state !== 'approved'
+  })
+  const videoQueueBlockedReason = !shots.length
+    ? 'No planned shots are available for video generation.'
+    : videoMissingImageRows.length
+      ? `${videoMissingImageRows.length} shot${videoMissingImageRows.length === 1 ? '' : 's'} still need a starting image.`
+      : videoUnapprovedImageRows.length
+        ? `${videoUnapprovedImageRows.length} starting image${videoUnapprovedImageRows.length === 1 ? '' : 's'} still need approval.`
+        : null
+
+  async function uploadVideoSource() {
+    if (!workspace?.projectId || !videoFile || historical) return
+    setVideoUploadState('uploading')
+    setVideoUploadMessage('')
+    try {
+      const result = await api.uploadVideoSourceAsset(
+        workspace.projectId,
+        videoFile,
+      )
+      if (!result) throw new Error('Video ingest endpoint is unavailable.')
+      setVideoUploadState('complete')
+      setVideoUploadMessage(
+        result.created
+          ? `Managed source ${result.asset.original_filename || result.asset.id} was added.`
+          : `That video already exists as managed source ${result.asset.id}.`,
+      )
+      setVideoFile(null)
+    } catch (error) {
+      setVideoUploadState('error')
+      setVideoUploadMessage(
+        error instanceof Error ? error.message : 'Video ingest failed.',
+      )
+    }
+  }
+
+  async function queueVideoPrompts() {
+    if (!workspace?.storyId || historical || videoQueueBlockedReason) return
+    setVideoQueueState('queueing')
+    setVideoQueueMessage('Submitting all approved shot prompts to ComfyAPI Runner…')
+    try {
+      const result = await api.queuePhaseSevenVideos(workspace.storyId, {
+        requested_by: 'CineForge Phase 7 video handoff',
+      })
+      if (result.blocked_count || result.blockers.length) {
+        setVideoQueueState('blocked')
+        setVideoQueueMessage(`${result.message} ${result.blockers.slice(0, 3).join(' ')}`)
+        return
+      }
+      setVideoQueueState('complete')
+      setVideoQueueMessage(
+        `${result.message} Open ComfyAPI Runner to watch ${result.queued_count} job${result.queued_count === 1 ? '' : 's'}.`,
+      )
+    } catch (error) {
+      setVideoQueueState('error')
+      setVideoQueueMessage(error instanceof Error ? error.message : 'Video queue submission failed.')
+    }
+  }
 
   return (
     <div className="phase-workspace">
@@ -1167,22 +1289,297 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
         phase={phase}
         historical={historical}
         source={historical ? 'Retained snapshot' : 'Design template'}
-        description="Review the intended candidate-selection, assembly, audio, subtitle, technical-QA, and provenance experience without presenting ungenerated clips as finished work."
+        description="Generate and select video segments, verify continuity, establish the canonical edit, and lock picture before downstream Foley and final delivery."
         actions={[{ label: 'Workflows', page: 'workflows' }, { label: 'Exports', page: 'exports' }]}
         onNavigate={onNavigate}
       />
       <PreviewDisclosure historical={historical} />
       <div className="phase-metrics five">
+        <WorkspaceMetric label="Production profile" value={profile.label} detail={profile.detail} />
+        <WorkspaceMetric label="Stitch stage" value={stitch.label} detail={stitch.detail} />
+        <WorkspaceMetric label="Planned shots" value={shots.length || '—'} />
+        <WorkspaceMetric label="Picture runtime" value={planned ? formatDuration(planned) : '—'} />
         <WorkspaceMetric
-          label="Planned shots"
-          value={Number(workspace?.assembly?.planned_shot_count ?? shots.length) || '—'}
+          label="Picture lock"
+          value={pictureLocked ? 'Locked' : 'Not locked'}
+          detail="Phase 8 must consume an immutable picture-lock reference"
         />
+      </div>
+
+      {!historical ? (
+        <section className="phase-final-qa" aria-label="Generate video prompts">
+          <header className="phase-subheading">
+            <div>
+              <span>LOCAL VIDEO HANDOFF</span>
+              <h4>Queue all approved image-to-video prompts</h4>
+              <p>
+                Once every planned shot has an approved starting image, this submits the full Phase 7 prompt batch
+                to ComfyAPI Runner. Audio, Foley, stitching, and picture lock stay separate.
+              </p>
+            </div>
+            <span
+              className="status-pill"
+              data-status={videoQueueState === 'complete' ? 'complete' : videoQueueBlockedReason ? 'blocked' : 'draft'}
+            >
+              {videoQueueState === 'queueing' ? 'queueing' : videoQueueBlockedReason ? 'blocked' : videoQueueState}
+            </span>
+          </header>
+          <div className="phase-footer-actions">
+            <button
+              type="button"
+              className="btn primary"
+              disabled={Boolean(videoQueueBlockedReason) || videoQueueState === 'queueing'}
+              onClick={() => void queueVideoPrompts()}
+            >
+              {videoQueueState === 'queueing' ? 'Queueing video prompts…' : 'Generate video'}
+            </button>
+            <button type="button" className="btn secondary" onClick={() => onNavigate?.('images')}>
+              Review starting images
+            </button>
+            <button type="button" className="btn secondary" onClick={() => onNavigate?.('workflows')}>
+              Review workflow
+            </button>
+          </div>
+          {videoQueueBlockedReason ? <p role="status">{videoQueueBlockedReason}</p> : null}
+          {videoQueueMessage ? <p role="status">{videoQueueMessage}</p> : null}
+        </section>
+      ) : null}
+
+      <div className="phase-inline-tabs phase-major-tabs" role="tablist" aria-label="Phase 7 picture-lock view">
+        {(['timeline', 'review', 'manifest'] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            role="tab"
+            aria-selected={pictureTab === tab}
+            className={pictureTab === tab ? 'active' : ''}
+            onClick={() => setPictureTab(tab)}
+          >
+            {tab === 'timeline' ? 'Picture timeline' : tab === 'review' ? 'Picture QA' : 'Picture manifest'}
+          </button>
+        ))}
+      </div>
+
+      {pictureTab === 'timeline' ? (
+        <div className="phase-assembly-layout">
+          <section className="phase-monitor" aria-label="Picture-lock preview">
+            <div>
+              <span aria-hidden="true">▶</span>
+              <b>Canonical picture preview</b>
+              <p>No project-scoped stitched video is presented unless a real picture-lock artifact is recorded.</p>
+            </div>
+            <footer>
+              <span>00:00:00</span>
+              <i aria-hidden="true" />
+              <span>{formatDuration(planned || workspace?.targetDurationSec || 0)}</span>
+            </footer>
+          </section>
+          <section className="phase-timeline" aria-label="Picture assembly timeline">
+            <header className="phase-subheading">
+              <div>
+                <span>PICTURE ASSEMBLY</span>
+                <h4>Selected video segments and continuity joins</h4>
+                <p>
+                  Timeline geometry is derived from planned shot durations. Audio generation and final AV delivery remain Phase 8 responsibilities.
+                </p>
+              </div>
+              <b>{shots.length ? `${shots.length} planned` : 'Empty'}</b>
+            </header>
+            <div>
+              <b>VIDEO</b>
+              <section aria-label="Video clips by planned duration">
+                {shots.length ? shots.map((row) => {
+                  const duration = Math.max(1, Number(row.shot.duration_sec || 1))
+                  return (
+                    <span
+                      key={row.shot.id}
+                      style={{ flexGrow: duration }}
+                      title={`${row.code} · ${duration}s · selected clip not recorded`}
+                    >
+                      {row.code}
+                    </span>
+                  )
+                }) : <span>No project-scoped video segments</span>}
+              </section>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {pictureTab === 'review' ? (
+        <section className="phase-final-qa" aria-label="Picture QA review">
+          <header className="phase-subheading">
+            <div>
+              <span>PICTURE QA</span>
+              <h4>Video integrity before picture lock</h4>
+              <p>All checks remain pending until selected clips, probe evidence, and a canonical picture artifact exist.</p>
+            </div>
+            <span className="status-pill" data-status={qaState === 'passed' ? 'complete' : 'draft'}>
+              {qaState.replaceAll('_', ' ')}
+            </span>
+          </header>
+          <div className="phase-qa-grid">
+            {[
+              ['Shot coverage', 'Every planned shot has a selected, decodable video segment.'],
+              ['Continuity', 'Identity, geography, motion, and joins remain coherent.'],
+              ['Motion quality', 'No black frames, freezes, severe flicker, or unacceptable blur.'],
+              ['Picture profile', 'Codec, dimensions, pixel format, frame rate, and time base are compatible.'],
+              ['Picture duration', 'The canonical edit matches the approved duration plan.'],
+              ['Picture lock', 'The immutable output hash, EDL, probes, and source lineage are stored.'],
+            ].map(([title, detail]) => (
+              <article key={title}>
+                <span aria-hidden="true">○</span>
+                <div><b>{title}</b><p>{detail}</p></div>
+                <small>Pending evidence</small>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {pictureTab === 'manifest' ? (
+        <section className="phase-manifest-preview" aria-label="Picture manifest and provenance">
+          <header className="phase-subheading">
+            <div>
+              <span>PICTURE MANIFEST</span>
+              <h4>Canonical edit and generation lineage</h4>
+              <p>This preview does not claim that video segments or a stitched picture artifact exist.</p>
+            </div>
+            <span className="status-pill" data-status={pictureLocked ? 'ready' : 'draft'}>
+              {historical ? 'Snapshot' : 'Template'}
+            </span>
+          </header>
+          <div className="phase-manifest-grid">
+            {[
+              ['Profile selection', `${profile.label} · ${profile.detail}`],
+              ['Stitch policy', `${stitch.label} · ${stitch.detail}`],
+              ['Selected segments', 'Workflow, model, seed, prompt, input, and output hashes'],
+              ['Canonical EDL', 'Ordered segments, trims, transitions, and timebase'],
+              ['Picture artifact', 'Codec, resolution, FPS, frame count, duration, SHA-256'],
+              ['Video QA', 'Decode, continuity, motion, and compatibility evidence'],
+            ].map(([title, detail]) => (
+              <article key={title}>
+                <span>{title}</span>
+                <p>{detail}</p>
+                <code>Awaiting picture-lock evidence</code>
+              </article>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {!historical ? (
+        <section className="phase-final-qa" aria-label="Add an existing video source">
+          <header className="phase-subheading">
+            <div>
+              <span>MANAGED VIDEO INGEST</span>
+              <h4>Add an existing or soundless video</h4>
+              <p>
+                MP4, MOV, MKV, and WebM uploads are streamed into managed project
+                storage, hashed, probed, and preserved unchanged. Full decode is
+                still required before picture lock.
+              </p>
+            </div>
+            <span
+              className="status-pill"
+              data-status={videoUploadState === 'complete' ? 'complete' : 'draft'}
+            >
+              {videoUploadState}
+            </span>
+          </header>
+          <div className="phase-footer-actions">
+            <input
+              aria-label="Choose an existing video"
+              type="file"
+              accept="video/mp4,video/quicktime,video/x-matroska,video/webm,.mp4,.mov,.mkv,.webm"
+              onChange={(event) => {
+                setVideoFile(event.target.files?.[0] ?? null)
+                setVideoUploadState('idle')
+                setVideoUploadMessage('')
+              }}
+            />
+            <button
+              type="button"
+              className="btn primary"
+              disabled={!videoFile || videoUploadState === 'uploading'}
+              onClick={() => void uploadVideoSource()}
+            >
+              {videoUploadState === 'uploading' ? 'Uploading…' : 'Add video source'}
+            </button>
+          </div>
+          {videoUploadMessage ? <p role="status">{videoUploadMessage}</p> : null}
+        </section>
+      ) : null}
+
+      <div className="phase-footer">
+        <div>
+          <span>PHASE BOUNDARY</span>
+          <b>Picture lock is the only handoff to Phase 8</b>
+          <p>Foley, narration mixing, subtitles, final mux, and delivery QA are not performed here.</p>
+        </div>
+        {onNavigate ? (
+          <div className="phase-footer-actions">
+            <button type="button" className="btn secondary" onClick={() => onNavigate('workflows')}>
+              {editorLabel('Review workflows', historical)}
+            </button>
+            <button type="button" className="btn primary" onClick={() => onNavigate('exports')}>
+              {editorLabel('Open Exports', historical)}
+            </button>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function PhaseEightPreview({
+  phase,
+  workspace,
+  historical,
+  productionProfileKey,
+  stitchStage,
+  onNavigate,
+}: PreviewProps) {
+  const scenes = useMemo(() => buildSceneRows(workspace), [workspace])
+  const shots = useMemo(() => buildShotRows(scenes), [scenes])
+  const plannedFromShots = shots.reduce((total, row) => total + Number(row.shot.duration_sec || 0), 0)
+  const audioDelivery = workspace?.audioDelivery ?? workspace?.assembly
+  const planned = Number(audioDelivery?.planned_runtime_sec ?? plannedFromShots)
+  const [assemblyTab, setAssemblyTab] = useState<'timeline' | 'review' | 'manifest'>('timeline')
+  const qaState = String(audioDelivery?.qa_state || 'not_evaluated')
+  const manifest = (audioDelivery?.manifest && typeof audioDelivery.manifest === 'object')
+    ? audioDelivery.manifest as Record<string, unknown>
+    : null
+  const voiceShots = shots.filter((row) => row.shot.narration_text)
+  const finalPresent = Boolean(audioDelivery?.final_output)
+  const endLabel = formatDuration(planned || workspace?.targetDurationSec || 0)
+  const picture = workspace?.picture
+  const profile = productionProfilePresentation(
+    historical ? String(picture?.production_profile_key || '') : productionProfileKey,
+  )
+  const stitch = stitchStagePresentation(
+    historical ? String(picture?.stitch_stage || '') : stitchStage,
+  )
+
+  return (
+    <div className="phase-workspace">
+      <PhasePreviewHeader
+        phase={phase}
+        historical={historical}
+        source={historical ? 'Retained snapshot' : 'Design template'}
+        description="Generate Foley against the canonical picture, mix narration, music, and effects, optionally perform the deferred stitch, then validate the final synchronized delivery artifact."
+        actions={[{ label: 'Workflows', page: 'workflows' }, { label: 'Exports', page: 'exports' }]}
+        onNavigate={onNavigate}
+      />
+      <PreviewDisclosure historical={historical} />
+      <div className="phase-metrics five">
+        <WorkspaceMetric label="Production profile" value={profile.label} detail={profile.detail} />
+        <WorkspaceMetric label="Stitch stage" value={stitch.label} detail={stitch.detail} />
         <WorkspaceMetric
-          label="Assembly runtime"
+          label="Delivery runtime"
           value={planned ? formatDuration(planned) : '—'}
           detail={workspace ? `${formatDuration(workspace.targetDurationSec)} target` : undefined}
         />
-        <WorkspaceMetric label="Selected clips" value="—" detail="No project-scoped clip API" />
         <WorkspaceMetric
           label="Final output"
           value={finalPresent ? 'Present' : 'Not produced'}
@@ -1190,7 +1587,7 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
         <WorkspaceMetric label="Final QA" value={qaState.replaceAll('_', ' ')} />
       </div>
 
-      <div className="phase-inline-tabs phase-major-tabs" role="tablist" aria-label="Phase 7 assembly view">
+      <div className="phase-inline-tabs phase-major-tabs" role="tablist" aria-label="Phase 8 audio and delivery view">
         {(['timeline', 'review', 'manifest'] as const).map((tab) => (
           <button
             key={tab}
@@ -1200,21 +1597,21 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
             className={assemblyTab === tab ? 'active' : ''}
             onClick={() => setAssemblyTab(tab)}
           >
-            {tab === 'timeline' ? 'Assembly timeline' : tab === 'review' ? 'Final QA review' : 'Manifest & provenance'}
+            {tab === 'timeline' ? 'Audio timeline' : tab === 'review' ? 'Delivery QA' : 'Delivery manifest'}
           </button>
         ))}
       </div>
 
       {assemblyTab === 'timeline' ? (
         <div className="phase-assembly-layout">
-          <section className="phase-monitor" aria-label="Final assembly preview">
+          <section className="phase-monitor" aria-label="Final audio delivery preview">
             <div>
               <span aria-hidden="true">▶</span>
               <b>Final preview area</b>
               <p>
                 {finalPresent
                   ? 'A final_output reference is recorded, but no project-scoped player stream is wired.'
-                  : `No project-scoped video output is available${historical ? ' in this snapshot' : ''}.`}
+                  : `No final synchronized delivery is available${historical ? ' in this snapshot' : ''}.`}
               </p>
             </div>
             <footer>
@@ -1224,21 +1621,21 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
             </footer>
           </section>
 
-          <section className="phase-timeline" aria-label="Assembly timeline tracks">
+          <section className="phase-timeline" aria-label="Audio and delivery timeline tracks">
             <header className="phase-subheading">
               <div>
-                <span>ASSEMBLY TIMELINE</span>
-                <h4>Shot, dialogue, music, and subtitle tracks</h4>
+                <span>AUDIO & DELIVERY TIMELINE</span>
+                <h4>Locked picture, voice, Foley, music, and subtitle tracks</h4>
                 <p>
                   Timeline geometry is derived from {historical ? 'snapshot' : 'planned'} shot durations only.
-                  Clips are not generated or concatenated here.
+                  No audio, mux, or deferred stitch is presented without project-scoped artifacts.
                 </p>
               </div>
               <b>{shots.length ? `${shots.length} planned` : 'Empty'}</b>
             </header>
 
             <div>
-              <b>VIDEO</b>
+              <b>PICTURE</b>
               <section aria-label="Video clips by planned duration">
                 {shots.length ? shots.map((row) => {
                   const dur = Math.max(1, Number(row.shot.duration_sec || 1))
@@ -1251,7 +1648,7 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
                       {row.code}
                     </span>
                   )
-                }) : <span>No project-scoped video output</span>}
+                }) : <span>No immutable picture-lock reference</span>}
               </section>
             </div>
 
@@ -1274,8 +1671,8 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
             </div>
 
             <div className="empty">
-              <b>MUSIC</b>
-              <section><span>Music and SFX design lane</span></section>
+              <b>FOLEY / MUSIC</b>
+              <section><span>Foley, ambience, music, and SFX design lane</span></section>
             </div>
             <div className="empty">
               <b>CAPTIONS</b>
@@ -1286,11 +1683,11 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
       ) : null}
 
       {assemblyTab === 'review' ? (
-        <section className="phase-final-qa" aria-label="Final QA review">
+        <section className="phase-final-qa" aria-label="Delivery QA review">
           <header className="phase-subheading">
             <div>
-              <span>FINAL QA REVIEW</span>
-              <h4>Technical and creative validation</h4>
+              <span>DELIVERY QA REVIEW</span>
+              <h4>Audio synchronization and final technical validation</h4>
               <p>
                 Every check remains pending until real project-scoped outputs and probe evidence exist.
                 No FFmpeg or decode validation is run from this UI.
@@ -1302,11 +1699,11 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
           </header>
           <div className="phase-qa-grid">
             {[
-              ['Timeline coverage', 'Every planned shot has a selected, decodable clip.'],
-              ['Continuity', 'Characters, locations, props, and transitions remain coherent.'],
-              ['Motion quality', 'No black frames, frozen clips, severe flicker, or unacceptable blur.'],
+              ['Picture-lock identity', 'The final mux consumes the approved immutable Phase 7 picture hash.'],
+              ['Foley coverage', 'Every planned sound window has a generated or approved exception result.'],
+              ['Mix integrity', 'Narration, Foley, music, ambience, and effects remain intelligible and balanced.'],
               ['Audio sync', 'Narration and dialogue align with picture and remain intelligible.'],
-              ['Delivery profile', 'Duration, aspect ratio, resolution, FPS, and 2× upscale are verified.'],
+              ['Delivery profile', 'Picture and audio codecs, duration, FPS, sample rate, and loudness are verified.'],
               ['Output integrity', 'Final decode, SHA-256, manifest, and provenance are stored.'],
             ].map(([title, detail]) => (
               <article key={title}>
@@ -1323,11 +1720,11 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
       ) : null}
 
       {assemblyTab === 'manifest' ? (
-        <section className="phase-manifest-preview" aria-label="Final manifest and provenance">
+        <section className="phase-manifest-preview" aria-label="Delivery manifest and provenance">
           <header className="phase-subheading">
             <div>
-              <span>FINAL MANIFEST</span>
-              <h4>Provenance and delivery record</h4>
+              <span>DELIVERY MANIFEST</span>
+              <h4>Final AV provenance and delivery record</h4>
               <p>
                 {manifest
                   ? `Snapshot manifest schema: ${String(manifest.schema || 'unknown')}`
@@ -1343,8 +1740,8 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
               ['Output identity', 'Canonical filename, delivery path, SHA-256'],
               ['Picture profile', 'Codec, resolution, aspect ratio, FPS, frame count'],
               ['Audio profile', 'Codec, channels, sample rate, loudness, duration'],
-              ['Source lineage', 'Selected clips, prompts, models, workflows, seeds'],
-              ['Post-production', 'Upscale, interpolation, normalization, subtitles'],
+              ['Source lineage', 'Picture-lock hash, audio windows, prompts, models, workflows, seeds'],
+              ['Post-production', 'Foley, mixing, mux, normalization, subtitles'],
               ['Review history', 'Candidate decisions, retries, QA reports, approvals'],
             ].map(([title, detail]) => (
               <article key={title}>
@@ -1359,9 +1756,9 @@ function PhaseSevenPreview({ phase, workspace, historical, onNavigate }: Preview
 
       <div className="phase-footer">
         <div>
-          <span>BACKEND PRESERVED</span>
-          <b>Execution remains separate from this design</b>
-          <p>No project-scoped clip, FFmpeg, or final-output API is currently represented as complete.</p>
+          <span>DELIVERY BOUNDARY</span>
+          <b>Final completion requires project-scoped AV evidence</b>
+          <p>No Foley, mix, mux, deferred stitch, or final-output state is represented as complete without backend evidence.</p>
         </div>
         {onNavigate ? (
           <div className="phase-footer-actions">
@@ -1383,6 +1780,8 @@ export function ProductionPhasePreview({
   workspace,
   historical,
   incompleteReason,
+  productionProfileKey,
+  stitchStage,
   onNavigate,
 }: PreviewProps) {
   if (historical && incompleteReason) {
@@ -1428,7 +1827,27 @@ export function ProductionPhasePreview({
     case 6:
       return <PhaseSixPreview phase={phase} workspace={workspace} historical={historical} onNavigate={onNavigate} />
     case 7:
-      return <PhaseSevenPreview phase={phase} workspace={workspace} historical={historical} onNavigate={onNavigate} />
+      return (
+        <PhaseSevenPreview
+          phase={phase}
+          workspace={workspace}
+          historical={historical}
+          productionProfileKey={productionProfileKey}
+          stitchStage={stitchStage}
+          onNavigate={onNavigate}
+        />
+      )
+    case 8:
+      return (
+        <PhaseEightPreview
+          phase={phase}
+          workspace={workspace}
+          historical={historical}
+          productionProfileKey={productionProfileKey}
+          stitchStage={stitchStage}
+          onNavigate={onNavigate}
+        />
+      )
     default:
       return (
         <div className="panel">

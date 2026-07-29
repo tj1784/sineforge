@@ -2,6 +2,8 @@
 
 Target: single RTX 5090 Laptop GPU, 24GB VRAM, 192GB RAM. Feasibility below is intentionally conservative. "Feasible" means worth benchmarking locally, not production-approved.
 
+Local model provenance, trigger words, integrity hashes, and `file:///` locations are tracked in [LOCAL_MODEL_RESOURCES.md](LOCAL_MODEL_RESOURCES.md).
+
 ## Model Matrix
 
 | Model | Variant | Source | Params | File Size | Text Encoder | VAE | ComfyUI Support | Required Nodes | Quant Options | LoRA Support | 24GB Feasible? | Best Use | Risk |

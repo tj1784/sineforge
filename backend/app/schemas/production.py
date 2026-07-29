@@ -1,4 +1,4 @@
-"""Contracts for CineForge's exact seven-phase production lifecycle."""
+"""Contracts for CineForge's exact eight-phase production lifecycle."""
 
 from __future__ import annotations
 
@@ -43,6 +43,8 @@ class PhaseOneGenerationInput(BaseModel):
     narration_dialogue_preference: str | None = None
     source_fidelity_constraints: str | None = None
     content_constraints: str | None = None
+    requested_chapter_count: int = Field(default=1, ge=1, le=50)
+    chapter_intake: list[dict[str, Any]] = Field(default_factory=list)
     comparison_baseline: PhaseOneBaselineKey | None = None
     requested_by: str | None = Field(default=None, max_length=200)
 
@@ -168,7 +170,7 @@ class ProductionPhaseRead(BaseModel):
 class ProductionPipelineRead(BaseModel):
     story_id: UUID
     project_id: UUID
-    exact_phase_count: Literal[7] = 7
+    exact_phase_count: Literal[8] = 8
     phases: list[ProductionPhaseRead]
     completion_message: str | None = None
 

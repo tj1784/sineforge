@@ -156,6 +156,16 @@ class RuntimeCatalogResponse(BaseModel):
     loras: list[LoraCatalogItem] = Field(default_factory=list)
 
 
+class LocalModelInventoryResponse(BaseModel):
+    """Read-only filename inventory reported by the active ComfyUI instance."""
+
+    status: str
+    source_url: str
+    total_count: int = 0
+    categories: dict[str, list[str]] = Field(default_factory=dict)
+    errors: dict[str, str] = Field(default_factory=dict)
+
+
 class WorkflowArchetypeCatalogItem(BaseModel):
     archetype_id: str
     name: str

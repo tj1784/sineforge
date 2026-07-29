@@ -50,6 +50,16 @@ class ComfyUIClient:
         class_info = object_info.get(class_type)
         return class_info if isinstance(class_info, dict) else None
 
+    async def get_model_names(self, folder: str) -> list[str]:
+        """Return ComfyUI's live filename list for one registered model folder."""
+
+        response = await self._client.get(f"/models/{folder}")
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, list):
+            raise ValueError(f"ComfyUI returned a non-list model payload for {folder}.")
+        return sorted({str(item) for item in payload if isinstance(item, str) and item.strip()})
+
     async def get_history(self, prompt_id: str) -> dict[str, Any]:
         response = await self._client.get(f"/history/{prompt_id}")
         response.raise_for_status()

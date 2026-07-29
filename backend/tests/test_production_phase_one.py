@@ -1,4 +1,4 @@
-"""Acceptance coverage for the exact seven-phase contract and Phase 1 boundary."""
+"""Acceptance coverage for the exact eight-phase contract and Phase 1 boundary."""
 
 from collections.abc import Generator
 from pathlib import Path
@@ -124,9 +124,9 @@ def test_one_prompt_creates_only_complete_phase_one_package(client: TestClient, 
     assert response.status_code == 201, response.text
     body = response.json()
     pipeline = body["production_pipeline"]
-    assert pipeline["exact_phase_count"] == 7
-    assert len(pipeline["phases"]) == 7
-    assert [phase["phase_number"] for phase in pipeline["phases"]] == list(range(1, 8))
+    assert pipeline["exact_phase_count"] == 8
+    assert len(pipeline["phases"]) == 8
+    assert [phase["phase_number"] for phase in pipeline["phases"]] == list(range(1, 9))
     assert pipeline["completion_message"] == "Your complete script is ready for review."
 
     phase_one = pipeline["phases"][0]
@@ -144,6 +144,10 @@ def test_one_prompt_creates_only_complete_phase_one_package(client: TestClient, 
     assert package["duration_analysis"]["narration_duration_sec"] > 0
     assert package["duration_analysis"]["dialogue_duration_sec"] > 0
     assert package["duration_analysis"]["planned_silence_visual_duration_sec"] > 0
+    assert package["planned_scene_count"] == 38
+    assert len(package["scene_duration_plan_sec"]) == 38
+    assert sum(package["scene_duration_plan_sec"]) == 300
+    assert all(6 <= duration <= 10 for duration in package["scene_duration_plan_sec"])
     assert "Source-required speech" in package["dialogue_script"]
     assert package["baseline_comparison"]["classification"] == "acceptable_variation"
     assert package["baseline_comparison"]["missing_count"] == 0
@@ -154,7 +158,7 @@ def test_one_prompt_creates_only_complete_phase_one_package(client: TestClient, 
 
     assert all(phase["lifecycle_state"] == "not_started" for phase in pipeline["phases"][1:])
     assert all(phase["is_locked"] is True for phase in pipeline["phases"][1:])
-    # Phases 2–7 receive idempotent planning baselines (not executable packages).
+    # Phases 2–8 receive idempotent planning baselines (not executable packages).
     assert all(
         phase["latest_version"] is not None
         and phase["latest_version"]["source"] == "baseline"
@@ -165,9 +169,9 @@ def test_one_prompt_creates_only_complete_phase_one_package(client: TestClient, 
     story = db_session.get(Story, UUID(body["story"]["id"]))
     assert story is not None
     assert story.approval_state == "draft"
-    assert _count(db_session, ProductionPhase) == 7
-    # One Phase 1 generated package + six planning baselines for phases 2–7.
-    assert _count(db_session, ProductionPhaseVersion) == 7
+    assert _count(db_session, ProductionPhase) == 8
+    # One Phase 1 generated package + seven planning baselines for phases 2–8.
+    assert _count(db_session, ProductionPhaseVersion) == 8
     assert _count(db_session, QAReport) == 1
     assert _count(db_session, AuditLog) >= 3
 
@@ -220,8 +224,8 @@ def test_phase_one_revision_preserves_prior_version_and_remains_unapproved(
     assert revised["current_version_number"] == 2
     assert revised["latest_version"]["version_number"] == 2
     assert revised["lifecycle_state"] == "ready_for_review"
-    # Two Phase 1 rows + six planning baselines.
-    assert _count(db_session, ProductionPhaseVersion) == 8
+    # Two Phase 1 rows + seven planning baselines.
+    assert _count(db_session, ProductionPhaseVersion) == 9
     phase_one_id = UUID(revised["id"])
     versions = list(
         db_session.scalars(
@@ -286,7 +290,8 @@ def test_contract_exposes_exact_canonical_names(client: TestClient):
         "Location and Key-Asset Development",
         "Production Prompt and Workflow Package",
         "Image and Voice Generation and Mapping",
-        "Video Generation, Assembly, and Final QA",
+        "Video Generation, Continuity, Assembly, and Picture Lock",
+        "Foley, Audio Mix, Final Mux, and Delivery QA",
     ]
     assert pipeline["phases"][0]["lifecycle_state"] == "not_started"
     assert pipeline["phases"][0]["is_locked"] is False

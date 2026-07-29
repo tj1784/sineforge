@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { FormEvent } from 'react'
 import {
   api,
   type Chapter,
@@ -18,6 +19,8 @@ import { formatDate } from '../../components/formatDate'
 import { useStudio } from '../StudioState'
 import { formatDuration } from '../utils'
 import { EmptyState, LoadingState } from '../components/StateBlocks'
+import { ChapterIntakeForm } from '../../components/ChapterIntakeForm'
+import { makeChapterIntakeDraft, type ChapterIntakeDraft } from '../../components/chapterIntake'
 
 type ProviderPreference = 'local' | 'hosted' | 'mixed'
 type LogicalModel = NonNullable<ManualTaskRoute['logical_model']>
@@ -75,6 +78,9 @@ export function StoryPage() {
   const [pointOfView, setPointOfView] = useState(data?.story.point_of_view ?? '')
   const [productionNotes, setProductionNotes] = useState(data?.story.production_notes ?? '')
   const [targetRuntime, setTargetRuntime] = useState(data?.story.target_duration_sec ?? 300)
+  const [chapterCreatorOpen, setChapterCreatorOpen] = useState(false)
+  const [chapterDraft, setChapterDraft] = useState<ChapterIntakeDraft>(() => makeChapterIntakeDraft(0))
+  const [chapterOrderSlot, setChapterOrderSlot] = useState(1)
   const [expanded, setExpanded] = useState<string[]>([])
   const planningDetailsRef = useRef<HTMLDetailsElement | null>(null)
 
@@ -508,19 +514,84 @@ export function StoryPage() {
     }
   }
 
-  async function persistStructure(action: () => Promise<unknown>, successMessage: string) {
+  async function persistStructure(action: () => Promise<unknown>, successMessage: string): Promise<boolean> {
     setStructureBusy(true)
     setStructureError(null)
     try {
       await action()
       await reload(story.id)
       setMessage(successMessage)
+      return true
     } catch (error) {
       const text = errorMessage(error, 'Could not update the persisted story structure.')
       setStructureError(text)
       setMessage(text)
+      return false
     } finally {
       setStructureBusy(false)
+    }
+  }
+
+  function newChapterDuration() {
+    const runtime = Number(targetRuntime) || story.target_duration_sec || 60
+    return Math.max(6, Math.round(runtime / Math.max(1, chapters.length + 1)))
+  }
+
+  function openChapterCreator() {
+    const slot = chapters.length + 1
+    setChapterOrderSlot(slot)
+    setChapterDraft(makeChapterIntakeDraft(slot - 1, newChapterDuration()))
+    setStructureError(null)
+    setChapterCreatorOpen(true)
+  }
+
+  const updateChapterDraft = <Key extends keyof ChapterIntakeDraft>(
+    key: Key,
+    value: ChapterIntakeDraft[Key],
+  ) => {
+    setChapterDraft((current) => ({ ...current, [key]: value }))
+  }
+
+  function chapterSummaryFromDraft(draft: ChapterIntakeDraft): string | null {
+    const parts = [
+      draft.summary.trim(),
+      draft.sourcePrompt.trim() ? `Source prompt: ${draft.sourcePrompt.trim()}` : '',
+      draft.productionNotes.trim() ? `Production notes: ${draft.productionNotes.trim()}` : '',
+    ].filter(Boolean)
+    return parts.length ? parts.join('\n\n') : null
+  }
+
+  async function createChapterFromDraft(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const targetIndex = Math.max(
+      0,
+      Math.min(chapters.length, Math.round(Number(chapterOrderSlot) || chapters.length + 1) - 1),
+    )
+    const title = chapterDraft.title.trim() || `Chapter ${targetIndex + 1}`
+    let createdChapterId = ''
+    const success = await persistStructure(
+      async () => {
+        const created = await api.createChapter(story.id, {
+          title,
+          summary: chapterSummaryFromDraft(chapterDraft),
+          order_index: chapters.length,
+          narrative_purpose: chapterDraft.narrativePurpose.trim() || null,
+          target_duration_sec: chapterDraft.targetDurationSec,
+          dramatic_progression: chapterDraft.dramaticProgression.trim() || null,
+        })
+        createdChapterId = created.id
+        if (targetIndex < chapters.length) {
+          const orderedIds = chapters.map((chapter) => chapter.id)
+          orderedIds.splice(targetIndex, 0, created.id)
+          await api.reorderChapters(story.id, orderedIds)
+        }
+      },
+      `Chapter "${title}" created at ${chapterCode(targetIndex)}.`,
+    )
+    if (!success) return
+    setChapterCreatorOpen(false)
+    if (createdChapterId) {
+      setExpanded((ids) => (ids.includes(createdChapterId) ? ids : [...ids, createdChapterId]))
     }
   }
 
@@ -563,16 +634,18 @@ export function StoryPage() {
   }
 
   async function moveChapter(chapterIndex: number, direction: -1 | 1) {
-    const targetIndex = chapterIndex + direction
-    if (targetIndex < 0 || targetIndex >= chapters.length) return
+    await moveChapterTo(chapterIndex, chapterIndex + direction)
+  }
+
+  async function moveChapterTo(chapterIndex: number, targetIndex: number) {
+    if (targetIndex < 0 || targetIndex >= chapters.length || targetIndex === chapterIndex) return
     const orderedIds = chapters.map((chapter) => chapter.id)
-    ;[orderedIds[chapterIndex], orderedIds[targetIndex]] = [
-      orderedIds[targetIndex],
-      orderedIds[chapterIndex],
-    ]
+    const [chapterId] = orderedIds.splice(chapterIndex, 1)
+    if (!chapterId) return
+    orderedIds.splice(targetIndex, 0, chapterId)
     await persistStructure(
       () => api.reorderChapters(story.id, orderedIds),
-      'Chapter order persisted to the backend.',
+      `Chapter moved to ${chapterCode(targetIndex)}.`,
     )
   }
 
@@ -778,11 +851,56 @@ export function StoryPage() {
                 type="button"
                 className="btn quiet"
                 disabled={structureDisabled}
-                onClick={() => void addHierarchy('chapter')}
+                onClick={() => openChapterCreator()}
               >
                 <span>Add chapter</span>
               </button>
             </header>
+            {chapterCreatorOpen ? (
+              <form className="chapter-creator-panel" onSubmit={createChapterFromDraft}>
+                <header className="chapter-creator-head">
+                  <div>
+                    <span className="eyebrow">NEW CHAPTER</span>
+                    <h3>Chapter intake</h3>
+                    <p>Use the same three-step setup as a new project, then place the chapter in the live order.</p>
+                  </div>
+                  <label className="chapter-order-slot">
+                    <span>Insert as</span>
+                    <select
+                      aria-label="New chapter order slot"
+                      disabled={structureDisabled}
+                      value={chapterOrderSlot}
+                      onChange={(event) => setChapterOrderSlot(Number(event.target.value))}
+                    >
+                      {Array.from({ length: chapters.length + 1 }, (_, index) => (
+                        <option key={index} value={index + 1}>
+                          {chapterCode(index)} {index < chapters.length ? `before ${chapters[index].title}` : 'at end'}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </header>
+                <ChapterIntakeForm
+                  draft={chapterDraft}
+                  index={Math.max(0, chapterOrderSlot - 1)}
+                  disabled={structureDisabled}
+                  onChange={updateChapterDraft}
+                />
+                <footer className="chapter-creator-actions">
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    disabled={structureDisabled}
+                    onClick={() => setChapterCreatorOpen(false)}
+                  >
+                    <span>Cancel</span>
+                  </button>
+                  <button type="submit" className="btn primary" disabled={structureDisabled}>
+                    <span>Create chapter</span>
+                  </button>
+                </footer>
+              </form>
+            ) : null}
             {structureError ? (
               <p className="notice error" role="alert">
                 {structureError}
@@ -821,6 +939,21 @@ export function StoryPage() {
                           </small>
                         </span>
                         <div>
+                          <label className="chapter-order-select">
+                            <span>Slot</span>
+                            <select
+                              aria-label={`Move ${chapter.title} to chapter slot`}
+                              disabled={structureDisabled || chapters.length < 2}
+                              value={chapterIndex + 1}
+                              onChange={(event) => void moveChapterTo(chapterIndex, Number(event.target.value) - 1)}
+                            >
+                              {chapters.map((_, index) => (
+                                <option key={index} value={index + 1}>
+                                  {chapterCode(index)}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
                           <button
                             type="button"
                             disabled={structureDisabled || chapterIndex === 0}

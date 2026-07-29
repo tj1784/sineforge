@@ -7,12 +7,18 @@ import { ProductionPhases } from './ProductionPhases'
 vi.mock('../../api/client', () => ({
   api: {
     getProductionPipeline: vi.fn(),
+    generatePhaseOne: vi.fn(),
     approveProductionPhase: vi.fn(),
     revisePhaseOne: vi.fn(),
     listPhaseVersions: vi.fn(),
     getPhaseVersion: vi.fn(),
     createPhaseVersion: vi.fn(),
     exportPhaseHistory: vi.fn(),
+    listRuntimeWorkflowTemplates: vi.fn(),
+    getSettings: vi.fn(),
+    preparePhaseSixImages: vi.fn(),
+    generatePhaseFiveHandoff: vi.fn(),
+    generateStartingImage: vi.fn(),
   },
 }))
 
@@ -23,7 +29,8 @@ const phaseNames = [
   'Location and Key-Asset Development',
   'Production Prompt and Workflow Package',
   'Image and Voice Generation and Mapping',
-  'Video Generation, Assembly, and Final QA',
+  'Video Generation, Continuity, Assembly, and Picture Lock',
+  'Foley, Audio Mix, Final Mux, and Delivery QA',
 ]
 
 const packageData = {
@@ -67,7 +74,7 @@ const packageData = {
 const pipeline: ProductionPipeline = {
   story_id: 'story-1',
   project_id: 'project-1',
-  exact_phase_count: 7,
+  exact_phase_count: 8,
   completion_message: 'Your complete script is ready for review.',
   phases: phaseNames.map((name, index) => ({
     id: `phase-${index + 1}`,
@@ -233,6 +240,35 @@ const baselineVersions = (phaseNumber: number) => [{
 }]
 
 function mockHistoryApis() {
+  vi.mocked(api.getSettings).mockResolvedValue({
+    id: 'settings-1',
+    project_id: 'project-1',
+    settings_version: 1,
+    shot_duration_min_sec: 6,
+    shot_duration_max_sec: 12,
+    continuity_policy_json: {},
+    prompting_policy_json: {},
+    voice_policy_json: {},
+    approval_policy_json: {},
+    speaking_rate: 1,
+    aspect_ratio: '16:9',
+    preview_width: 1280,
+    preview_height: 720,
+    final_width: 1920,
+    final_height: 1080,
+    fps: 24,
+    captions_enabled: true,
+    audio_enabled: true,
+    production_profile_key: 'ltx_base@1',
+    production_profile_snapshot_json: {},
+    stitch_stage: 'phase7_before_audio',
+    prefer_hosted_providers: false,
+    prefer_local_providers: true,
+    allow_model_download: false,
+    allow_rendering: false,
+    require_voice_consent: true,
+    require_production_plan_approval: true,
+  })
   vi.mocked(api.listPhaseVersions).mockImplementation(async (_storyId, phaseNumber) => baselineVersions(phaseNumber))
   vi.mocked(api.getPhaseVersion).mockImplementation(async (storyId, phaseNumber, versionId) => ({
     ...baselineVersions(phaseNumber)[0],
@@ -262,6 +298,191 @@ function mockHistoryApis() {
     },
     pipeline,
   })
+  vi.mocked(api.generatePhaseOne).mockResolvedValue({
+    pipeline,
+    phase: pipeline.phases[0],
+    completion_message: 'Your complete script is ready for review.',
+  })
+  vi.mocked(api.listRuntimeWorkflowTemplates).mockResolvedValue([])
+  vi.mocked(api.preparePhaseSixImages).mockResolvedValue({
+    status: {
+      shot_count: 1,
+      required_count: 1,
+      assigned_count: 0,
+      approved_count: 0,
+      in_review_count: 0,
+      missing_count: 1,
+      complete: false,
+      phase_7_locked: false,
+      runtime_reachable: null,
+    },
+    message: 'Phase 6 images are ready for local ComfyUI generation; Phase 7 is not artificially locked.',
+  })
+  vi.mocked(api.generateStartingImage).mockResolvedValue({
+    asset: {
+      id: 'asset-1',
+      project_id: 'project-1',
+      kind: 'starting_image',
+      source_type: 'comfyui_generated',
+      managed_uri: '/media/asset-1.png',
+      sha256: 'f'.repeat(64),
+      mime_type: 'image/png',
+      width: 1024,
+      height: 576,
+      duration_sec: null,
+      approval_state: 'in_review',
+      metadata_json: {},
+      original_filename: 'S01A_Opening_image.png',
+      size_bytes: 123,
+      archived_at: null,
+      created_at: '2026-07-19T00:00:00Z',
+      updated_at: '2026-07-19T00:00:00Z',
+      is_duplicate: false,
+    },
+    created: true,
+    duplicate_of_existing: false,
+    shot_id: 'shot-1',
+    previous_asset_id: null,
+    status: {
+      shot_count: 1,
+      required_count: 1,
+      assigned_count: 1,
+      approved_count: 0,
+      in_review_count: 1,
+      missing_count: 0,
+      complete: false,
+      phase_7_locked: false,
+      runtime_reachable: true,
+    },
+    prompt_id: 'prompt-1',
+    model_name: 'flux2_dev_fp8mixed.safetensors',
+    seed: 123,
+  })
+  vi.mocked(api.generatePhaseFiveHandoff).mockResolvedValue({
+    status: {
+      shot_count: 1,
+      required_count: 1,
+      assigned_count: 1,
+      approved_count: 0,
+      in_review_count: 1,
+      missing_count: 0,
+      complete: false,
+      phase_7_locked: false,
+      runtime_reachable: true,
+    },
+    message: 'Phase 5 handoff complete: 1 character reference, 1 reusable asset reference, and 1 scene starting image generated and labeled.',
+    character_count: 1,
+    asset_count: 1,
+    scene_count: 1,
+    generated: {
+      characters: [{
+        asset: {
+          id: 'asset-character-1',
+          project_id: 'project-1',
+          kind: 'character_reference',
+          source_type: 'comfyui_generated',
+          managed_uri: '/media/asset-character-1.png',
+          sha256: 'a'.repeat(64),
+          mime_type: 'image/png',
+          width: 1024,
+          height: 576,
+          duration_sec: null,
+          approval_state: 'in_review',
+          metadata_json: { label: 'CHAR-01 Lead Character' },
+          original_filename: 'CHAR_01_Lead_Character.png',
+          size_bytes: 123,
+          archived_at: null,
+          created_at: '2026-07-19T00:00:00Z',
+          updated_at: '2026-07-19T00:00:00Z',
+          is_duplicate: false,
+        },
+        created: true,
+        duplicate_of_existing: false,
+        entity_type: 'character',
+        entity_id: 'character-1',
+        label: 'CHAR-01 Lead Character',
+        prompt_id: 'prompt-character-1',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        seed: 123,
+      }],
+      assets: [{
+        asset: {
+          id: 'asset-location-1',
+          project_id: 'project-1',
+          kind: 'art_direction_reference',
+          source_type: 'comfyui_generated',
+          managed_uri: '/media/asset-location-1.png',
+          sha256: 'b'.repeat(64),
+          mime_type: 'image/png',
+          width: 1024,
+          height: 576,
+          duration_sec: null,
+          approval_state: 'in_review',
+          metadata_json: { label: 'LOC-01 Primary location' },
+          original_filename: 'LOC_01_Primary_location.png',
+          size_bytes: 123,
+          archived_at: null,
+          created_at: '2026-07-19T00:00:00Z',
+          updated_at: '2026-07-19T00:00:00Z',
+          is_duplicate: false,
+        },
+        created: true,
+        duplicate_of_existing: false,
+        entity_type: 'asset_reference',
+        entity_id: null,
+        label: 'LOC-01 Primary location',
+        prompt_id: 'prompt-location-1',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        seed: 1123,
+      }],
+      scenes: [{
+        asset: {
+          id: 'asset-1',
+          project_id: 'project-1',
+          kind: 'starting_image',
+          source_type: 'comfyui_generated',
+          managed_uri: '/media/asset-1.png',
+          sha256: 'f'.repeat(64),
+          mime_type: 'image/png',
+          width: 1024,
+          height: 576,
+          duration_sec: null,
+          approval_state: 'in_review',
+          metadata_json: {
+            label: 'S01A',
+            labels: {
+              characters: [{ label: 'CHAR-01 Lead Character', asset_ids: ['asset-character-1'] }],
+              assets: [{ label: 'LOC-01 Primary location', entity_id: 'asset-location-1' }],
+            },
+          },
+          original_filename: 'S01A_Opening_image.png',
+          size_bytes: 123,
+          archived_at: null,
+          created_at: '2026-07-19T00:00:00Z',
+          updated_at: '2026-07-19T00:00:00Z',
+          is_duplicate: false,
+        },
+        created: true,
+        duplicate_of_existing: false,
+        shot_id: 'shot-1',
+        previous_asset_id: null,
+        status: {
+          shot_count: 1,
+          required_count: 1,
+          assigned_count: 1,
+          approved_count: 0,
+          in_review_count: 1,
+          missing_count: 0,
+          complete: false,
+          phase_7_locked: false,
+          runtime_reachable: true,
+        },
+        prompt_id: 'prompt-1',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+        seed: 2123,
+      }],
+    },
+  })
   vi.mocked(api.exportPhaseHistory).mockResolvedValue({
     schema_name: 'cineforge.phase-history',
     version: 1,
@@ -270,10 +491,10 @@ function mockHistoryApis() {
     exported_at: '2026-07-19T00:00:00Z',
     integrity: {
       verified: true,
-      iteration_count: 7,
-      snapshot_count: 7,
-      phase_counts: { '1': 1, '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 1 },
-      hashes: Array.from({ length: 7 }, () => 'e'.repeat(64)),
+      iteration_count: 8,
+      snapshot_count: 8,
+      phase_counts: { '1': 1, '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 1, '8': 1 },
+      hashes: Array.from({ length: 8 }, () => 'e'.repeat(64)),
     },
     iterations: [],
   })
@@ -315,13 +536,54 @@ describe('ProductionPhases', () => {
     expect(screen.getByRole('tab', { name: /Scene and Shot Segmentation/ }).textContent).toContain('drafting')
   })
 
-  it('shows exactly seven enabled phase tabs and opens every UI workspace', async () => {
+  it('submits Phase 5 as one ordered character-asset-scene handoff batch', async () => {
+    const phaseFiveReadyPipeline: ProductionPipeline = {
+      ...pipeline,
+      phases: pipeline.phases.map((phase) => phase.phase_number < 5
+        ? { ...phase, lifecycle_state: 'approved', approved_at: '2026-07-22T00:00:00Z', is_locked: false, locked_reason: null }
+        : phase.phase_number === 5
+          ? { ...phase, lifecycle_state: 'ready_for_review', is_locked: false, locked_reason: null }
+          : phase),
+    }
+    const phaseFiveApprovedPipeline: ProductionPipeline = {
+      ...phaseFiveReadyPipeline,
+      phases: phaseFiveReadyPipeline.phases.map((phase) => phase.phase_number === 5
+        ? { ...phase, lifecycle_state: 'approved', approved_at: '2026-07-22T00:00:00Z' }
+        : phase),
+    }
+    vi.mocked(api.getProductionPipeline).mockResolvedValue(phaseFiveReadyPipeline)
+    vi.mocked(api.approveProductionPhase).mockResolvedValue({
+      pipeline: phaseFiveApprovedPipeline,
+      phase: phaseFiveApprovedPipeline.phases[4],
+      message: 'Phase 5 approved.',
+    })
+    mockHistoryApis()
+
+    render(<ProductionPhases storyId="story-1" projectId="project-1" data={aggregate} />)
+
+    fireEvent.click(await screen.findByRole('tab', { name: /Production Prompt and Workflow Package/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Approve Phase 5 & choose workflow' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Approve and submit handoff batch' }))
+
+    await waitFor(() => expect(api.generatePhaseFiveHandoff).toHaveBeenCalledWith(
+      'story-1',
+      expect.objectContaining({
+        requested_by: 'CineForge Phase 5 workflow handoff',
+        model_name: 'flux2_dev_fp8mixed.safetensors',
+      }),
+    ))
+    expect(api.preparePhaseSixImages).not.toHaveBeenCalled()
+    expect(api.generateStartingImage).not.toHaveBeenCalled()
+    expect(await screen.findByText(/generated with attachment labels/i)).toBeTruthy()
+  })
+
+  it('shows exactly eight enabled phase tabs and opens every UI workspace', async () => {
     vi.mocked(api.getProductionPipeline).mockResolvedValue(pipeline)
     mockHistoryApis()
 
     render(<ProductionPhases storyId="story-1" projectId="project-1" data={aggregate} />)
 
-    expect(await screen.findByText('7 complete workspaces')).toBeTruthy()
+    expect(await screen.findByText('8 complete workspaces')).toBeTruthy()
     expect(screen.getAllByText('All blocking checks passed').length).toBeGreaterThan(0)
     expect(screen.getAllByText('The Test Film').length).toBeGreaterThan(0)
 
@@ -353,7 +615,7 @@ describe('ProductionPhases', () => {
     expect(document.querySelector('.phase-one-metrics')).toBeNull()
 
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(7)
+    expect(tabs).toHaveLength(8)
     tabs.forEach((tab) => expect(tab.hasAttribute('disabled')).toBe(false))
     expect(screen.queryByText(/Locked ·/i)).toBeNull()
 
@@ -370,7 +632,7 @@ describe('ProductionPhases', () => {
     expect(api.revisePhaseOne).not.toHaveBeenCalled()
   })
 
-  it('supports keyboard navigation across the seven phase tabs', async () => {
+  it('supports keyboard navigation across the eight phase tabs', async () => {
     vi.mocked(api.getProductionPipeline).mockResolvedValue(pipeline)
     mockHistoryApis()
     render(<ProductionPhases storyId="story-1" projectId="project-1" data={aggregate} />)
@@ -380,9 +642,9 @@ describe('ProductionPhases', () => {
     expect(screen.getByRole('tab', { name: /Scene and Shot Segmentation/ }).getAttribute('aria-selected')).toBe('true')
 
     fireEvent.keyDown(screen.getByRole('tab', { name: /Scene and Shot Segmentation/ }), { key: 'End' })
-    expect(screen.getByRole('tab', { name: /Video Generation, Assembly, and Final QA/ }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByRole('tab', { name: /Foley, Audio Mix, Final Mux, and Delivery QA/ }).getAttribute('aria-selected')).toBe('true')
 
-    fireEvent.keyDown(screen.getByRole('tab', { name: /Video Generation, Assembly, and Final QA/ }), { key: 'ArrowRight' })
+    fireEvent.keyDown(screen.getByRole('tab', { name: /Foley, Audio Mix, Final Mux, and Delivery QA/ }), { key: 'ArrowRight' })
     expect(screen.getByRole('tab', { name: /Script and Narrative Development/ }).getAttribute('aria-selected')).toBe('true')
   })
 
@@ -442,7 +704,7 @@ describe('ProductionPhases', () => {
     }))
   })
 
-  it('loads SQLite-backed history and retains a current draft iteration', async () => {
+  it('loads SQLite-backed history and regenerates a current Phase 1 iteration', async () => {
     vi.mocked(api.getProductionPipeline).mockResolvedValue(pipeline)
     mockHistoryApis()
     render(<ProductionPhases storyId="story-1" projectId="project-1" data={aggregate} />)
@@ -450,14 +712,18 @@ describe('ProductionPhases', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'New iteration' }))
     fireEvent.change(screen.getByPlaceholderText(/Director review/), { target: { value: 'Director review' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Retain current draft' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate new iteration' }))
 
-    await waitFor(() => expect(api.createPhaseVersion).toHaveBeenCalledTimes(1))
-    expect(api.createPhaseVersion).toHaveBeenCalledWith(
+    await waitFor(() => expect(api.generatePhaseOne).toHaveBeenCalledTimes(1))
+    expect(api.generatePhaseOne).toHaveBeenCalledWith(
       'story-1',
-      1,
-      expect.objectContaining({ label: 'Director review' }),
+      expect.objectContaining({
+        original_prompt: 'A complete source story.',
+        target_duration_sec: 300,
+        requested_by: 'CineForge UI reviewer: Director review',
+      }),
     )
+    expect(api.createPhaseVersion).not.toHaveBeenCalled()
     expect(api.listPhaseVersions).toHaveBeenCalled()
   })
 
@@ -707,7 +973,7 @@ describe('ProductionPhases', () => {
     expect(screen.queryByText('This retained snapshot has no Phase 1 script package')).toBeNull()
   })
 
-  it('renders Phase 7 assembly workspace with timeline, QA, and manifest tabs', async () => {
+  it('separates Phase 7 picture lock from Phase 8 audio and delivery', async () => {
     const onNavigate = vi.fn()
     vi.mocked(api.getProductionPipeline).mockResolvedValue(pipeline)
     mockHistoryApis()
@@ -720,48 +986,68 @@ describe('ProductionPhases', () => {
       />,
     )
 
-    fireEvent.click(await screen.findByRole('tab', { name: /Video Generation, Assembly, and Final QA/ }))
+    fireEvent.click(await screen.findByRole('tab', { name: /Video Generation, Continuity, Assembly, and Picture Lock/ }))
 
-    expect(screen.getByRole('heading', { name: 'Video Generation, Assembly, and Final QA' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Video Generation, Continuity, Assembly, and Picture Lock' })).toBeTruthy()
     expect(screen.getAllByText('Interactive UI/UX preview').length).toBeGreaterThan(0)
+    expect(await screen.findByText('LTX Base v1')).toBeTruthy()
+    expect(screen.getByText('Persisted compatibility profile')).toBeTruthy()
+    expect(screen.getByText('Lock and stitch picture before audio generation')).toBeTruthy()
     expect(screen.getAllByText('Planned shots').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Selected clips').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('No project-scoped clip API').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Not produced').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('not evaluated').length).toBeGreaterThan(0)
-
-    expect(screen.getByRole('tablist', { name: 'Phase 7 assembly view' })).toBeTruthy()
-    expect(screen.getByRole('tab', { name: 'Assembly timeline' }).getAttribute('aria-selected')).toBe('true')
-    expect(screen.getByLabelText('Final assembly preview')).toBeTruthy()
-    expect(screen.getAllByText('Final preview area').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/No project-scoped video output is available/).length).toBeGreaterThan(0)
-    expect(screen.getByLabelText('Assembly timeline tracks')).toBeTruthy()
-    expect(screen.getAllByText('ASSEMBLY TIMELINE').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/Clips are not generated or concatenated here/).length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Not locked').length).toBeGreaterThan(0)
+    expect(screen.getByRole('tablist', { name: 'Phase 7 picture-lock view' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Picture timeline' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByLabelText('Picture-lock preview')).toBeTruthy()
+    expect(screen.getAllByText('Canonical picture preview').length).toBeGreaterThan(0)
+    expect(screen.getByLabelText('Picture assembly timeline')).toBeTruthy()
+    expect(screen.getAllByText('PICTURE ASSEMBLY').length).toBeGreaterThan(0)
     expect(screen.getByLabelText('Video clips by planned duration')).toBeTruthy()
     expect(screen.getAllByText('S01A').length).toBeGreaterThanOrEqual(1)
-    expect(screen.getAllByText('Music and SFX design lane').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Subtitle and accessibility lane').length).toBeGreaterThan(0)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Final QA review' }))
-    expect(screen.getByLabelText('Final QA review')).toBeTruthy()
-    expect(screen.getAllByText('FINAL QA REVIEW').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Timeline coverage').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Output integrity').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Pending evidence').length).toBe(6)
-    expect(screen.getAllByText('not evaluated').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/No FFmpeg or decode validation is run from this UI/).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: 'Picture QA' }))
+    expect(screen.getByLabelText('Picture QA review')).toBeTruthy()
+    expect(screen.getAllByText('PICTURE QA').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Picture lock').length).toBeGreaterThan(0)
 
-    fireEvent.click(screen.getByRole('tab', { name: 'Manifest & provenance' }))
-    expect(screen.getByLabelText('Final manifest and provenance')).toBeTruthy()
-    expect(screen.getAllByText('FINAL MANIFEST').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Output identity').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Awaiting production output').length).toBe(6)
-    expect(screen.getAllByText(/does not claim that an output exists/).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: /Foley, Audio Mix, Final Mux, and Delivery QA/ }))
+    expect(screen.getByRole('heading', { name: 'Foley, Audio Mix, Final Mux, and Delivery QA' })).toBeTruthy()
+    expect(screen.getByRole('tablist', { name: 'Phase 8 audio and delivery view' })).toBeTruthy()
+    expect(screen.getByRole('tab', { name: 'Audio timeline' }).getAttribute('aria-selected')).toBe('true')
+    expect(screen.getByLabelText('Audio and delivery timeline tracks')).toBeTruthy()
+    expect(screen.getAllByText('AUDIO & DELIVERY TIMELINE').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Foley, ambience, music, and SFX design lane').length).toBeGreaterThan(0)
 
-    expect(screen.getAllByText('BACKEND PRESERVED').length).toBeGreaterThan(0)
-    expect(screen.getAllByText(/No project-scoped clip, FFmpeg, or final-output API/).length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('tab', { name: 'Delivery QA' }))
+    expect(screen.getByLabelText('Delivery QA review')).toBeTruthy()
+    expect(screen.getAllByText('DELIVERY QA REVIEW').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Foley coverage').length).toBeGreaterThan(0)
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Delivery manifest' }))
+    expect(screen.getByLabelText('Delivery manifest and provenance')).toBeTruthy()
+    expect(screen.getAllByText('DELIVERY MANIFEST').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Picture-lock hash, audio windows, prompts, models, workflows, seeds').length).toBeGreaterThan(0)
+
+    expect(screen.getAllByText('DELIVERY BOUNDARY').length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/No Foley, mix, mux, deferred stitch/).length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('button', { name: /Open Exports/i }))
     expect(onNavigate).toHaveBeenCalledWith('exports')
+  })
+
+  it('shows persisted WAN selection without claiming runtime qualification', async () => {
+    vi.mocked(api.getProductionPipeline).mockResolvedValue(pipeline)
+    mockHistoryApis()
+    vi.mocked(api.getSettings).mockResolvedValue({
+      ...(await vi.mocked(api.getSettings)('project-1'))!,
+      production_profile_key: 'wan_base@1',
+      stitch_stage: 'phase8_before_foley',
+    })
+
+    render(<ProductionPhases storyId="story-1" projectId="project-1" data={aggregate} />)
+    fireEvent.click(await screen.findByRole('tab', { name: /Video Generation, Continuity, Assembly, and Picture Lock/ }))
+
+    expect(await screen.findByText('WAN Base v1')).toBeTruthy()
+    expect(screen.getByText('Persisted selection · runtime qualification required')).toBeTruthy()
+    expect(screen.getByText('Picture stitch is deferred until the audio/delivery phase')).toBeTruthy()
+    expect(screen.queryByText(/WAN.*qualified runtime/i)).toBeNull()
   })
 })

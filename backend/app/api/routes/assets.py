@@ -61,6 +61,14 @@ async def upload_planning_asset(
     db: Session = Depends(get_db),
 ) -> AssetUploadResponse:
     """Bounded raw-body upload; returns IDs only and requires no multipart runtime."""
+    if kind == AssetKind.video_source:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=(
+                "Use /video/phase-7/projects/{project_id}/sources/upload for "
+                "bounded streaming video ingest."
+            ),
+        )
     max_bytes = int(service.KIND_POLICY[kind.value]["max_bytes"])
     content_length = request.headers.get("content-length")
     if content_length:

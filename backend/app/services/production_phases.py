@@ -1,4 +1,4 @@
-"""Exact seven-phase production ledger and Phase 1 script generation.
+"""Exact eight-phase production ledger and Phase 1 script generation.
 
 This module is deliberately planning-text only.  It imports no media generator,
 render queue, ComfyUI client, voice worker, model installer, or FFmpeg service.
@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -20,6 +21,11 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from backend.app.core.config import get_settings
+from backend.app.services.lm_studio_models import (
+    get_active_lm_studio_model_filename,
+    get_active_lm_studio_model_id,
+)
 from backend.app.db.base import (
     AuditLog,
     Chapter,
@@ -29,6 +35,7 @@ from backend.app.db.base import (
     ProductionPhase,
     ProductionPhaseVersion,
     Project,
+    ProjectStoryboardSettings,
     ProviderProfile,
     QAReport,
     Scene,
@@ -57,8 +64,22 @@ from backend.app.schemas.production import (
     ProductionPipelineRead,
     QAReportRead,
 )
+from backend.app.services.clip_planning import (
+    MAX_CLIP_DURATION_SEC,
+    MIN_CLIP_DURATION_SEC,
+    NOMINAL_CLIP_DURATION_SEC,
+    plan_scenes_for_duration,
+)
+from backend.app.services.planning.sulphur_phase_one import enhance_phase_one_package
 
-SNAPSHOT_SCHEMA_VERSION = 1
+
+logger = logging.getLogger(__name__)
+
+LEGACY_SNAPSHOT_SCHEMA_VERSION = 1
+SNAPSHOT_SCHEMA_VERSION = 2
+SUPPORTED_SNAPSHOT_SCHEMA_VERSIONS = frozenset(
+    {LEGACY_SNAPSHOT_SCHEMA_VERSION, SNAPSHOT_SCHEMA_VERSION}
+)
 PHASE_ONE_PACKAGE_SCHEMA = "cineforge.phase_one_script_package"
 SUPPORTED_SOURCES = frozenset(
     {"baseline", "manual", "generated", "revision", "imported"}
@@ -72,7 +93,16 @@ PHASE_DEFINITIONS: tuple[tuple[int, str], ...] = (
     (4, "Location and Key-Asset Development"),
     (5, "Production Prompt and Workflow Package"),
     (6, "Image and Voice Generation and Mapping"),
-    (7, "Video Generation, Assembly, and Final QA"),
+    (7, "Video Generation, Continuity, Assembly, and Picture Lock"),
+    (8, "Foley, Audio Mix, Final Mux, and Delivery QA"),
+)
+LEGACY_PHASE_NAMES: dict[int, frozenset[str]] = {
+    7: frozenset({"Video Generation, Assembly, and Final QA"}),
+}
+PHASE_EIGHT_PICTURE_LOCK_REQUIRED = (
+    "Phase 8 remains locked until Phase 7 records an approved immutable picture "
+    "lock with matching EDL, media, and technical-QA hashes. Planning approval "
+    "alone is not media evidence."
 )
 
 COMPLETION_MESSAGE = "Your complete script is ready for review."
@@ -248,6 +278,9 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
     facts, prompt_constraints = _split_prompt(payload.original_prompt)
     groups = _group_facts(facts)
     target = round(float(payload.target_duration_sec), 3)
+    scene_clip_plan = plan_scenes_for_duration(target)
+    requested_chapter_count = max(1, int(payload.requested_chapter_count or 1))
+    chapter_intake = list(payload.chapter_intake or [])
     movement_duration = target / 4
     narration_lines: list[str] = []
     dialogue_lines: list[str] = []
@@ -362,7 +395,16 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
     detailed_treatment = "\n\n".join(treatment_sections)
     source_notes = [
         "Every narrative movement retains a direct source anchor from the original prompt.",
-        "Macro movements are editorial guidance only; final scene and shot segmentation is reserved for Phase 2.",
+        (
+            f"Project creation requested {requested_chapter_count} chapter"
+            f"{'' if requested_chapter_count == 1 else 's'} as Phase 2 planning guidance."
+        ),
+        (
+            "Phase 2 must materialize exactly "
+            f"{scene_clip_plan.planned_scene_count} scenes from total seconds divided by "
+            f"{NOMINAL_CLIP_DURATION_SEC:g}, rounded up."
+        ),
+        "Macro movements are editorial guidance only; final scene and shot records remain reserved for Phase 2.",
     ]
     if payload.source_fidelity_constraints:
         source_notes.append(payload.source_fidelity_constraints.strip())
@@ -374,6 +416,11 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
         "The requested duration is achieved through supported action, reaction, environmental observation, and intentional silence.",
         "No new named character, location, object, or plot event was added beyond the supplied source.",
         "Dialogue is omitted unless quoted or clearly required by the supplied prompt.",
+        (
+            f"Generated clips use a nominal {NOMINAL_CLIP_DURATION_SEC:g}-second target "
+            f"and remain between {MIN_CLIP_DURATION_SEC:g} and "
+            f"{MAX_CLIP_DURATION_SEC:g} seconds."
+        ),
     ]
     if payload.narration_dialogue_preference:
         assumptions.append(
@@ -408,6 +455,22 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
             "resolution": treatment_sections[3],
         },
         "pacing_plan": pacing_plan,
+        "chapter_planning": {
+            "requested_chapter_count": requested_chapter_count,
+            "provided_chapter_count": len(chapter_intake),
+            "chapter_intake": chapter_intake,
+            "phase_2_instruction": (
+                "Use this as chapter-level planning guidance only. "
+                "Do not treat it as persisted scene or shot segmentation until Phase 2."
+            ),
+        },
+        "planned_scene_count": scene_clip_plan.planned_scene_count,
+        "nominal_scene_duration_sec": NOMINAL_CLIP_DURATION_SEC,
+        "clip_duration_range_sec": [
+            MIN_CLIP_DURATION_SEC,
+            MAX_CLIP_DURATION_SEC,
+        ],
+        "scene_duration_plan_sec": list(scene_clip_plan.scene_duration_plan_sec),
         "duration_analysis": {
             "target_duration_sec": target,
             "narration_word_count": _word_count(narration_script),
@@ -445,6 +508,109 @@ def _build_phase_one_package(story: Story, payload: PhaseOneGenerationInput) -> 
             package, payload.comparison_baseline
         )
     return package
+
+
+def _refresh_phase_one_metrics(
+    package: dict[str, Any],
+    payload: PhaseOneGenerationInput,
+) -> None:
+    """Recalculate bounded duration facts after text-only enhancement."""
+
+    narration_script = str(package.get("narration_script") or "")
+    dialogue_script = str(package.get("dialogue_script") or "")
+    dialogue_words = (
+        0
+        if dialogue_script.startswith("No spoken character dialogue")
+        else _word_count(dialogue_script)
+    )
+    narration_duration = round(_word_count(narration_script) / 145 * 60, 2)
+    dialogue_duration = round(dialogue_words / 135 * 60, 2)
+    target = round(float(payload.target_duration_sec), 3)
+    planned_visual_duration = round(
+        max(0.0, target - narration_duration - dialogue_duration),
+        2,
+    )
+    package["script_word_count"] = _word_count(str(package.get("complete_script") or ""))
+    package["duration_analysis"] = {
+        **dict(package.get("duration_analysis") or {}),
+        "target_duration_sec": target,
+        "narration_word_count": _word_count(narration_script),
+        "dialogue_word_count": dialogue_words,
+        "narration_duration_sec": narration_duration,
+        "dialogue_duration_sec": dialogue_duration,
+        "planned_silence_visual_duration_sec": planned_visual_duration,
+        "estimated_total_duration_sec": round(
+            narration_duration + dialogue_duration + planned_visual_duration,
+            2,
+        ),
+        "narration_wpm": 145,
+        "dialogue_wpm": 135,
+    }
+
+
+def _apply_sulphur_phase_one_enhancement(
+    package: dict[str, Any],
+    payload: PhaseOneGenerationInput,
+) -> dict[str, Any]:
+    """Use Sulphur when enabled, retaining the valid deterministic package on failure."""
+
+    settings = get_settings()
+    active_model_id = get_active_lm_studio_model_id(settings)
+    active_model_file = get_active_lm_studio_model_filename(settings)
+    if not (settings.sulphur_configured and settings.sulphur_phase_one_enabled):
+        return package
+
+    enhanced_package = dict(package)
+    try:
+        enhancement = enhance_phase_one_package(
+            original_prompt=payload.original_prompt,
+            target_duration_sec=float(payload.target_duration_sec),
+            creative_direction=dict(package.get("creative_direction") or {}),
+            baseline_package=package,
+            settings=settings,
+        )
+        enhanced_package.update(enhancement)
+        creative_direction = dict(enhanced_package.get("creative_direction") or {})
+        creative_direction.update(
+            {
+                "script_provider": "sulphur",
+                "script_model": active_model_id,
+                "script_model_file": active_model_file,
+            }
+        )
+        enhanced_package["creative_direction"] = creative_direction
+        enhanced_package["source_fidelity_notes"] = [
+            *list(enhanced_package.get("source_fidelity_notes") or []),
+            "Script language was enhanced locally by Sulphur; deterministic QA remains authoritative.",
+        ]
+        _refresh_phase_one_metrics(enhanced_package, payload)
+        enhanced_qa = _qa_report(enhanced_package, payload)
+        if not enhanced_qa.get("passed"):
+            raise ValueError("Sulphur enhancement did not pass the Phase 1 QA contract")
+        return enhanced_package
+    except Exception as exc:
+        logger.warning(
+            "sulphur_phase_one_fallback error_type=%s",
+            exc.__class__.__name__,
+        )
+        fallback = dict(package)
+        creative_direction = dict(fallback.get("creative_direction") or {})
+        creative_direction.update(
+            {
+                "script_provider": "deterministic_fallback",
+                "script_model": active_model_id,
+                "script_model_file": active_model_file,
+            }
+        )
+        fallback["creative_direction"] = creative_direction
+        fallback["source_fidelity_notes"] = [
+            *list(fallback.get("source_fidelity_notes") or []),
+            (
+                "Sulphur was requested but its structured enhancement did not pass the "
+                "Phase 1 contract; the deterministic source-faithful script was retained."
+            ),
+        ]
+        return fallback
 
 
 def _scan_forbidden_keys(value: Any, path: str = "$") -> list[str]:
@@ -491,7 +657,32 @@ def _qa_report(
         ),
     )
     minimum_words = max(240, round(target * 1.1))
+    expected_scene_clip_plan = plan_scenes_for_duration(target)
+    actual_scene_durations = [
+        float(item) for item in (package.get("scene_duration_plan_sec") or [])
+    ]
     checks = [
+        {
+            "code": "scene_clip_plan",
+            "label": "Scene count and short-clip durations match the total runtime",
+            "passed": (
+                int(package.get("planned_scene_count") or 0)
+                == expected_scene_clip_plan.planned_scene_count
+                and len(actual_scene_durations)
+                == expected_scene_clip_plan.planned_scene_count
+                and abs(sum(actual_scene_durations) - target) <= 0.01
+                and all(
+                    MIN_CLIP_DURATION_SEC <= item <= MAX_CLIP_DURATION_SEC
+                    for item in actual_scene_durations
+                )
+            ),
+            "blocking": True,
+            "detail": (
+                f"Planned {package.get('planned_scene_count', 0)} scenes using "
+                f"ceil({target:g} / {NOMINAL_CLIP_DURATION_SEC:g}); clips must be "
+                f"{MIN_CLIP_DURATION_SEC:g}-{MAX_CLIP_DURATION_SEC:g} seconds."
+            ),
+        },
         {
             "code": "source_fidelity",
             "label": "Original prompt remains represented",
@@ -692,15 +883,19 @@ def ensure_contract(db: Session, story: Story, *, commit: bool = False) -> list[
                 locked_reason=(
                     None
                     if phase_number == 1
+                    else PHASE_EIGHT_PICTURE_LOCK_REQUIRED
+                    if phase_number == 8
                     else f"Phase {phase_number - 1} must be approved before this phase can begin."
                 ),
                 is_stale=False,
             )
             db.add(phase)
             created.append(phase)
+        elif phase.name in LEGACY_PHASE_NAMES.get(phase_number, frozenset()):
+            phase.name = name
         elif phase.name != name:
             raise ProductionPhaseError(
-                f"Phase {phase_number} name drifted from the canonical seven-phase contract."
+                f"Phase {phase_number} name drifted from the canonical eight-phase contract."
             )
     if created:
         db.flush()
@@ -710,7 +905,7 @@ def ensure_contract(db: Session, story: Story, *, commit: bool = False) -> list[
                 entity_id=story.id,
                 action="production_contract_initialized",
                 details={
-                    "exact_phase_count": 7,
+                    "exact_phase_count": 8,
                     "created_phase_numbers": [item.phase_number for item in created],
                 },
             )
@@ -822,8 +1017,8 @@ def get_pipeline(db: Session, story_id: UUID, *, ensure: bool = True) -> Product
         ensure_phase_baselines(db, story, phases=phases, commit=True)
         phases = ensure_contract(db, story, commit=False)
     reads = [_phase_read(db, phase) for phase in phases]
-    if len(reads) != 7:
-        raise ProductionPhaseError("Production contract must contain exactly seven phases.")
+    if len(reads) != 8:
+        raise ProductionPhaseError("Production contract must contain exactly eight phases.")
     phase_one = reads[0]
     message = COMPLETION_MESSAGE if phase_one.lifecycle_state == "ready_for_review" else None
     return ProductionPipelineRead(
@@ -959,7 +1154,10 @@ def generate_phase_one(
             details={"story_id": str(story.id), "approved": False},
         )
     )
-    package = _build_phase_one_package(story, payload)
+    package = _apply_sulphur_phase_one_enhancement(
+        _build_phase_one_package(story, payload),
+        payload,
+    )
     phase.lifecycle_state = "qa_pending"
     qa = _qa_report(package, payload)
     _persist_phase_one_version(
@@ -1069,8 +1267,8 @@ def _require_story(db: Session, story_id: UUID) -> Story:
 def _require_phase(
     db: Session, story: Story, phase_number: int
 ) -> ProductionPhase:
-    if phase_number < 1 or phase_number > 7:
-        raise ProductionPhaseError("Phase number must be between 1 and 7.")
+    if phase_number < 1 or phase_number > 8:
+        raise ProductionPhaseError("Phase number must be between 1 and 8.")
     phases = ensure_contract(db, story, commit=False)
     phase = next((item for item in phases if item.phase_number == phase_number), None)
     if phase is None:
@@ -1100,6 +1298,11 @@ def build_phase_snapshot(
 ) -> dict[str, Any]:
     """Build a phase-scoped snapshot from live canonical records (no media bytes)."""
     project = db.get(Project, story.project_id)
+    project_settings = db.scalar(
+        select(ProjectStoryboardSettings).where(
+            ProjectStoryboardSettings.project_id == story.project_id
+        )
+    )
     chapters = list(
         db.scalars(
             select(Chapter)
@@ -1379,18 +1582,50 @@ def build_phase_snapshot(
             for n in narrations.values()
         ],
     }
-    assembly = {
+    picture = {
         "planned_shot_count": len(shots),
         "planned_runtime_sec": round(
             sum(float(sh.duration_sec or 0) for sh in shots), 2
         ),
-        "export_ready": False,
-        "final_output": None,
+        "production_profile_key": (
+            project_settings.production_profile_key
+            if project_settings is not None
+            else "ltx_base@1"
+        ),
+        "stitch_stage": (
+            project_settings.stitch_stage
+            if project_settings is not None
+            else "phase7_before_audio"
+        ),
+        "picture_locked": False,
+        "picture_lock": None,
+        "canonical_edl": None,
+        "analysis_proxy": None,
         "qa_state": "not_evaluated",
         "manifest": {
-            "schema": "cineforge.assembly_manifest_preview",
-            "version": 1,
+            "schema": "cineforge.picture_manifest_preview",
+            "version": 2,
             "note": "Planning snapshot only; no rendered clips are claimed.",
+        },
+    }
+    audio_delivery = {
+        "audio_enabled": (
+            bool(project_settings.audio_enabled)
+            if project_settings is not None
+            else True
+        ),
+        "picture_lock_required": True,
+        "picture_lock_hash": None,
+        "foley_windows": [],
+        "stems": [],
+        "mix_master": None,
+        "final_output": None,
+        "delivery_ready": False,
+        "qa_state": "not_evaluated",
+        "manifest": {
+            "schema": "cineforge.audio_delivery_manifest_preview",
+            "version": 1,
+            "note": "Planning snapshot only; no generated audio or final mux is claimed.",
         },
     }
 
@@ -1405,7 +1640,17 @@ def build_phase_snapshot(
             "identity": identity,
             "structure": {"shots": structure["shots"]},
         },
-        7: {"assembly": assembly, "structure": structure, "media": media},
+        7: {"picture": picture, "structure": structure, "media": media},
+        8: {
+            "audio_delivery": audio_delivery,
+            "picture": {
+                "picture_locked": picture["picture_locked"],
+                "picture_lock": picture["picture_lock"],
+                "production_profile_key": picture["production_profile_key"],
+                "stitch_stage": picture["stitch_stage"],
+            },
+            "media": media,
+        },
     }
     body = domains.get(phase_number, {})
     return {
@@ -1428,7 +1673,7 @@ def _verify_version_row(
     phase: ProductionPhase | None = None,
     story: Story | None = None,
 ) -> None:
-    if version.snapshot_schema_version != SNAPSHOT_SCHEMA_VERSION:
+    if version.snapshot_schema_version not in SUPPORTED_SNAPSHOT_SCHEMA_VERSIONS:
         raise ProductionPhaseError(
             f"Unsupported snapshot schema version {version.snapshot_schema_version}."
         )
@@ -1672,8 +1917,8 @@ def approve_phase(
     Approval records the ledger state only. Media generation is handled by the
     dedicated local runtime routes for the relevant phase.
     """
-    if phase_number < 1 or phase_number > 7:
-        raise ProductionPhaseError("Phase number must be between 1 and 7.")
+    if phase_number < 1 or phase_number > 8:
+        raise ProductionPhaseError("Phase number must be between 1 and 8.")
     story = _require_story(db, story_id)
     phases = ensure_contract(db, story, commit=False)
     ensure_phase_baselines(db, story, phases=phases, commit=False)
@@ -1697,6 +1942,8 @@ def approve_phase(
     # Approving a phase that is still locked because its predecessor was just
     # approved is allowed only when that predecessor is now approved.
     if phase.is_locked and phase_number > 1:
+        if phase_number == 8:
+            raise ProductionPhaseError(PHASE_EIGHT_PICTURE_LOCK_REQUIRED)
         previous = next(p for p in phases if p.phase_number == phase_number - 1)
         if previous.lifecycle_state == "approved":
             phase.is_locked = False
@@ -1739,10 +1986,15 @@ def approve_phase(
 
     next_phase = next((p for p in phases if p.phase_number == phase_number + 1), None)
     if next_phase is not None:
-        next_phase.is_locked = False
-        next_phase.locked_reason = None
-        if next_phase.lifecycle_state == "not_started":
-            next_phase.lifecycle_state = "drafting"
+        if next_phase.phase_number == 8:
+            next_phase.is_locked = True
+            next_phase.locked_reason = PHASE_EIGHT_PICTURE_LOCK_REQUIRED
+            next_phase.lifecycle_state = "not_started"
+        else:
+            next_phase.is_locked = False
+            next_phase.locked_reason = None
+            if next_phase.lifecycle_state == "not_started":
+                next_phase.lifecycle_state = "drafting"
 
     db.add(
         AuditLog(
@@ -1768,9 +2020,11 @@ def approve_phase(
         phase=next(p for p in pipeline.phases if p.phase_number == phase_number),
         message=f"Phase {phase_number} approved. "
         + (
-            f"Phase {phase_number + 1} is unlocked for planning."
+            PHASE_EIGHT_PICTURE_LOCK_REQUIRED
+            if next_phase is not None and next_phase.phase_number == 8
+            else f"Phase {phase_number + 1} is unlocked for planning."
             if next_phase is not None
-            else "All seven phases are approved."
+            else "All eight phases are approved."
         ),
     )
 

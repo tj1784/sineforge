@@ -50,6 +50,21 @@ def test_wait_until_ready_fails_if_child_exits(tmp_path):
         start_cineforge.wait_until_ready(owned, lambda _url: False)
 
 
+def test_wait_until_ready_accepts_successful_nonpersistent_bootstrap(tmp_path):
+    candidate = service(tmp_path)
+    candidate = start_cineforge.Service(
+        **{
+            **candidate.__dict__,
+            "persistent": False,
+            "always_start": True,
+        }
+    )
+    process = SimpleNamespace(poll=lambda: 0, returncode=0)
+    owned = SimpleNamespace(service=candidate, process=process)
+
+    start_cineforge.wait_until_ready(owned, lambda _url: True)
+
+
 def test_state_distinguishes_owned_and_reused(tmp_path, monkeypatch):
     runtime_root = tmp_path / "runtime"
     monkeypatch.setattr(start_cineforge, "RUNTIME_ROOT", runtime_root)

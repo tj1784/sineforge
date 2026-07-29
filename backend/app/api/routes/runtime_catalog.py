@@ -1,6 +1,9 @@
 """Read-only factual runtime model/workflow catalog API.
 
-Never probes ComfyUI, GPUs, FFmpeg, installers, downloads, or providers.
+Database-backed catalog endpoints never infer installation state. The explicit
+``local-model-inventory`` endpoint is a separate read-only filename probe
+against the configured ComfyUI instance so operators can see what ComfyUI
+currently exposes without changing the evidence registry.
 """
 
 from __future__ import annotations
@@ -12,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from backend.app.db.session import get_db
 from backend.app.schemas.runtime_catalog import (
+    LocalModelInventoryResponse,
     LoraCatalogItem,
     ModelCatalogItem,
     ModelVariantCatalogItem,
@@ -21,11 +25,28 @@ from backend.app.schemas.runtime_catalog import (
     WorkflowCandidateRegistryResponse,
     WorkflowTemplateCatalogItem,
 )
+from backend.app.core.config import get_settings
 from backend.app.services import runtime_catalog as service
+from backend.app.services.comfy.client import ComfyUIClient
 from backend.app.services.workflows import candidate_catalog as workflow_candidates
 
 
 router = APIRouter(prefix="/runtime-catalog", tags=["runtime-catalog"])
+
+LOCAL_MODEL_FOLDERS = (
+    "checkpoints",
+    "diffusion_models",
+    "loras",
+    "vae",
+    "text_encoders",
+    "latent_upscale_models",
+    "frame_interpolation",
+    "upscale_models",
+    "controlnet",
+    "embeddings",
+    "sams",
+    "ultralytics",
+)
 
 
 @router.get("", response_model=RuntimeCatalogResponse)
@@ -56,6 +77,37 @@ def get_catalog_summary(db: Session = Depends(get_db)) -> RuntimeCatalogSummary:
 @router.get("/models", response_model=list[ModelCatalogItem])
 def list_models(db: Session = Depends(get_db)) -> list[ModelCatalogItem]:
     return [ModelCatalogItem.model_validate(item) for item in service.list_models(db)]
+
+
+@router.get("/local-model-inventory", response_model=LocalModelInventoryResponse)
+async def get_local_model_inventory() -> LocalModelInventoryResponse:
+    """Return the active ComfyUI model lists without mutating either system."""
+
+    base_url = str(get_settings().comfyui_base_url).rstrip("/")
+    categories: dict[str, list[str]] = {}
+    errors: dict[str, str] = {}
+    async with ComfyUIClient(base_url, timeout=10.0) as client:
+        for folder in LOCAL_MODEL_FOLDERS:
+            try:
+                categories[folder] = await client.get_model_names(folder)
+            except Exception as exc:  # each folder remains independently useful
+                categories[folder] = []
+                errors[folder] = str(exc)
+
+    available_categories = sum(1 for folder in LOCAL_MODEL_FOLDERS if folder not in errors)
+    if available_categories == len(LOCAL_MODEL_FOLDERS):
+        inventory_status = "available"
+    elif available_categories:
+        inventory_status = "partial"
+    else:
+        inventory_status = "unavailable"
+    return LocalModelInventoryResponse(
+        status=inventory_status,
+        source_url=base_url,
+        total_count=sum(len(items) for items in categories.values()),
+        categories=categories,
+        errors=errors,
+    )
 
 
 @router.get("/model-variants", response_model=list[ModelVariantCatalogItem])
