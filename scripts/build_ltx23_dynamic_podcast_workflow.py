@@ -39,6 +39,9 @@ WORKFLOW_ID = str(uuid.uuid5(uuid.NAMESPACE_URL, SOURCE_ID))
 EDITOR_FILENAME = "SineForge_LTX23_Dynamic_Podcast_Qwen40B.workflow.json"
 API_FILENAME = "SineForge_LTX23_Dynamic_Podcast_Qwen40B.api.json"
 PROMPT_FILENAME = "SineForge_LTX23_Dynamic_Podcast.prompt.json"
+GEOPOLITICS_EXAMPLE_FILENAME = (
+    "SineForge_LTX23_Podcast_Geopolitics_To_Everyday.prompt.json"
+)
 MANIFEST_FILENAME = "SineForge_LTX23_Dynamic_Podcast.manifest.json"
 TIMESTAMP = "2026-07-30T12:00:00-07:00"
 
@@ -52,6 +55,7 @@ CLIP_2 = "ltx-2.3_text_projection_bf16.safetensors"
 VIDEO_VAE = "LTX23_video_vae_bf16.safetensors"
 AUDIO_VAE = "LTX23_audio_vae_bf16.safetensors"
 UPSCALER = "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+SHARED_MODEL_ROOT = "C:\\ComfyUI\\ComfyUI_Shared_Folders\\models"
 PASS_1_SIGMAS = (
     "1.0, 0.995833, 0.991667, 0.9875, 0.983333, 0.979167, "
     "0.975, 0.93125, 0.847917, 0.725, 0.522917, 0.28125, 0.0"
@@ -78,6 +82,34 @@ def _write_json(path: Path, value: Any) -> None:
         json.dumps(value, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+def _geopolitics_example(contract: dict[str, Any]) -> dict[str, Any]:
+    request = json.loads(
+        json.dumps(contract["default_request"], ensure_ascii=False)
+    )
+    request["primary_topic_brief"] = (
+        "Create a fictional-opinion podcast exchange about public concern around "
+        "possible military escalation and diplomatic tension involving Iran and "
+        "Russia. Do not claim a direct Iran–Russia war is verified unless the "
+        "approved source_notes explicitly establish that."
+    )
+    request["pivot_topic_brief"] = (
+        "After MAN_B replies, pivot abruptly but naturally to one completely "
+        "unrelated specific topic from cooking, design, travel, nature, books, "
+        "or everyday etiquette. Choose a different subject on each fresh run."
+    )
+    request["tone"] = (
+        "measured fictional current-affairs commentary followed by a lightly "
+        "curious everyday-topic pivot"
+    )
+    request["factuality_policy"] = (
+        "No approved sources are attached. Treat the geopolitical exchange as "
+        "fictional opinion, avoid precise changing claims, and do not present it "
+        "as verified news."
+    )
+    request["source_notes"] = []
+    return request
 
 
 def _input(name: str, type_name: str, link: int, *, shape: int | None = None) -> dict[str, Any]:
@@ -114,8 +146,9 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
 1. Load a two-person podcast image. The original image goes directly to LTX as the first frame.
 2. Edit `topic_request_json` only as valid JSON. MAN_A defaults to camera-left; MAN_B defaults to camera-right.
 3. `new variation every run` creates a fresh topic, reply, unrelated pivot, JSON artifact, and video seed.
-4. Local Qwen 3.6 40B is called through LM Studio on loopback. Comfy models are released first, and every LM Studio model must be confirmed unloaded before LTX can start.
-5. LTX-2.3 renders one 8-second, two-pass, native-audio I2V clip. The accepted prompt is saved beside the video as `.json`.
+4. Local Qwen 3.6 40B is loaded on demand through loopback LM Studio and trust-locked to `C:\\Users\\Blokey\\.lmstudio\\models`. Comfy models are released first, and every LM Studio model must be confirmed unloaded before LTX can start.
+5. LTX files resolve from `C:\\ComfyUI\\ComfyUI_Shared_Folders\\models` through the live ComfyUI registry.
+6. LTX-2.3 renders one 8-second, two-pass, native-audio I2V clip. The accepted prompt is saved beside the video as `.json`.
 
 **Reality check:** native two-person speech is experimental. Exact words, voice separation, and which face speaks are QA conditions, not guarantees. For verified current affairs, add approved source notes or treat the dialogue as fictional commentary."""
 
@@ -559,7 +592,7 @@ def _api_workflow(contract: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _manifest() -> dict[str, Any]:
+def _manifest(contract: dict[str, Any]) -> dict[str, Any]:
     return {
         "schema_version": "sineforge.semantic-workflow-manifest/v1",
         "template_id": "ltx23-dynamic-podcast-qwen40b-native-audio-v1",
@@ -567,12 +600,18 @@ def _manifest() -> dict[str, Any]:
         "editor_workflow": EDITOR_FILENAME,
         "api_workflow": API_FILENAME,
         "prompt_contract": PROMPT_FILENAME,
+        "prompt_examples": [GEOPOLITICS_EXAMPLE_FILENAME],
         "execution_policy": {
             "cloud_agents_allowed": False,
             "local_planner": "LM Studio",
             "planner_model": MODEL_ID,
+            "trusted_planner_model_root": contract[
+                "trusted_lm_studio_model_root"
+            ],
+            "planner_preload": False,
             "planner_must_unload_before_render": True,
             "all_lm_studio_models_must_unload_before_render": True,
+            "shared_model_root": SHARED_MODEL_ROOT,
             "gpu_queue_depth": 1,
             "batch_size": 1,
             "native_audio": True,
@@ -690,12 +729,12 @@ def _manifest() -> dict[str, Any]:
 
 def _instructions() -> str:
     return """1. Install or update the bundled `SineForge-Workflow-Bridge` with `scripts/Install-SineForgeWorkflowBridge.ps1`, then restart the main LTX ComfyUI once. The workflow requires the `SineForge · Local Qwen Podcast JSON` node.
-2. Keep LM Studio's local server running at `http://127.0.0.1:1234`. The planner explicitly selects the installed Qwen 3.6 40B model; it does not use the currently selected global LM Studio model and never calls a hosted API.
-3. Upload a two-person podcast image and patch `1.image`. The same original image is sent losslessly to LTX as its first-frame guide. A resized JPEG copy is used only for local Qwen visual analysis.
+2. Keep LM Studio's local server running at `http://127.0.0.1:1234` with `CINEFORGE_PLANNING_MODEL_PRELOAD=false`. Qwen 3.6 40B remains the persisted default but loads only on demand. Prompt generation is restricted by the JSON trust contract to its exact package under `C:\\Users\\Blokey\\.lmstudio\\models`; alternate roots, aliases, loaded-instance IDs, and hosted APIs are rejected.
+3. Upload a two-person podcast image and patch `1.image`. The unchanged decoded image tensor goes directly to LTX as its first-frame guide; it is never chained through the planner copy. A resized JPEG copy is used only for local Qwen visual analysis.
 4. In `2.topic_request_json`, edit valid JSON only. Set `speaker_assignment.MAN_A` and `MAN_B` to match the people in the image. Default is camera-left and camera-right. Keep source notes in `source_notes` when dialogue must remain grounded.
 5. Leave `variation_mode` at `new variation every run` for a fresh cryptographic variation seed, two topic categories, three short dialogue turns, prompt JSON, and LTX seed each run. Change it to `replay visible seed` to reproduce the visible seed as closely as local-model sampling allows.
 6. Use `recent_topics_json` as a JSON array of recent topic names when you want stronger duplicate avoidance. The default `[]` is valid. The planner retries malformed or overlong output once under the same strict response schema.
-7. Validate against the active ComfyUI registry before queueing. Confirm the exact Sulphur distilled checkpoint, Gemma encoder, LTX projection, video/audio VAEs, and spatial upscaler remain selectable.
+7. Treat `C:\\ComfyUI\\ComfyUI_Shared_Folders\\models` as the preferred model root. Validate against the active ComfyUI registry before queueing and confirm the exact shared Sulphur distilled checkpoint, Gemma encoder, LTX projection, video/audio VAEs, and spatial upscaler remain selectable.
 8. Queue one job only. Before Qwen runs, the planner resolves the exact LM Studio catalog key, releases cached ComfyUI models, and unloads other local models. Its outer cleanup guard then unloads every LM Studio instance and refuses to hand the prompt to LTX unless the complete loaded-instance set is empty. This is required on the 24GB GPU.
 9. The default render is one 8-second, 24fps, 768×448 custom-profile, two-pass LTX-2.3 I2V job with native audio and all optional LoRAs disabled. Start here; benchmark before increasing duration or resolution.
 10. Each run saves an H.264 MP4 and its exact `.json` prompt record under the same variation prefix. The JSON includes the canonical request and approved source notes, recent topics, source-image tensor hash, planner and video seeds, topics, dialogue, positive/negative prompts, model ID, hashes, and complete LM Studio unload confirmation. The API Runner separately retains the submitted graph hash and output metadata needed for full render provenance.
@@ -707,7 +746,10 @@ def _library_record(
     *,
     editor: dict[str, Any],
     api: dict[str, Any],
+    contract: dict[str, Any],
 ) -> dict[str, Any]:
+    trusted_prompt_root = contract["trusted_lm_studio_model_root"]
+    trusted_prompt_package = contract["trusted_planner_models"][MODEL_ID]
     return {
         "schema": "sineforge.api-caller-workflow.v1",
         "id": WORKFLOW_ID,
@@ -724,9 +766,10 @@ def _library_record(
             "has MAN_A open a "
             "topic, MAN_B reply, and MAN_A pivot to an unrelated topic while "
             "the supplied image remains the first-frame identity and set "
-            "anchor. Fresh mode varies both meaning and pixels; replay mode "
-            "locks the visible seed. Two-face lip assignment and verbatim "
-            "native dialogue remain experimental and require review."
+            "anchor. Fresh mode requests new meaning and always derives a new "
+            "render seed; replay mode locks the visible seed. Two-face lip "
+            "assignment and verbatim native dialogue remain experimental and "
+            "require review."
         ),
         "category": "Video & Animation",
         "subcategory": "LTX-2.3 · Dynamic podcasts",
@@ -743,11 +786,18 @@ def _library_record(
             "dynamic prompt",
             "two pass",
             "read only",
+            "trusted local model roots",
         ],
         "requirements": {
             "custom_node_root": (
                 "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes"
             ),
+            "shared_model_root": SHARED_MODEL_ROOT,
+            "model_root_policy": "prefer_shared_comfy_root",
+            "trusted_prompt_model_root": trusted_prompt_root,
+            "trusted_prompt_models": {
+                MODEL_ID: trusted_prompt_package,
+            },
             "custom_node_packs": [
                 "SineForge-Workflow-Bridge",
                 "comfyui_starnodes",
@@ -767,46 +817,60 @@ def _library_record(
                     "node_type": "LTXVSulphurAllInOne",
                     "input": "base_model",
                     "value": BASE_MODEL,
+                    "preferred_relative_path": f"checkpoints/{BASE_MODEL}",
                 },
                 {
                     "node_id": "3",
                     "node_type": "LTXVSulphurAllInOne",
                     "input": "clip_1",
                     "value": CLIP_1,
+                    "preferred_relative_path": f"text_encoders/{CLIP_1}",
                 },
                 {
                     "node_id": "3",
                     "node_type": "LTXVSulphurAllInOne",
                     "input": "clip_2",
                     "value": CLIP_2,
+                    "preferred_relative_path": f"text_encoders/{CLIP_2}",
                 },
                 {
                     "node_id": "3",
                     "node_type": "LTXVSulphurAllInOne",
                     "input": "vae",
                     "value": VIDEO_VAE,
+                    "preferred_relative_path": f"vae/{VIDEO_VAE}",
                 },
                 {
                     "node_id": "3",
                     "node_type": "LTXVSulphurAllInOne",
                     "input": "audio_vae",
                     "value": AUDIO_VAE,
+                    "preferred_relative_path": f"vae/{AUDIO_VAE}",
                 },
                 {
                     "node_id": "3",
                     "node_type": "LTXVSulphurAllInOne",
                     "input": "upscale_model",
                     "value": UPSCALER,
+                    "preferred_relative_path": (
+                        f"latent_upscale_models/{UPSCALER}"
+                    ),
                 },
             ],
             "local_services": [
                 {
                     "service": "LM Studio",
                     "url": "http://127.0.0.1:1234",
-                "model": MODEL_ID,
-                "cloud": False,
-                "unload_required_before_render": True,
-                "all_models_unloaded_before_render": True,
+                    "model": MODEL_ID,
+                    "model_root": trusted_prompt_root,
+                    "required_relative_files": trusted_prompt_package[
+                        "required_relative_files"
+                    ],
+                    "trust_contract_enforced": True,
+                    "preload": False,
+                    "cloud": False,
+                    "unload_required_before_render": True,
+                    "all_models_unloaded_before_render": True,
                 }
             ],
             "media_inputs": [
@@ -823,6 +887,9 @@ def _library_record(
             "prompt_contract": (
                 f"Workflows/LTX23/{PROMPT_FILENAME}"
             ),
+            "prompt_examples": [
+                f"Workflows/LTX23/{GEOPOLITICS_EXAMPLE_FILENAME}"
+            ],
             "semantic_manifest": (
                 f"Workflows/LTX23/{MANIFEST_FILENAME}"
             ),
@@ -848,9 +915,12 @@ def _library_record(
                 "notes, source-image tensor hash, planner and video seeds, and the "
                 "LTX positive/negative strings. A resized JPEG is sent only to "
                 "local Qwen for visual analysis; LTX receives the original image "
-                "tensor. The API Runner's submitted graph hash and output metadata "
-                "remain the render-provenance record. Native two-speaker speech is "
-                "probabilistic."
+                "tensor. The selected LTX files are resolved from the preferred "
+                f"shared root `{SHARED_MODEL_ROOT}` through the live ComfyUI "
+                "registry. Prompt generation is restricted to the exact approved "
+                f"package beneath `{trusted_prompt_root}`. The API Runner's "
+                "submitted graph hash and output metadata remain the render-"
+                "provenance record. Native two-speaker speech is probabilistic."
             ),
         },
         "workflow_status": "converted",
@@ -921,12 +991,17 @@ def main() -> None:
     contract = json.loads(CONTRACT_SOURCE.read_text(encoding="utf-8"))
     editor = _editor_workflow(contract)
     api = _api_workflow(contract)
-    manifest = _manifest()
-    record = _library_record(editor=editor, api=api)
+    manifest = _manifest(contract)
+    record = _library_record(editor=editor, api=api, contract=contract)
+    geopolitics_example = _geopolitics_example(contract)
 
     _write_json(WORKFLOW_DIR / EDITOR_FILENAME, editor)
     _write_json(WORKFLOW_DIR / API_FILENAME, api)
     _write_json(WORKFLOW_DIR / PROMPT_FILENAME, contract)
+    _write_json(
+        WORKFLOW_DIR / GEOPOLITICS_EXAMPLE_FILENAME,
+        geopolitics_example,
+    )
     _write_json(WORKFLOW_DIR / MANIFEST_FILENAME, manifest)
     _write_json(RECORDS_DIR / f"{WORKFLOW_ID}.json", record)
     _update_catalog(record)

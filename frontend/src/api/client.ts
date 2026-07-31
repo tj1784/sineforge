@@ -2697,7 +2697,7 @@ export const api = {
   runNativeApiRunnerWorkflow: (payload: {
     workflow: Record<string, unknown>
     workflow_name: string
-    workflow_sha256: string
+    workflow_sha256?: string | null
     confirmation: true
     idempotency_key: string
   }) =>

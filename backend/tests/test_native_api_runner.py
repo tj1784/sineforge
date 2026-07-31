@@ -184,7 +184,7 @@ def test_repository_workflow_catalog_is_shared_and_read_only(tmp_path: Path):
 
     listed = native.list()
 
-    assert len(listed) == 172
+    assert len(listed) == 173
     assert {item["category"] for item in listed} == {
         "Image Editing & Composition",
         "Image Generation",
@@ -194,7 +194,7 @@ def test_repository_workflow_catalog_is_shared_and_read_only(tmp_path: Path):
         "Utilities & Workflow Tools",
         "Video & Animation",
     }
-    assert sum(item["repository_managed"] for item in listed) == 172
+    assert sum(item["repository_managed"] for item in listed) == 173
     assert sum(
         item["workflow_status"] == "requires_custom_nodes" for item in listed
     ) == 42
@@ -242,10 +242,91 @@ def test_repository_workflow_catalog_is_shared_and_read_only(tmp_path: Path):
     )
     assert podcast_detail["workflow"]["6"]["inputs"]["format"] == "json"
     assert podcast_detail["requirements"]["local_services"][0]["cloud"] is False
+    assert podcast_detail["requirements"]["shared_model_root"] == (
+        r"C:\ComfyUI\ComfyUI_Shared_Folders\models"
+    )
+    assert podcast_detail["requirements"]["trusted_prompt_model_root"] == (
+        r"C:\Users\Blokey\.lmstudio\models"
+    )
+    assert (
+        podcast_detail["requirements"]["local_services"][0][
+            "trust_contract_enforced"
+        ]
+        is True
+    )
+    assert (
+        podcast_detail["requirements"]["local_services"][0]["preload"]
+        is False
+    )
+    assert podcast_detail["requirements"]["prompt_examples"] == [
+        "Workflows/LTX23/"
+        "SineForge_LTX23_Podcast_Geopolitics_To_Everyday.prompt.json"
+    ]
+    assert {
+        item["preferred_relative_path"]
+        for item in podcast_detail["requirements"]["model_files"]
+    } == {
+        "checkpoints/sulphur2Base_distilled.safetensors",
+        "text_encoders/gemma_3_12B_it_fp8_e4m3fn.safetensors",
+        "text_encoders/ltx-2.3_text_projection_bf16.safetensors",
+        "vae/LTX23_video_vae_bf16.safetensors",
+        "vae/LTX23_audio_vae_bf16.safetensors",
+        "latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+    }
     assert (
         podcast_detail["requirements"]["qualification"]["status"]
         == "static_validated_not_rendered"
     )
+
+    continuation = next(
+        item
+        for item in listed
+        if item["name"]
+        == "LTX-2.3 + Krea 2 Lossless Continuation Loop — Local Qwen JSON"
+    )
+    assert continuation["subcategory"] == "LTX-2.3 · Automated continuation"
+    assert continuation["repository_managed"] is True
+    continuation_detail = native.get(continuation["id"])
+    assert continuation_detail["workflow"]["2"]["class_type"] == (
+        "easy forLoopStart"
+    )
+    assert continuation_detail["workflow"]["3"]["class_type"] == (
+        "SineForgeLTXKreaContinuationPlanner"
+    )
+    assert continuation_detail["workflow"]["14"]["class_type"] == (
+        "SaveImageAdvanced"
+    )
+    assert continuation_detail["workflow"]["14"]["inputs"]["format"] == {
+        "format": "png",
+        "bit_depth": "16-bit",
+        "input_color_space": "sRGB",
+    }
+    assert continuation_detail["workflow"]["16"]["inputs"]["format"] == (
+        "video/ffv1-mkv"
+    )
+    assert continuation_detail["workflow"]["18"]["inputs"]["batch_index"] == -1
+    assert continuation_detail["workflow"]["20"]["inputs"]["format"] == {
+        "format": "png",
+        "bit_depth": "16-bit",
+        "input_color_space": "sRGB",
+    }
+    assert continuation_detail["workflow"]["22"]["class_type"] == (
+        "easy forLoopEnd"
+    )
+    assert {
+        item["preferred_relative_path"]
+        for item in continuation_detail["requirements"]["model_files"]
+    } == {
+        "diffusion_models/krea2TurboOfficialComfy_krea2RawInt8Convrot.safetensors",
+        "text_encoders/qwen3vl_4b_fp8_scaled.safetensors",
+        "vae/qwen_image_vae.safetensors",
+        "checkpoints/sulphur2Base_distilled.safetensors",
+        "text_encoders/gemma_3_12B_it_fp8_e4m3fn.safetensors",
+        "text_encoders/ltx-2.3_text_projection_bf16.safetensors",
+        "vae/LTX23_video_vae_bf16.safetensors",
+        "vae/LTX23_audio_vae_bf16.safetensors",
+        "latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+    }
 
 
 def test_repository_routes_reject_mutation_and_stage_original_for_comfyui(
@@ -469,7 +550,7 @@ def test_native_routes_start_empty_and_submit_directly(
     assert len(FakeComfyUIClient.submissions) == 1
 
 
-def test_native_run_rejects_json_changed_after_validation(tmp_path: Path, monkeypatch):
+def test_native_run_ignores_stale_validation_hash(tmp_path: Path, monkeypatch):
     app = create_app()
     app.dependency_overrides[get_native_api_workflow_library] = lambda: NativeApiWorkflowLibrary(
         tmp_path, include_repository=False
@@ -492,8 +573,9 @@ def test_native_run_rejects_json_changed_after_validation(tmp_path: Path, monkey
         },
     )
 
-    assert response.status_code == 409
-    assert "changed after validation" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.json()["prompt_id"] == "native-prompt-1"
+    assert FakeComfyUIClient.submissions[0][0] == workflow
 
 
 def test_native_routes_map_visual_json_to_422(tmp_path: Path, monkeypatch):

@@ -1,7 +1,7 @@
 {
   "schema": "sineforge.repository-workflow-catalog/v1",
-  "generated_at": "2026-07-30T12:00:00-07:00",
-  "workflow_count": 172,
+  "generated_at": "2026-07-31T01:00:00-07:00",
+  "workflow_count": 173,
   "category_counts": {
     "Image Editing & Composition": 44,
     "Image Generation": 43,
@@ -9,7 +9,7 @@
     "Speech, Audio & Music": 18,
     "Upscaling & Restoration": 10,
     "Utilities & Workflow Tools": 17,
-    "Video & Animation": 22
+    "Video & Animation": 23
   },
   "episode_counts": {
     "EP02": 3,
@@ -38,7 +38,7 @@
     "EP28": 4
   },
   "status_counts": {
-    "converted": 130,
+    "converted": 131,
     "requires_custom_nodes": 42
   },
   "support_assets": [
@@ -2107,7 +2107,19 @@
       "source_archive": null,
       "source_entry": "Workflows/LTX23/SineForge_LTX23_Dynamic_Podcast_Qwen40B.workflow.json",
       "sha256": "70a3c41a9aa98982abdd96e30645515e5b0bc37162b33a34b993dd3efc16bb99",
-      "source_workflow_sha256": "fca249d0b738c7d0ba29f6b7d9233e0c8dbff4268b7a1962f216d48d10f06f82"
+      "source_workflow_sha256": "cd7c4f5f7b2af28f7ea9e8184a6136d34c10bf4b0643be450c36a055bbfb19b4"
+    },
+    {
+      "id": "95682418-d6a6-501a-82dc-f6d465a564c3",
+      "name": "LTX-2.3 + Krea 2 Lossless Continuation Loop — Local Qwen JSON",
+      "category": "Video & Animation",
+      "subcategory": "LTX-2.3 · Automated continuation",
+      "episode": null,
+      "workflow_status": "converted",
+      "source_archive": null,
+      "source_entry": "Workflows/LTX23/SineForge_LTX23_Krea2_Lossless_Continuation_Loop.workflow.json",
+      "sha256": "428494c43a6feb04f8182c70791cab946cf5e0435102ae66e49afe7d489bbc7b",
+      "source_workflow_sha256": "86cdf118059a542ce28f7a819a60c926b8753d1193ebe744ec56198238d3a6ac"
     }
   ],
   "archive_notes": {

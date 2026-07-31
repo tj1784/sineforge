@@ -2,6 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schema_version": "sineforge.ltx23-podcast-prompt-contract/v1",
   "planner_model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+  "trusted_lm_studio_model_root": "C:\\Users\\Blokey\\.lmstudio\\models",
+  "trusted_planner_models": {
+    "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max": {
+      "publisher": "DavidAU",
+      "package": "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF",
+      "required_relative_files": [
+        "DavidAU/Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF/Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf",
+        "DavidAU/Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF/mmproj-F32.gguf"
+      ]
+    }
+  },
   "system_prompt": {
     "role": "local_ltx23_podcast_variation_planner",
     "objective": "Create one fresh, image-aware, short two-person podcast variation for LTX-2.3 image-to-video with native audio.",

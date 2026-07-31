@@ -14,10 +14,17 @@ It also registers one local planning node:
 SineForge · Local Qwen Podcast JSON
 ```
 
-That node calls the exact local LM Studio model selected in the workflow,
+That node resolves the selected value to one exact LM Studio catalog key,
 requires a strict JSON-Schema response, releases cached ComfyUI models before
-planning, and confirms that LM Studio unloaded Qwen before returning anything
-to an LTX render node. It never accepts a cloud URL or API key.
+planning, and uses an outer cleanup guard to unload every LM Studio model
+instance before returning anything to an LTX render node. If the complete
+loaded-instance set cannot be verified empty, the node fails closed. It never
+accepts a cloud URL or API key.
+
+The bundled podcast JSON contract also whitelists the exact planner package
+and required GGUF/mmproj files beneath
+`C:\Users\Blokey\.lmstudio\models`. Files outside that trusted root are not
+accepted for this workflow.
 
 Install it with:
 

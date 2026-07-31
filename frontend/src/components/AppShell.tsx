@@ -56,7 +56,6 @@ const navItems: { id: PageId; label: string; icon: ShellIconName }[] = [
   { id: 'routing', label: 'Model routing', icon: 'cpu' },
   { id: 'workflows', label: 'Workflows', icon: 'layers' },
   { id: 'sequence-sheet', label: 'Sequence Sheet', icon: 'film' },
-  { id: 'api-caller', label: 'API Caller', icon: 'play' },
   { id: 'api-runner', label: 'API Runner', icon: 'play' },
   { id: 'downloads', label: 'Downloads', icon: 'download' },
   { id: 'exports', label: 'Exports', icon: 'download' },

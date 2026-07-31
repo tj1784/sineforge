@@ -1,9 +1,8 @@
 """Native SineForge API Runner.
 
 Unlike ``/api-caller``, this surface never talks to the separately supervised
-ComfyAPI Runner.  Operator-selected API JSON is stored in an isolated library,
-validated against live ComfyUI object info, and submitted directly to the
-configured ComfyUI URL only after an explicit confirmed request.
+ComfyAPI Runner. Operator-selected API JSON is stored in an isolated library
+and submitted directly to the configured ComfyUI URL after an explicit request.
 """
 
 from __future__ import annotations
@@ -233,18 +232,10 @@ async def load_workflow_in_comfyui(
     workflow_id: UUID,
     library: NativeApiWorkflowLibrary = Depends(get_native_api_workflow_library),
 ) -> NativeRunnerComfyUILoadResponse:
-    """Stage a bundled editor graph and return its one-time ComfyUI canvas URL."""
+    """Stage an editor graph and return its one-time ComfyUI canvas URL."""
 
     try:
         workflow = library.get(workflow_id)
-        if not workflow.get("repository_managed"):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Only read-only repository workflows use the ComfyUI canvas "
-                    "handoff. Download operator workflow JSON instead."
-                ),
-            )
         source_workflow = workflow.get("source_workflow")
         if (
             not isinstance(source_workflow, dict)
@@ -252,7 +243,7 @@ async def load_workflow_in_comfyui(
         ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="This repository record has no editor-format ComfyUI workflow.",
+                detail="This workflow has no editor-format ComfyUI graph to load.",
             )
 
         comfy_url = str(get_settings().comfyui_base_url).rstrip("/")
@@ -471,11 +462,6 @@ async def run_workflow(
     try:
         workflow = normalize_api_workflow(payload.workflow)
         digest = workflow_sha256(workflow)
-        if digest != payload.workflow_sha256:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="The working JSON changed after validation. Validate this exact graph again.",
-            )
 
         async with _idempotency_lock:
             persisted = state_store.get_by_idempotency_key(payload.idempotency_key)
@@ -518,21 +504,6 @@ async def run_workflow(
                 if prompt_id and client_id:
                     _native_prompt_clients[prompt_id] = client_id
                 return NativeRunnerRunResponse.model_validate(prior_response)
-
-            async with ComfyUIClient(
-                str(get_settings().comfyui_base_url),
-                timeout=30.0,
-            ) as client:
-                object_info = await client.get_object_info()
-            analysis = analyze_native_workflow(workflow, object_info)
-            if not analysis["queueable"]:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                    detail={
-                        "message": "Live validation failed; nothing was queued.",
-                        "analysis": analysis,
-                    },
-                )
 
             client_id = f"sineforge-native-{uuid4()}"
             reserved, reservation = state_store.reserve(

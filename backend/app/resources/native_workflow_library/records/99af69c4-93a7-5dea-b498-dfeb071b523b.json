@@ -3,11 +3,11 @@
   "id": "99af69c4-93a7-5dea-b498-dfeb071b523b",
   "name": "LTX-2.3 Dynamic Podcast — Local Qwen JSON + Native Audio",
   "version": "1.0",
-  "description": "A one-click, image-driven LTX-2.3 podcast experiment that creates a fresh structured conversation locally before every render. The SineForge planner calls the installed Qwen 3.6 40B model through loopback LM Studio with a strict JSON Schema, saves the complete prompt as `.json`, derives a new render seed, and confirms Qwen is unloaded before the two-pass Sulphur LTX-2.3 native-audio I2V node can claim VRAM. The default eight-second shot has MAN_A open a topic, MAN_B reply, and MAN_A pivot to an unrelated topic while the supplied image remains the first-frame identity and set anchor. Fresh mode varies both meaning and pixels; replay mode locks the visible seed. Two-face lip assignment and verbatim native dialogue remain experimental and require review.",
+  "description": "A one-click, image-driven LTX-2.3 podcast experiment that creates a fresh structured conversation locally before every render. The SineForge planner calls the installed Qwen 3.6 40B model through loopback LM Studio with a strict JSON Schema, saves the complete prompt as `.json`, derives a new render seed, and confirms every LM Studio model is unloaded before the two-pass Sulphur LTX-2.3 native-audio I2V node can claim VRAM. The default eight-second shot has MAN_A open a topic, MAN_B reply, and MAN_A pivot to an unrelated topic while the supplied image remains the first-frame identity and set anchor. Fresh mode requests new meaning and always derives a new render seed; replay mode locks the visible seed. Two-face lip assignment and verbatim native dialogue remain experimental and require review.",
   "category": "Video & Animation",
   "subcategory": "LTX-2.3 · Dynamic podcasts",
   "episode": null,
-  "instructions": "1. Install or update the bundled `SineForge-Workflow-Bridge` with `scripts/Install-SineForgeWorkflowBridge.ps1`, then restart the main LTX ComfyUI once. The workflow requires the `SineForge · Local Qwen Podcast JSON` node.\n2. Keep LM Studio's local server running at `http://127.0.0.1:1234`. The planner explicitly selects the installed Qwen 3.6 40B model; it does not use the currently selected global LM Studio model and never calls a hosted API.\n3. Upload a two-person podcast image and patch `1.image`. The same original image is sent losslessly to LTX as its first-frame guide. A resized JPEG copy is used only for local Qwen visual analysis.\n4. In `2.topic_request_json`, edit valid JSON only. Set `speaker_assignment.MAN_A` and `MAN_B` to match the people in the image. Default is camera-left and camera-right. Keep source notes in `source_notes` when dialogue must remain grounded.\n5. Leave `variation_mode` at `new variation every run` for a fresh cryptographic variation seed, two topic categories, three short dialogue turns, prompt JSON, and LTX seed each run. Change it to `replay visible seed` to reproduce the visible seed as closely as local-model sampling allows.\n6. Use `recent_topics_json` as a JSON array of recent topic names when you want stronger duplicate avoidance. The default `[]` is valid. The planner retries malformed or overlong output once under the same strict response schema.\n7. Validate against the active ComfyUI registry before queueing. Confirm the exact Sulphur distilled checkpoint, Gemma encoder, LTX projection, video/audio VAEs, and spatial upscaler remain selectable.\n8. Queue one job only. Before Qwen runs, the planner releases cached ComfyUI models and unloads other LM Studio models. It then refuses to hand the prompt to LTX unless the selected Qwen instance is confirmed unloaded. This is required on the 24GB GPU.\n9. The default render is one 8-second, 24fps, 768×448 custom-profile, two-pass LTX-2.3 I2V job with native audio and all optional LoRAs disabled. Start here; benchmark before increasing duration or resolution.\n10. Each run saves an H.264 MP4 and its exact `.json` prompt record under the same variation prefix. The JSON includes planner and video seeds, topics, dialogue, positive/negative prompts, hashes, model ID, and unload confirmation.\n11. Treat two-person native dialogue as experimental. Exact words, distinct voices, lip sync, and the correct face speaking are QA conditions rather than guarantees. For production, render one independently anchored five-second speaker turn per job and assemble the accepted turns.\n12. LTX and the local planner are not news sources. Without approved source notes, dialogue about war, politics, elections, medicine, finance, or other changing facts is generated as fictional opinion or broad discussion, not verified reporting.",
+  "instructions": "1. Install or update the bundled `SineForge-Workflow-Bridge` with `scripts/Install-SineForgeWorkflowBridge.ps1`, then restart the main LTX ComfyUI once. The workflow requires the `SineForge · Local Qwen Podcast JSON` node.\n2. Keep LM Studio's local server running at `http://127.0.0.1:1234` with `CINEFORGE_PLANNING_MODEL_PRELOAD=false`. Qwen 3.6 40B remains the persisted default but loads only on demand. Prompt generation is restricted by the JSON trust contract to its exact package under `C:\\Users\\Blokey\\.lmstudio\\models`; alternate roots, aliases, loaded-instance IDs, and hosted APIs are rejected.\n3. Upload a two-person podcast image and patch `1.image`. The unchanged decoded image tensor goes directly to LTX as its first-frame guide; it is never chained through the planner copy. A resized JPEG copy is used only for local Qwen visual analysis.\n4. In `2.topic_request_json`, edit valid JSON only. Set `speaker_assignment.MAN_A` and `MAN_B` to match the people in the image. Default is camera-left and camera-right. Keep source notes in `source_notes` when dialogue must remain grounded.\n5. Leave `variation_mode` at `new variation every run` for a fresh cryptographic variation seed, two topic categories, three short dialogue turns, prompt JSON, and LTX seed each run. Change it to `replay visible seed` to reproduce the visible seed as closely as local-model sampling allows.\n6. Use `recent_topics_json` as a JSON array of recent topic names when you want stronger duplicate avoidance. The default `[]` is valid. The planner retries malformed or overlong output once under the same strict response schema.\n7. Treat `C:\\ComfyUI\\ComfyUI_Shared_Folders\\models` as the preferred model root. Validate against the active ComfyUI registry before queueing and confirm the exact shared Sulphur distilled checkpoint, Gemma encoder, LTX projection, video/audio VAEs, and spatial upscaler remain selectable.\n8. Queue one job only. Before Qwen runs, the planner resolves the exact LM Studio catalog key, releases cached ComfyUI models, and unloads other local models. Its outer cleanup guard then unloads every LM Studio instance and refuses to hand the prompt to LTX unless the complete loaded-instance set is empty. This is required on the 24GB GPU.\n9. The default render is one 8-second, 24fps, 768×448 custom-profile, two-pass LTX-2.3 I2V job with native audio and all optional LoRAs disabled. Start here; benchmark before increasing duration or resolution.\n10. Each run saves an H.264 MP4 and its exact `.json` prompt record under the same variation prefix. The JSON includes the canonical request and approved source notes, recent topics, source-image tensor hash, planner and video seeds, topics, dialogue, positive/negative prompts, model ID, hashes, and complete LM Studio unload confirmation. The API Runner separately retains the submitted graph hash and output metadata needed for full render provenance.\n11. Treat two-person native dialogue as experimental. Exact words, distinct voices, lip sync, and the correct face speaking are QA conditions rather than guarantees. For production, render one independently anchored five-second speaker turn per job and assemble the accepted turns.\n12. LTX and the local planner are not news sources. Without approved source notes, dialogue about war, politics, elections, medicine, finance, or other changing facts is generated as fictional opinion or broad discussion, not verified reporting.",
   "tags": [
     "LTX-2.3",
     "image to video",
@@ -18,10 +18,24 @@
     "strict JSON",
     "dynamic prompt",
     "two pass",
-    "read only"
+    "read only",
+    "trusted local model roots"
   ],
   "requirements": {
     "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "shared_model_root": "C:\\ComfyUI\\ComfyUI_Shared_Folders\\models",
+    "model_root_policy": "prefer_shared_comfy_root",
+    "trusted_prompt_model_root": "C:\\Users\\Blokey\\.lmstudio\\models",
+    "trusted_prompt_models": {
+      "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max": {
+        "publisher": "DavidAU",
+        "package": "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF",
+        "required_relative_files": [
+          "DavidAU/Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF/Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf",
+          "DavidAU/Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF/mmproj-F32.gguf"
+        ]
+      }
+    },
     "custom_node_packs": [
       "SineForge-Workflow-Bridge",
       "comfyui_starnodes",
@@ -42,37 +56,43 @@
         "node_id": "3",
         "node_type": "LTXVSulphurAllInOne",
         "input": "base_model",
-        "value": "sulphur2Base_distilled.safetensors"
+        "value": "sulphur2Base_distilled.safetensors",
+        "preferred_relative_path": "checkpoints/sulphur2Base_distilled.safetensors"
       },
       {
         "node_id": "3",
         "node_type": "LTXVSulphurAllInOne",
         "input": "clip_1",
-        "value": "gemma_3_12B_it_fp8_e4m3fn.safetensors"
+        "value": "gemma_3_12B_it_fp8_e4m3fn.safetensors",
+        "preferred_relative_path": "text_encoders/gemma_3_12B_it_fp8_e4m3fn.safetensors"
       },
       {
         "node_id": "3",
         "node_type": "LTXVSulphurAllInOne",
         "input": "clip_2",
-        "value": "ltx-2.3_text_projection_bf16.safetensors"
+        "value": "ltx-2.3_text_projection_bf16.safetensors",
+        "preferred_relative_path": "text_encoders/ltx-2.3_text_projection_bf16.safetensors"
       },
       {
         "node_id": "3",
         "node_type": "LTXVSulphurAllInOne",
         "input": "vae",
-        "value": "LTX23_video_vae_bf16.safetensors"
+        "value": "LTX23_video_vae_bf16.safetensors",
+        "preferred_relative_path": "vae/LTX23_video_vae_bf16.safetensors"
       },
       {
         "node_id": "3",
         "node_type": "LTXVSulphurAllInOne",
         "input": "audio_vae",
-        "value": "LTX23_audio_vae_bf16.safetensors"
+        "value": "LTX23_audio_vae_bf16.safetensors",
+        "preferred_relative_path": "vae/LTX23_audio_vae_bf16.safetensors"
       },
       {
         "node_id": "3",
         "node_type": "LTXVSulphurAllInOne",
         "input": "upscale_model",
-        "value": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+        "value": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+        "preferred_relative_path": "latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
       }
     ],
     "local_services": [
@@ -80,8 +100,16 @@
         "service": "LM Studio",
         "url": "http://127.0.0.1:1234",
         "model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+        "model_root": "C:\\Users\\Blokey\\.lmstudio\\models",
+        "required_relative_files": [
+          "DavidAU/Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF/Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf",
+          "DavidAU/Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF/mmproj-F32.gguf"
+        ],
+        "trust_contract_enforced": true,
+        "preload": false,
         "cloud": false,
-        "unload_required_before_render": true
+        "unload_required_before_render": true,
+        "all_models_unloaded_before_render": true
       }
     ],
     "media_inputs": [
@@ -96,6 +124,9 @@
     "prompt_field_count": 2,
     "output_node_count": 3,
     "prompt_contract": "Workflows/LTX23/SineForge_LTX23_Dynamic_Podcast.prompt.json",
+    "prompt_examples": [
+      "Workflows/LTX23/SineForge_LTX23_Podcast_Geopolitics_To_Everyday.prompt.json"
+    ],
     "semantic_manifest": "Workflows/LTX23/SineForge_LTX23_Dynamic_Podcast.manifest.json",
     "qualification": {
       "status": "static_validated_not_rendered",
@@ -109,7 +140,7 @@
         "queue_depth": 1
       }
     },
-    "documentation_notes": "The local planner's system prompt, user request, and generated record are JSON. `SaveText` is fixed to format=json. The LTX positive/negative strings are extracted runtime values retained inside that JSON record. A resized JPEG is sent only to local Qwen for visual analysis; LTX receives the original image tensor. Native two-speaker speech is probabilistic."
+    "documentation_notes": "The local planner's system prompt, user request, and generated record are JSON. `SaveText` is fixed to format=json. The record retains the canonical request, recent-topic list, approved source notes, source-image tensor hash, planner and video seeds, and the LTX positive/negative strings. A resized JPEG is sent only to local Qwen for visual analysis; LTX receives the original image tensor. The selected LTX files are resolved from the preferred shared root `C:\\ComfyUI\\ComfyUI_Shared_Folders\\models` through the live ComfyUI registry. Prompt generation is restricted to the exact approved package beneath `C:\\Users\\Blokey\\.lmstudio\\models`. The API Runner's submitted graph hash and output metadata remain the render-provenance record. Native two-speaker speech is probabilistic."
   },
   "workflow_status": "converted",
   "repository_managed": true,
@@ -631,7 +662,7 @@
         "title": "READ ME · one-click local planner → safe VRAM handoff → LTX-2.3",
         "properties": {},
         "widgets_values": [
-          "# SineForge · LTX-2.3 Dynamic Podcast\n\n1. Load a two-person podcast image. The original image goes directly to LTX as the first frame.\n2. Edit `topic_request_json` only as valid JSON. MAN_A defaults to camera-left; MAN_B defaults to camera-right.\n3. `new variation every run` creates a fresh topic, reply, unrelated pivot, JSON artifact, and video seed.\n4. Local Qwen 3.6 40B is called through LM Studio on loopback. Comfy models are released first, and Qwen must be confirmed unloaded before LTX can start.\n5. LTX-2.3 renders one 8-second, two-pass, native-audio I2V clip. The accepted prompt is saved beside the video as `.json`.\n\n**Reality check:** native two-person speech is experimental. Exact words, voice separation, and which face speaks are QA conditions, not guarantees. For verified current affairs, add approved source notes or treat the dialogue as fictional commentary."
+          "# SineForge · LTX-2.3 Dynamic Podcast\n\n1. Load a two-person podcast image. The original image goes directly to LTX as the first frame.\n2. Edit `topic_request_json` only as valid JSON. MAN_A defaults to camera-left; MAN_B defaults to camera-right.\n3. `new variation every run` creates a fresh topic, reply, unrelated pivot, JSON artifact, and video seed.\n4. Local Qwen 3.6 40B is loaded on demand through loopback LM Studio and trust-locked to `C:\\Users\\Blokey\\.lmstudio\\models`. Comfy models are released first, and every LM Studio model must be confirmed unloaded before LTX can start.\n5. LTX files resolve from `C:\\ComfyUI\\ComfyUI_Shared_Folders\\models` through the live ComfyUI registry.\n6. LTX-2.3 renders one 8-second, two-pass, native-audio I2V clip. The accepted prompt is saved beside the video as `.json`.\n\n**Reality check:** native two-person speech is experimental. Exact words, voice separation, and which face speaks are QA conditions, not guarantees. For verified current affairs, add approved source notes or treat the dialogue as fictional commentary."
         ],
         "color": "#26354f",
         "bgcolor": "#172237"
@@ -819,7 +850,7 @@
     },
     "version": 0.4
   },
-  "source_workflow_sha256": "fca249d0b738c7d0ba29f6b7d9233e0c8dbff4268b7a1962f216d48d10f06f82",
+  "source_workflow_sha256": "cd7c4f5f7b2af28f7ea9e8184a6136d34c10bf4b0643be450c36a055bbfb19b4",
   "workflow": {
     "1": {
       "inputs": {
