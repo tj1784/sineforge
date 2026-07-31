@@ -14,12 +14,6 @@ MODULE_PATH = (
     / "sineforge_workflow_bridge"
     / "podcast_planner.py"
 )
-GEOPOLITICS_EXAMPLE_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "Workflows"
-    / "LTX23"
-    / "SineForge_LTX23_Podcast_Geopolitics_To_Everyday.prompt.json"
-)
 SPEC = importlib.util.spec_from_file_location(
     "sineforge_podcast_planner_test_module",
     MODULE_PATH,
@@ -80,43 +74,16 @@ def _chat_response(result: dict[str, str] | None = None) -> dict:
     }
 
 
-def _patch_trusted_package(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(
-        planner,
-        "_validate_trusted_model_package",
-        lambda model: {
-            "model": model,
-            "root": r"C:\trusted\models",
-            "files": [{"relative_path": "model.gguf", "size_bytes": 1}],
-        },
-    )
-
-
 def test_prompt_contract_is_strict_json_and_uses_requested_qwen_model() -> None:
     contract = planner._load_contract()
 
     assert contract["schema_version"].endswith("/v1")
     assert contract["planner_model"].startswith("qwen3.6-40b-")
-    assert contract["trusted_lm_studio_model_root"] == (
-        r"C:\Users\Blokey\.lmstudio\models"
-    )
-    assert contract["planner_model"] in contract["trusted_planner_models"]
     assert contract["response_schema"]["additionalProperties"] is False
     assert set(contract["response_schema"]["required"]) == set(
         contract["response_schema"]["properties"]
     )
     assert contract["default_request"]["duration_seconds"] == 8
-
-
-def test_geopolitics_example_is_json_and_requires_fictional_opinion() -> None:
-    request = json.loads(GEOPOLITICS_EXAMPLE_PATH.read_text(encoding="utf-8"))
-
-    assert request["schema_version"].endswith("/v1")
-    assert "Iran" in request["primary_topic_brief"]
-    assert "Russia" in request["primary_topic_brief"]
-    assert "unrelated" in request["pivot_topic_brief"]
-    assert "fictional opinion" in request["factuality_policy"]
-    assert request["source_notes"] == []
 
 
 def test_validated_result_builds_timed_prompt_with_exact_dialogue() -> None:
@@ -172,20 +139,6 @@ def test_planner_enforces_schema_lengths_and_source_bound_notes() -> None:
         source_bound,
         request=request,
     )["factuality_mode"] == "source_bound"
-
-
-def test_recent_topics_accepts_array_jsonl_and_rejects_trailing_text() -> None:
-    assert planner._parse_json_list("", label="recent_topics_json") == []
-    assert planner._parse_json_list(
-        '["one"]\n["two", "three"]\n{"topic": "four"}',
-        label="recent_topics_json",
-    ) == ["one", "two", "three", {"topic": "four"}]
-
-    with pytest.raises(ValueError, match="recent_topics_json must be valid JSON"):
-        planner._parse_json_list(
-            '["one"]\nnot-json',
-            label="recent_topics_json",
-        )
 
 
 def test_variation_mode_controls_cache_identity() -> None:
@@ -244,7 +197,6 @@ def test_generate_resolves_exact_model_and_cleans_all_lm_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[str] = []
-    _patch_trusted_package(monkeypatch)
     monkeypatch.setattr(
         planner,
         "_resolve_model_entry",
@@ -299,7 +251,6 @@ def test_generate_retries_invalid_json_once(
 ) -> None:
     payloads: list[dict] = []
     responses = iter([_chat_response(), _chat_response(_valid_result())])
-    _patch_trusted_package(monkeypatch)
     monkeypatch.setattr(
         planner,
         "_resolve_model_entry",
@@ -336,7 +287,6 @@ def test_generate_failure_still_cleans_all_lm_models(
     failure_stage: str,
 ) -> None:
     cleanup_calls: list[str] = []
-    _patch_trusted_package(monkeypatch)
     monkeypatch.setattr(
         planner,
         "_resolve_model_entry",
@@ -380,7 +330,6 @@ def test_generate_fails_closed_for_unknown_model_or_cleanup_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cleanup_calls: list[str] = []
-    _patch_trusted_package(monkeypatch)
     monkeypatch.setattr(planner, "_model_entries", lambda: [])
     monkeypatch.setattr(
         planner,
@@ -416,17 +365,3 @@ def test_generate_fails_closed_for_unknown_model_or_cleanup_failure(
 
     with pytest.raises(RuntimeError, match="cleanup failed.*still loaded"):
         planner.SineForgeLTXPodcastPlanner().generate(**_generate_kwargs())
-
-
-def test_validate_inputs_rejects_untrusted_planner_model() -> None:
-    validation = planner.SineForgeLTXPodcastPlanner.VALIDATE_INPUTS(
-        model="some-model-outside-the-trust-contract",
-        variation_mode="new variation every run",
-        topic_request_json=planner._canonical_json(_request()),
-        recent_topics_json="[]",
-    )
-
-    assert validation == (
-        "Planner model 'some-model-outside-the-trust-contract' is not approved "
-        "by the JSON trust contract."
-    )

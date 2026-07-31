@@ -53,8 +53,6 @@ def _load_contract() -> dict[str, Any]:
     required = {
         "schema_version",
         "planner_model",
-        "trusted_lm_studio_model_root",
-        "trusted_planner_models",
         "system_prompt",
         "default_request",
         "category_hints",
@@ -80,32 +78,10 @@ def _parse_json_object(raw: str, *, label: str) -> dict[str, Any]:
 
 
 def _parse_json_list(raw: str, *, label: str) -> list[Any]:
-    text = str(raw or "").strip()
-    if not text:
-        return []
     try:
-        value = json.loads(text)
+        value = json.loads(str(raw or ""))
     except json.JSONDecodeError as exc:
-        if exc.msg != "Extra data":
-            raise ValueError(f"{label} must be valid JSON: {exc.msg}") from exc
-
-        decoder = json.JSONDecoder()
-        values: list[Any] = []
-        cursor = 0
-        try:
-            while cursor < len(text):
-                value, cursor = decoder.raw_decode(text, cursor)
-                if isinstance(value, list):
-                    values.extend(value)
-                else:
-                    values.append(value)
-                while cursor < len(text) and text[cursor].isspace():
-                    cursor += 1
-        except json.JSONDecodeError as sequence_exc:
-            raise ValueError(
-                f"{label} must be valid JSON: {sequence_exc.msg}"
-            ) from sequence_exc
-        return values
+        raise ValueError(f"{label} must be valid JSON: {exc.msg}") from exc
     if not isinstance(value, list):
         raise ValueError(f"{label} must contain one JSON array.")
     return value
@@ -367,67 +343,6 @@ def _resolve_model_entry(model: str) -> tuple[dict[str, Any], str]:
     return entry, canonical_key
 
 
-def _validate_trusted_model_package(model: str) -> dict[str, Any]:
-    contract = _load_contract()
-    trusted_models = contract.get("trusted_planner_models")
-    if not isinstance(trusted_models, dict) or model not in trusted_models:
-        raise RuntimeError(
-            f"Planner model {model!r} is not approved by the JSON trust contract."
-        )
-    package = trusted_models[model]
-    if not isinstance(package, dict):
-        raise RuntimeError(f"Trusted planner package for {model!r} is invalid.")
-
-    root_value = str(contract.get("trusted_lm_studio_model_root") or "").strip()
-    root = Path(root_value)
-    if not root.is_absolute():
-        raise RuntimeError("The trusted LM Studio model root must be absolute.")
-    try:
-        resolved_root = root.resolve(strict=True)
-    except OSError as exc:
-        raise RuntimeError(
-            f"Trusted LM Studio model root is unavailable: {root}"
-        ) from exc
-    if not resolved_root.is_dir():
-        raise RuntimeError(
-            f"Trusted LM Studio model root is not a directory: {resolved_root}"
-        )
-
-    relative_files = package.get("required_relative_files")
-    if not isinstance(relative_files, list) or not relative_files:
-        raise RuntimeError(
-            f"Trusted planner package for {model!r} has no required files."
-        )
-    verified_files: list[dict[str, Any]] = []
-    for relative_value in relative_files:
-        relative_path = Path(str(relative_value or "").strip())
-        if not str(relative_path) or relative_path.is_absolute():
-            raise RuntimeError(
-                f"Trusted planner file path {relative_value!r} must be relative."
-            )
-        try:
-            candidate = (resolved_root / relative_path).resolve(strict=True)
-            candidate.relative_to(resolved_root)
-        except (OSError, ValueError) as exc:
-            raise RuntimeError(
-                f"Trusted planner file is unavailable inside {resolved_root}: "
-                f"{relative_value}"
-            ) from exc
-        if not candidate.is_file():
-            raise RuntimeError(f"Trusted planner model file is missing: {candidate}")
-        verified_files.append(
-            {
-                "relative_path": relative_path.as_posix(),
-                "size_bytes": candidate.stat().st_size,
-            }
-        )
-    return {
-        "model": model,
-        "root": str(resolved_root),
-        "files": verified_files,
-    }
-
-
 def _loaded_instance_ids(
     *,
     model: str | None = None,
@@ -615,9 +530,8 @@ class SineForgeLTXPodcastPlanner:
         "Uses local LM Studio Qwen 3.6 40B to create a fresh strict-JSON "
         "two-person podcast variation from an image. It releases ComfyUI "
         "models first and refuses to return until every LM Studio model is "
-        "unloaded, preventing local-LLM/LTX VRAM overlap. The JSON contract "
-        "also verifies the exact package beneath the trusted LM Studio model "
-        "root. No cloud or API key is used."
+        "unloaded, preventing local-LLM/LTX VRAM overlap. No cloud or API key "
+        "is used."
     )
 
     @classmethod
@@ -745,10 +659,7 @@ class SineForgeLTXPodcastPlanner:
                 str(recent_topics_json or ""),
                 label="recent_topics_json",
             )
-            _validate_trusted_model_package(str(model or "").strip())
         except ValueError as exc:
-            return str(exc)
-        except RuntimeError as exc:
             return str(exc)
         return True
 
@@ -823,11 +734,9 @@ class SineForgeLTXPodcastPlanner:
         planner_error: Exception | None = None
         unload_error: Exception | None = None
         attempt_errors: list[str] = []
-        trusted_package: dict[str, Any] | None = None
         try:
             image_url = _image_data_url(image)
             source_image_sha256 = _image_tensor_sha256(image)
-            trusted_package = _validate_trusted_model_package(model)
             _, resolved_model = _resolve_model_entry(model)
             _release_comfy_models()
             _unload_loaded_lm_studio_models(except_model=resolved_model)
@@ -915,7 +824,6 @@ class SineForgeLTXPodcastPlanner:
                 "top_p": float(top_p),
                 "model_unloaded_before_ltx": True,
                 "all_lm_studio_models_unloaded_before_ltx": True,
-                "trusted_package": trusted_package,
             },
             "request_sha256": request_sha256,
             "request": request,

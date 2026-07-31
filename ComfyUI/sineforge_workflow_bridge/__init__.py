@@ -17,19 +17,14 @@ from typing import Any
 from aiohttp import web
 from server import PromptServer
 
-from .continuation_planner import SineForgeLTXKreaContinuationPlanner
 from .podcast_planner import SineForgeLTXPodcastPlanner
 
 
 WEB_DIRECTORY = "./js"
 NODE_CLASS_MAPPINGS: dict[str, Any] = {
-    "SineForgeLTXKreaContinuationPlanner": SineForgeLTXKreaContinuationPlanner,
     "SineForgeLTXPodcastPlanner": SineForgeLTXPodcastPlanner,
 }
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
-    "SineForgeLTXKreaContinuationPlanner": (
-        "SineForge · Local Qwen Krea 2 Continuation JSON"
-    ),
     "SineForgeLTXPodcastPlanner": "SineForge · Local Qwen Podcast JSON",
 }
 

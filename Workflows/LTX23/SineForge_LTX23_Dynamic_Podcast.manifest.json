@@ -5,18 +5,11 @@
   "editor_workflow": "SineForge_LTX23_Dynamic_Podcast_Qwen40B.workflow.json",
   "api_workflow": "SineForge_LTX23_Dynamic_Podcast_Qwen40B.api.json",
   "prompt_contract": "SineForge_LTX23_Dynamic_Podcast.prompt.json",
-  "prompt_examples": [
-    "SineForge_LTX23_Podcast_Geopolitics_To_Everyday.prompt.json"
-  ],
   "execution_policy": {
     "cloud_agents_allowed": false,
     "local_planner": "LM Studio",
     "planner_model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
-    "trusted_planner_model_root": "C:\\Users\\Blokey\\.lmstudio\\models",
-    "planner_preload": false,
     "planner_must_unload_before_render": true,
-    "all_lm_studio_models_must_unload_before_render": true,
-    "shared_model_root": "C:\\ComfyUI\\ComfyUI_Shared_Folders\\models",
     "gpu_queue_depth": 1,
     "batch_size": 1,
     "native_audio": true,

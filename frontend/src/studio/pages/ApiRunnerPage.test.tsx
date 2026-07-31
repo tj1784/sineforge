@@ -223,7 +223,7 @@ describe('ApiRunnerPage native isolation', () => {
     expect(api.runApiCallerWorkflow).not.toHaveBeenCalled()
 
     const runButton = screen.getByRole('button', { name: 'Run workflow' })
-    expect((runButton as HTMLButtonElement).disabled).toBe(false)
+    expect((runButton as HTMLButtonElement).disabled).toBe(true)
 
     fireEvent.click(screen.getByRole('button', { name: 'Save to library' }))
     await waitFor(() => expect(api.createNativeApiRunnerWorkflow).toHaveBeenCalledTimes(1))
@@ -246,7 +246,7 @@ describe('ApiRunnerPage native isolation', () => {
       expect.objectContaining({
         workflow,
         workflow_name: 'native test',
-        workflow_sha256: null,
+        workflow_sha256: 'a'.repeat(64),
         confirmation: true,
       }),
     )
@@ -273,12 +273,12 @@ describe('ApiRunnerPage native isolation', () => {
       target: { value: 'Edited after validation' },
     })
 
-    expect(runButton.disabled).toBe(false)
-    expect(screen.getByText('No preflight required')).toBeTruthy()
+    expect(runButton.disabled).toBe(true)
+    expect(screen.getByText('Validation required')).toBeTruthy()
     expect(api.runNativeApiRunnerWorkflow).not.toHaveBeenCalled()
   })
 
-  it('uses raw JSON edits directly for saving, downloading, and leaving the raw editor', async () => {
+  it('requires raw JSON edits to be applied before saving or leaving the raw editor', async () => {
     render(<ApiRunnerPage />)
     await screen.findByRole('heading', { name: 'No workflows yet' })
     const file = new File([JSON.stringify(workflow)], 'native-test.json', {
@@ -301,16 +301,20 @@ describe('ApiRunnerPage native isolation', () => {
       },
     })
 
-    await waitFor(() =>
-      expect(
-        (screen.getByRole('button', { name: 'Save to library' }) as HTMLButtonElement)
-          .disabled,
-      ).toBe(false),
+    expect((screen.getByRole('button', { name: 'Editable inputs' }) as HTMLButtonElement).disabled).toBe(
+      true,
     )
-    expect(
-      (screen.getByRole('button', { name: 'Download JSON' }) as HTMLButtonElement).disabled,
-    ).toBe(false)
+    expect((screen.getByRole('button', { name: 'Save to library' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
+    expect((screen.getByRole('button', { name: 'Download JSON' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    )
 
+    fireEvent.click(screen.getByRole('button', { name: 'Apply JSON' }))
+    expect((screen.getByRole('button', { name: 'Save to library' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    )
     fireEvent.click(screen.getByRole('button', { name: 'Editable inputs' }))
     expect(screen.getByDisplayValue('Edited in raw JSON')).toBeTruthy()
   })

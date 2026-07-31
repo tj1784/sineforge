@@ -64,7 +64,6 @@ describe('AppShell API Runner integration', () => {
   it('navigates to the distinct native API Runner page', () => {
     const onNavigate = renderShell()
     const projectNavigation = screen.getByLabelText('Current project navigation')
-    expect(within(projectNavigation).queryByRole('button', { name: 'API Caller' })).toBeNull()
     fireEvent.click(within(projectNavigation).getByRole('button', { name: 'API Runner' }))
 
     expect(onNavigate).toHaveBeenCalledWith('api-runner')

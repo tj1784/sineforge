@@ -41,18 +41,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 SAFE_MODEL_KEY = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$")
 
 
-def _configured_bool(name: str, default: bool) -> bool:
-    raw = os.environ.get(name)
-    if raw is None:
-        return default
-    normalized = raw.strip().casefold()
-    if normalized in {"1", "true", "yes", "on"}:
-        return True
-    if normalized in {"0", "false", "no", "off"}:
-        return False
-    raise ValueError(f"{name} must be a boolean")
-
-
 def _configured_path(name: str, default: Path) -> Path:
     raw = os.environ.get(name, str(default))
     if any(character in raw for character in "\r\n&|<>^`\"%'!()"):
@@ -143,22 +131,6 @@ def main() -> int:
     )
 
     loaded = _loaded_models(lms)
-    if not _configured_bool("CINEFORGE_PLANNING_MODEL_PRELOAD", True):
-        for item in loaded:
-            loaded_id = item.get("identifier") if isinstance(item, dict) else None
-            if not isinstance(loaded_id, str) or not SAFE_MODEL_KEY.fullmatch(
-                loaded_id
-            ):
-                raise RuntimeError(
-                    "LM Studio reported an unsafe loaded model identifier"
-                )
-            _run(lms, "unload", loaded_id, timeout=120)
-        print(
-            "Planning model selected for on-demand use: "
-            f"{model_id} ({model_path.name}); LM Studio is empty for ComfyUI"
-        )
-        return 0
-
     exact_model_loaded = any(
         item.get("identifier") == model_id
         and Path(str(item.get("path") or "")).name.casefold() == model_path.name.casefold()
