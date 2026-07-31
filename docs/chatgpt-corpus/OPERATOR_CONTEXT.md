@@ -1,21 +1,17 @@
 # Operator Context for ChatGPT/Codex
 
-## Sole ComfyUI runtime
+## ComfyUI runtime policy
 
-Use exactly one ComfyUI installation for all CineForge work:
+CineForge must never automatically start, restart, supervise, repair, or open
+ComfyUI. Keep:
 
-`C:\ComfyUI\LTX\ComfyUI`
+`CINEFORGE_COMFYUI_AUTOSTART=false`
 
-The executable runtime contains the live ComfyUI source at:
+The LTX installation at `C:\ComfyUI\LTX\ComfyUI` is preserved but manual-only.
+Port `8888` is normally offline. The operator alone may deliberately start a
+runtime for a specific generation session.
 
-`C:\ComfyUI\LTX\ComfyUI\ComfyUI`
-
-The active operator workflow folder is:
-
-`C:\ComfyUI\LTX\ComfyUI\ComfyUI\user\default\workflows`
-
-The sole endpoint is `http://127.0.0.1:8888`. CineForge's native API Runner
-submits directly to it. Never start or target BlokeyUI, port `8188`, port
-`8889`, or the legacy external ComfyAPI Runner unless the operator explicitly
-changes this invariant. Repository workflow files are mirrors, backups, or
-versioned templates unless the operator identifies one as the live source.
+Never start or target BlokeyUI, `BLOKEYEYEYEYEY`, port `8188`, port `8889`, or
+the legacy external ComfyAPI Runner. Never recreate `run_cineforge_ltx.bat`.
+Repository workflow files are mirrors, backups, or versioned templates unless
+the operator identifies one as the live source.

@@ -123,14 +123,17 @@ def test_command_path_rejects_shell_metacharacters(monkeypatch):
 
 def test_primary_defaults_select_the_ltx_comfyui_runtime(monkeypatch):
     for key in (
+        "CINEFORGE_COMFYUI_AUTOSTART",
         "CINEFORGE_COMFYUI_BASE_URL",
         "CINEFORGE_COMFYUI_WORKING_DIR",
         "CINEFORGE_COMFYUI_LAUNCHER",
+        "CINEFORGE_PLANNING_MODEL_PRELOAD",
     ):
         monkeypatch.delenv(key, raising=False)
 
     start_cineforge.apply_primary_workstation_defaults()
 
+    assert start_cineforge.os.environ["CINEFORGE_COMFYUI_AUTOSTART"] == "false"
     assert start_cineforge.os.environ["CINEFORGE_COMFYUI_BASE_URL"] == (
         "http://127.0.0.1:8888"
     )
@@ -139,6 +142,10 @@ def test_primary_defaults_select_the_ltx_comfyui_runtime(monkeypatch):
     )
     assert start_cineforge.os.environ["CINEFORGE_COMFYUI_LAUNCHER"] == (
         r"C:\ComfyUI\LTX\ComfyUI\run_cineforge_ltx.bat"
+    )
+    assert (
+        start_cineforge.os.environ["CINEFORGE_PLANNING_MODEL_PRELOAD"]
+        == "false"
     )
 
 
@@ -156,6 +163,7 @@ def test_supervisor_does_not_launch_the_legacy_external_runner(tmp_path, monkeyp
 
     monkeypatch.setenv("CINEFORGE_COMFYUI_WORKING_DIR", str(comfy_root))
     monkeypatch.setenv("CINEFORGE_COMFYUI_LAUNCHER", str(launcher))
+    monkeypatch.setenv("CINEFORGE_COMFYUI_AUTOSTART", "true")
     monkeypatch.setenv("CINEFORGE_PYTHON_EXECUTABLE", str(python))
     monkeypatch.setenv("COMSPEC", str(command_processor))
     monkeypatch.setattr(start_cineforge, "_npm_executable", lambda: npm)
@@ -165,6 +173,28 @@ def test_supervisor_does_not_launch_the_legacy_external_runner(tmp_path, monkeyp
     assert [service.name for service in services] == [
         "sulphur",
         "comfyui",
+        "backend",
+        "frontend",
+    ]
+
+
+def test_supervisor_skips_comfyui_when_autostart_is_disabled(tmp_path, monkeypatch):
+    python = tmp_path / "python.exe"
+    python.touch()
+    npm = tmp_path / "npm.cmd"
+    npm.touch()
+    command_processor = tmp_path / "cmd.exe"
+    command_processor.touch()
+
+    monkeypatch.setenv("CINEFORGE_COMFYUI_AUTOSTART", "false")
+    monkeypatch.setenv("CINEFORGE_PYTHON_EXECUTABLE", str(python))
+    monkeypatch.setenv("COMSPEC", str(command_processor))
+    monkeypatch.setattr(start_cineforge, "_npm_executable", lambda: npm)
+
+    services = start_cineforge.build_services()
+
+    assert [service.name for service in services] == [
+        "sulphur",
         "backend",
         "frontend",
     ]

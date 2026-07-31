@@ -40,6 +40,7 @@ def apply_primary_workstation_defaults() -> None:
     """Enable the approved local runtimes when no local override was supplied."""
 
     defaults = {
+        "CINEFORGE_COMFYUI_AUTOSTART": "false",
         "CINEFORGE_COMFYUI_BASE_URL": "http://127.0.0.1:8888",
         "CINEFORGE_COMFYUI_WORKING_DIR": r"C:\ComfyUI\LTX\ComfyUI",
         "CINEFORGE_COMFYUI_LAUNCHER": (
@@ -73,6 +74,10 @@ def apply_primary_workstation_defaults() -> None:
             / "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF"
             / "Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf"
         ),
+        # The 40B planner and LTX cannot coexist on the 24GB workstation GPU.
+        # Keep the selected model persisted, but let the planning request load it
+        # on demand and unload it before ComfyUI rendering starts.
+        "CINEFORGE_PLANNING_MODEL_PRELOAD": "false",
     }
     for key, value in defaults.items():
         os.environ.setdefault(key, value)
@@ -133,6 +138,15 @@ def _port(name: str, default: int) -> int:
     return value
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name, str(default)).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"{name} must be a boolean")
+
+
 def _timeout(name: str, default: float) -> float:
     try:
         value = float(os.environ.get(name, str(default)))
@@ -173,24 +187,13 @@ def _npm_executable() -> Path:
 
 
 def build_services() -> list[Service]:
-    comfy_root = _env_path(
-        "CINEFORGE_COMFYUI_WORKING_DIR",
-        Path(r"C:\ComfyUI\LTX\ComfyUI"),
-    )
-    comfy_launcher = _env_path(
-        "CINEFORGE_COMFYUI_LAUNCHER",
-        comfy_root / "run_cineforge_ltx.bat",
-    )
+    comfy_autostart = _env_bool("CINEFORGE_COMFYUI_AUTOSTART", False)
     python = _env_path(
         "CINEFORGE_PYTHON_EXECUTABLE",
         REPO_ROOT / ".venv" / "Scripts" / "python.exe",
     )
     npm = _npm_executable()
     command_processor = Path(os.environ.get("COMSPEC", r"C:\Windows\System32\cmd.exe"))
-    comfy_base_url = _loopback_base_url(
-        "CINEFORGE_COMFYUI_BASE_URL",
-        "http://127.0.0.1:8888",
-    )
     sulphur_base_url = _loopback_base_url(
         "CINEFORGE_SULPHUR_BASE_URL",
         "http://127.0.0.1:1234/v1",
@@ -203,21 +206,7 @@ def build_services() -> list[Service]:
     backend_port = _port("CINEFORGE_BACKEND_PORT", 8010)
     frontend_port = _port("CINEFORGE_FRONTEND_PORT", 5174)
 
-    if comfy_launcher.suffix.lower() not in {".bat", ".cmd", ".exe"}:
-        raise ValueError("ComfyUI launcher must be an administrator-configured .bat, .cmd, or .exe")
-    try:
-        comfy_launcher.relative_to(comfy_root)
-    except ValueError as exc:
-        raise ValueError("ComfyUI launcher must be located inside CINEFORGE_COMFYUI_WORKING_DIR") from exc
-
-    if comfy_launcher.suffix.lower() in {".bat", ".cmd"}:
-        command = command_processor
-        comfy_args = ("/d", "/c", str(comfy_launcher))
-    else:
-        command = comfy_launcher
-        comfy_args = ()
-
-    return [
+    services = [
         Service(
             name="sulphur",
             cwd=REPO_ROOT,
@@ -228,17 +217,56 @@ def build_services() -> list[Service]:
             persistent=False,
             always_start=True,
         ),
-        Service(
-            name="comfyui",
-            cwd=comfy_root,
-            executable=command,
-            args=comfy_args,
-            readiness_urls=(
-                comfy_base_url + "/",
-                comfy_base_url + "/object_info",
-            ),
-            timeout_seconds=_timeout("CINEFORGE_COMFYUI_STARTUP_TIMEOUT_SEC", 180),
-        ),
+    ]
+    if comfy_autostart:
+        comfy_root = _env_path(
+            "CINEFORGE_COMFYUI_WORKING_DIR",
+            Path(r"C:\ComfyUI\LTX\ComfyUI"),
+        )
+        comfy_launcher = _env_path(
+            "CINEFORGE_COMFYUI_LAUNCHER",
+            comfy_root / "run_cineforge_ltx.bat",
+        )
+        comfy_base_url = _loopback_base_url(
+            "CINEFORGE_COMFYUI_BASE_URL",
+            "http://127.0.0.1:8888",
+        )
+        if comfy_launcher.suffix.lower() not in {".bat", ".cmd", ".exe"}:
+            raise ValueError(
+                "ComfyUI launcher must be an administrator-configured .bat, .cmd, or .exe"
+            )
+        try:
+            comfy_launcher.relative_to(comfy_root)
+        except ValueError as exc:
+            raise ValueError(
+                "ComfyUI launcher must be located inside CINEFORGE_COMFYUI_WORKING_DIR"
+            ) from exc
+
+        if comfy_launcher.suffix.lower() in {".bat", ".cmd"}:
+            comfy_command = command_processor
+            comfy_args = ("/d", "/c", str(comfy_launcher))
+        else:
+            comfy_command = comfy_launcher
+            comfy_args = ()
+        services.append(
+            Service(
+                name="comfyui",
+                cwd=comfy_root,
+                executable=comfy_command,
+                args=comfy_args,
+                readiness_urls=(
+                    comfy_base_url + "/",
+                    comfy_base_url + "/object_info",
+                ),
+                timeout_seconds=_timeout(
+                    "CINEFORGE_COMFYUI_STARTUP_TIMEOUT_SEC",
+                    180,
+                ),
+            )
+        )
+
+    services.extend(
+        [
         Service(
             name="backend",
             cwd=REPO_ROOT,
@@ -277,7 +305,9 @@ def build_services() -> list[Service]:
             ),
             timeout_seconds=_timeout("CINEFORGE_FRONTEND_STARTUP_TIMEOUT_SEC", 60),
         ),
-    ]
+        ]
+    )
+    return services
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):

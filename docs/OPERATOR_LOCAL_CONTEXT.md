@@ -3,22 +3,24 @@
 This file records workstation-specific paths and conventions that are required
 for safe local operation.
 
-## Sole ComfyUI runtime
+## ComfyUI runtime policy
 
-The only approved ComfyUI installation for CineForge on this workstation is:
+ComfyUI is manual-only on this workstation. CineForge must never start,
+restart, supervise, or automatically open any ComfyUI installation.
+
+`CINEFORGE_COMFYUI_AUTOSTART=false` is a permanent fail-closed invariant.
+
+The preserved LTX installation is:
 
 `C:\ComfyUI\LTX\ComfyUI`
 
-Its ComfyUI source and live workflow folder are:
+It is not part of CineForge startup. Port `8888` is normally offline. Only the
+operator may deliberately start a runtime and identify its endpoint for a
+specific generation session.
 
-`C:\ComfyUI\LTX\ComfyUI\ComfyUI`
-
-`C:\ComfyUI\LTX\ComfyUI\ComfyUI\user\default\workflows`
-
-It listens only on `http://127.0.0.1:8888`. CineForge submits API workflows
-directly to this runtime. Do not start, configure, repair, or target BlokeyUI,
-port `8188`, port `8889`, or the legacy external ComfyAPI Runner unless the
-operator explicitly replaces this invariant.
+Never start, configure, repair, or target BlokeyUI, `BLOKEYEYEYEYEY`, port
+`8188`, port `8889`, or the legacy external ComfyAPI Runner. Do not recreate
+`run_cineforge_ltx.bat`; its disabled copy is retained only as evidence.
 
 Repository workflow files may be mirrors, backups, or versioned templates; do
 not treat them as the live ComfyUI canvas unless the operator asks for that file.

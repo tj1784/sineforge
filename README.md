@@ -52,8 +52,8 @@ Start the complete local stack from the repository root:
 .\start-cineforge.cmd
 ```
 
-The trusted launcher starts or reuses the local Sulphur model API, ComfyUI, the
-ComfyAPI Runner, the FastAPI backend, and the Vite frontend in that order. It
+The trusted launcher starts or reuses the local Sulphur model API, the FastAPI
+backend, and the Vite frontend in that order. It never starts ComfyUI. It
 opens Sineforge in the default browser after all readiness checks pass, writes
 logs and owned process metadata under `storage/runtime/supervisor/`, and stops
 only persistent child processes it started when you press Ctrl+C. Run
@@ -61,6 +61,7 @@ only persistent child processes it started when you press Ctrl+C. Run
 check, or add `--no-browser` to suppress the browser tab. The default startup
 destination is the Sulphur-backed Projects home at `/projects`.
 
+ComfyUI auto-start is disabled through `CINEFORGE_COMFYUI_AUTOSTART=false`.
 Administrator overrides are supported through `CINEFORGE_COMFYUI_WORKING_DIR`,
 `CINEFORGE_COMFYUI_LAUNCHER`, `CINEFORGE_COMFY_API_RUNNER_WORKING_DIR`,
 `CINEFORGE_COMFY_API_RUNNER_LAUNCHER`, `CINEFORGE_LMS_EXECUTABLE`,
@@ -71,21 +72,26 @@ Readiness URLs are restricted to loopback HTTP origins, shell metacharacters are
 from command paths, ports and timeouts are range-checked, and a singleton lock prevents
 competing supervisors. Logs rotate at 10 MiB per stream.
 
-### ComfyUI auto-start contract
+### Manual ComfyUI contract
 
-Starting CineForge must also start the explicitly configured external ComfyUI runtime when it is not already reachable. ComfyUI remains an isolated process; CineForge must not import it in-process or treat a listening port alone as generation readiness.
+Starting CineForge must not start ComfyUI. ComfyUI remains an isolated,
+operator-started process; CineForge must not import it in-process, launch it
+implicitly, or treat a listening port alone as generation readiness.
 
-The startup orchestrator must:
+The runtime integration must:
 
-1. Read an administrator-configured ComfyUI working directory and launcher path. On the primary Windows workstation, the only approved runtime is `C:\ComfyUI\LTX\ComfyUI`, its launcher is `run_cineforge_ltx.bat`, and its loopback URL is `http://127.0.0.1:8888`.
-2. Probe `CINEFORGE_COMFYUI_BASE_URL` before launching. If ComfyUI is already healthy, reuse it and do not start a duplicate process.
-3. Start the configured launcher as a hidden background child process with the configured runtime directory as its working directory. AI-authored text must never become a shell command or executable path.
-4. Wait for both the ComfyUI root endpoint and `/object_info` to respond within a bounded timeout. Only then may CineForge report ComfyUI as ready.
-5. Fail honestly: if startup or `/object_info` validation fails, keep planning available, block image/video generation, and show the exact runtime-readiness blocker. Never display a generated, reviewed, approved, or playable state for media that does not exist.
-6. Record whether CineForge owns the child process. On shutdown, CineForge may stop only the process it started; it must not terminate an independently running ComfyUI instance.
-7. Never install, update, download models, mutate custom nodes, or weaken host security as part of auto-start.
+1. Keep `CINEFORGE_COMFYUI_AUTOSTART=false` on the primary workstation.
+2. Never launch `C:\ComfyUI\LTX\ComfyUI`, BlokeyUI, or any other ComfyUI installation as part of CineForge startup.
+3. Treat `http://127.0.0.1:8888` as normally offline. The operator alone decides when to start a ComfyUI runtime.
+4. When the operator has deliberately started a runtime, require both the ComfyUI root endpoint and `/object_info` before reporting it ready.
+5. Fail honestly when ComfyUI is offline: keep planning available, block image/video generation, and show the runtime-readiness blocker.
+6. Never install, update, download models, mutate custom nodes, or weaken host security as part of startup.
 
-Auto-start does not by itself enable generation. Image generation additionally requires an enabled backend worker/submission path, a validated workflow manifest compatible with live `/object_info`, registered model evidence, output collection, and provenance persistence. Video generation remains a separately gated phase.
+Manual runtime availability does not by itself enable generation. Image
+generation additionally requires an enabled backend worker/submission path, a
+validated workflow manifest compatible with live `/object_info`, registered
+model evidence, output collection, and provenance persistence. Video generation
+remains a separately gated phase.
 
 ### Local planning models and ComfyAPI Runner
 
