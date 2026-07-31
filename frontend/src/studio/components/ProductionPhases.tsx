@@ -12,6 +12,7 @@ import {
   type StoryboardAggregate,
 } from '../../api/client'
 import type { PageId } from '../../components/AppShell'
+import type { PlanningAgent } from '../../planningAgents'
 import { ErrorNotice } from '../../components/Cards'
 import { ProductionPhasePreview } from './ProductionPhasePreview'
 import { LoadingState } from './StateBlocks'
@@ -85,6 +86,14 @@ function downloadText(filename: string, content: string) {
   anchor.download = filename
   anchor.click()
   window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function selectedPlanningAgent(
+  settings: ProjectStoryboardSettings | null,
+): PlanningAgent {
+  return settings?.prompting_policy_json.planning_agent === 'sulphur'
+    ? 'sulphur'
+    : 'qwen'
 }
 
 type ProductionPhasesProps = {
@@ -468,6 +477,9 @@ export function ProductionPhases({
             || packageData?.complete_script
             || packageData?.short_synopsis
             || data.story.title,
+          planning_agent: selectedPlanningAgent(productionSettings),
+          prompt_artifact_format: 'json',
+          prompt_schema_version: 'sineforge.local-planning-prompt/v1',
           target_duration_sec: Number(data.story.target_duration_sec || packageData?.duration_analysis.target_duration_sec || 300),
           audience: data.story.audience ?? null,
           genre: data.story.genre ?? null,

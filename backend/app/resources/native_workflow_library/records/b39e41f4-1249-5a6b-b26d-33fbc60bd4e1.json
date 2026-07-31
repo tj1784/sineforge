@@ -1,0 +1,757 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "b39e41f4-1249-5a6b-b26d-33fbc60bd4e1",
+  "name": "Nunchaku Flux1 Dev txt2img",
+  "version": "1.0",
+  "description": "Nunchaku Flux1 Dev txt2img is a text to image workflow designed to turn a text prompt into a finished still image using FLUX.1 Dev. Its 10-node graph exposes 1 prompt/text field(s), 0 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The imported graph contains unresolved custom-node classes, so install or map the listed nodes and reconvert from the included editor graph before production use.",
+  "category": "Image Generation",
+  "subcategory": "Text to image",
+  "episode": "EP02",
+  "instructions": "1. Install or map the unresolved node classes listed in Requirements, open the included editor-format source in the main LTX ComfyUI install, and export API format again before attempting a run.\n2. Review the model-file entries in Requirements and place each checkpoint, text encoder, VAE, LoRA, or auxiliary model in the folder documented by the source workflow. Refresh ComfyUI after adding files.\n3. No required media file was detected in the converted graph; begin with the prompt and generation controls.\n4. Edit the positive/negative prompt, resolution, sampler, steps, guidance, and seed. Use a fixed seed while tuning composition, then vary it deliberately.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP02",
+    "FLUX.1 Dev",
+    "Image Generation",
+    "Text to image"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "ComfyUI-nunchaku",
+      "pixaroma",
+      "Pixaroma YouTube Channel"
+    ],
+    "unresolved_node_classes": [
+      "NunchakuFluxDiTLoader"
+    ],
+    "node_classes": [
+      "CLIPTextEncode",
+      "ConditioningZeroOut",
+      "DualCLIPLoaderGGUF",
+      "EmptySD3LatentImage",
+      "FluxGuidance",
+      "KSampler",
+      "NunchakuFluxDiTLoader",
+      "SaveImage",
+      "VAEDecode",
+      "VAELoader"
+    ],
+    "model_files": [
+      {
+        "node_id": "9",
+        "node_type": "VAELoader",
+        "input": "vae_name",
+        "value": "ae.safetensors"
+      },
+      {
+        "node_id": "15",
+        "node_type": "DualCLIPLoaderGGUF",
+        "input": "clip_name1",
+        "value": "t5-v1_1-xxl-encoder-Q8_0.gguf"
+      },
+      {
+        "node_id": "15",
+        "node_type": "DualCLIPLoaderGGUF",
+        "input": "clip_name2",
+        "value": "clip_l.safetensors"
+      }
+    ],
+    "media_inputs": [],
+    "prompt_field_count": 1,
+    "output_node_count": 1,
+    "documentation_notes": "photo of a cute 3D cartoon bunny kung fu master inside a dark ancient kung fu temple interior, pure white fluffy fur with soft plush texture, big expressive eyes and rounded cheeks radiating adorability, standing confidently in a classic martial arts stance, dressed in a bright orange kung fu outfit with flowing fabric folds and a tied sash, small paws poised with disciplined grace, friendly yet focused expression, the temple interior lit by low warm lantern light, wooden pillars, stone floor, hanging scrolls, incense smoke drifting through the air, deep shadows and moody atmosphere framing the character, subtle rim light outlining the bunny against the darkness, high-quality 3D character rendering with smooth geometry and gentle fur detail, cinematic contrast between the vibrant orange outfit and the shadowy environment, charming and heroic tone designed for strong visual impact on social media, shot on ARRI Alexa 65, 50mm lens, f/2.8, clean high-resolution digital render\n\n# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🟣 Nunchaku FLUX DiT Loader\n### Download the right **nunchaku flux.1 dev model** from [HERE](https://huggingface.co/nunchaku-ai/nunchaku-flux.1-dev/tree/main)\n\n📁 **Place in:** `ComfyUI/models/diffusion_models/flux` \n\nCreate the `flux` folder if it does not exist)\n \nUse **FP4 models** if you have an **RTX 50-series or newer GPU**.\n\nUse **INT4 models** for RTX 40, 30 or older GPUs.\n\nThe **r** value controls quality: **r32, r128, r256.**\n\nHigher values give better quality but use more VRAM.\n\n---\n## 🟣 Dual Clip Loader (GGUF) 1️⃣\n\n###  Download t5-v1_1-xxl-encoder-Q8_0.gguf from [HERE](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true)  \n\n📁 **Place in:** `ComfyUI/models/text_encoders`  \n\n### Or a smaller variant from [HERE](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/tree/main)\n\n## 🟣 Dual Clip Loader (GGUF) 2️⃣\n\n###  Clip L model from [HERE](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true)  \n\n📁 **Place in:** `ComfyUI/models/text_encoders`\n\n--- \n\n## 🟣 Load VAE\n\n### Download the **ae.safetensor** (flux 1 vae) from [HERE](https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors)  \n\n📁 **Place in:** `ComfyUI/models/vae`  \n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- ComfyUI-nunchaku (installed with nunchaku.bat from Add-Ons folder)\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)"
+  },
+  "workflow_status": "requires_custom_nodes",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep02 workflows/ep02 workflows/nunchaku flux1 dev txt2img.json",
+  "source_filename": "Nunchaku Flux1 Dev txt2img.json",
+  "source_archive": "EP02 Workflows.zip",
+  "source_entry": "EP02 Workflows/EP02 Workflows/Nunchaku Flux1 Dev txt2img.json",
+  "source_workflow": {
+    "id": "e873e1a7-fcf5-4295-84ce-8fed03d370e5",
+    "revision": 0,
+    "last_node_id": 17,
+    "last_link_id": 16,
+    "nodes": [
+      {
+        "id": 6,
+        "type": "CLIPTextEncode",
+        "pos": [
+          -569.190279522594,
+          122.94507889430596
+        ],
+        "size": [
+          424.42708333333337,
+          293.02083333333337
+        ],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "clip",
+            "type": "CLIP",
+            "link": 16
+          }
+        ],
+        "outputs": [
+          {
+            "name": "CONDITIONING",
+            "type": "CONDITIONING",
+            "slot_index": 0,
+            "links": [
+              1,
+              12
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.27",
+          "Node name for S&R": "CLIPTextEncode"
+        },
+        "widgets_values": [
+          "photo of a cute 3D cartoon bunny kung fu master inside a dark ancient kung fu temple interior, pure white fluffy fur with soft plush texture, big expressive eyes and rounded cheeks radiating adorability, standing confidently in a classic martial arts stance, dressed in a bright orange kung fu outfit with flowing fabric folds and a tied sash, small paws poised with disciplined grace, friendly yet focused expression, the temple interior lit by low warm lantern light, wooden pillars, stone floor, hanging scrolls, incense smoke drifting through the air, deep shadows and moody atmosphere framing the character, subtle rim light outlining the bunny against the darkness, high-quality 3D character rendering with smooth geometry and gentle fur detail, cinematic contrast between the vibrant orange outfit and the shadowy environment, charming and heroic tone designed for strong visual impact on social media, shot on ARRI Alexa 65, 50mm lens, f/2.8, clean high-resolution digital render\n"
+        ],
+        "color": "#232",
+        "bgcolor": "#353"
+      },
+      {
+        "id": 12,
+        "type": "FluxGuidance",
+        "pos": [
+          -123.24545817954566,
+          122.94507889430596
+        ],
+        "size": [
+          210,
+          58
+        ],
+        "flags": {},
+        "order": 7,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "conditioning",
+            "type": "CONDITIONING",
+            "link": 12
+          }
+        ],
+        "outputs": [
+          {
+            "name": "CONDITIONING",
+            "type": "CONDITIONING",
+            "links": [
+              13
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.9.2",
+          "Node name for S&R": "FluxGuidance"
+        },
+        "widgets_values": [
+          3.5
+        ]
+      },
+      {
+        "id": 7,
+        "type": "KSampler",
+        "pos": [
+          108.27227983016928,
+          122.94507889430596
+        ],
+        "size": [
+          296.2197989449314,
+          262
+        ],
+        "flags": {},
+        "order": 8,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "model",
+            "type": "MODEL",
+            "link": 15
+          },
+          {
+            "name": "positive",
+            "type": "CONDITIONING",
+            "link": 13
+          },
+          {
+            "name": "negative",
+            "type": "CONDITIONING",
+            "link": 9
+          },
+          {
+            "name": "latent_image",
+            "type": "LATENT",
+            "link": 10
+          }
+        ],
+        "outputs": [
+          {
+            "name": "LATENT",
+            "type": "LATENT",
+            "slot_index": 0,
+            "links": [
+              3
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.27",
+          "Node name for S&R": "KSampler"
+        },
+        "widgets_values": [
+          504177664038289,
+          "randomize",
+          30,
+          1,
+          "dpmpp_2m",
+          "sgm_uniform",
+          1
+        ]
+      },
+      {
+        "id": 3,
+        "type": "VAEDecode",
+        "pos": [
+          426.00981678481565,
+          122.94507889430596
+        ],
+        "size": [
+          140,
+          46
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 9,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "samples",
+            "type": "LATENT",
+            "link": 3
+          },
+          {
+            "name": "vae",
+            "type": "VAE",
+            "link": 4
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              5
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.32",
+          "Node name for S&R": "VAEDecode"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 4,
+        "type": "SaveImage",
+        "pos": [
+          587.5275547945306,
+          122.94507889430596
+        ],
+        "size": [
+          615.0020278469565,
+          679.2872229947789
+        ],
+        "flags": {},
+        "order": 10,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 5
+          }
+        ],
+        "outputs": [],
+        "title": "Save Image Original",
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.27",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "img"
+        ]
+      },
+      {
+        "id": 1,
+        "type": "ConditioningZeroOut",
+        "pos": [
+          -120.31284099204566,
+          234.848254898655
+        ],
+        "size": [
+          204.134765625,
+          26
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "conditioning",
+            "type": "CONDITIONING",
+            "link": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "CONDITIONING",
+            "type": "CONDITIONING",
+            "links": [
+              9
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.76",
+          "Node name for S&R": "ConditioningZeroOut"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 5,
+        "type": "EmptySD3LatentImage",
+        "pos": [
+          -398.50552192545825,
+          469.407125870613
+        ],
+        "size": [
+          250.61128906920487,
+          106
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "LATENT",
+            "type": "LATENT",
+            "slot_index": 0,
+            "links": [
+              10
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.32",
+          "Node name for S&R": "EmptySD3LatentImage"
+        },
+        "widgets_values": [
+          1024,
+          1024,
+          1
+        ],
+        "color": "#323",
+        "bgcolor": "#535"
+      },
+      {
+        "id": 15,
+        "type": "DualCLIPLoaderGGUF",
+        "pos": [
+          -941.7877294463714,
+          378.1263072313204
+        ],
+        "size": [
+          351.0797119140625,
+          106
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "CLIP",
+            "type": "CLIP",
+            "slot_index": 0,
+            "links": [
+              16
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfyui-gguf",
+          "ver": "bc5223b0e37e053dbec2ea5e5f52c2fd4b8f712a",
+          "Node name for S&R": "DualCLIPLoaderGGUF"
+        },
+        "widgets_values": [
+          "t5-v1_1-xxl-encoder-Q8_0.gguf",
+          "clip_l.safetensors",
+          "flux"
+        ]
+      },
+      {
+        "id": 9,
+        "type": "VAELoader",
+        "pos": [
+          -860.7080175323089,
+          537.307535568335
+        ],
+        "size": [
+          270,
+          58
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "VAE",
+            "type": "VAE",
+            "links": [
+              4
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.76",
+          "Node name for S&R": "VAELoader"
+        },
+        "widgets_values": [
+          "ae.safetensors"
+        ]
+      },
+      {
+        "id": 16,
+        "type": "MarkdownNote",
+        "pos": [
+          -1544.2978744705738,
+          124.13943606081926
+        ],
+        "size": [
+          524.6227266359786,
+          733.2326149452343
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 3,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "👑 Pixaroma - Note - START HERE",
+        "properties": {},
+        "widgets_values": [
+          "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🟣 Nunchaku FLUX DiT Loader\n### Download the right **nunchaku flux.1 dev model** from [HERE](https://huggingface.co/nunchaku-ai/nunchaku-flux.1-dev/tree/main)\n\n📁 **Place in:** `ComfyUI/models/diffusion_models/flux` \n\nCreate the `flux` folder if it does not exist)\n \nUse **FP4 models** if you have an **RTX 50-series or newer GPU**.\n\nUse **INT4 models** for RTX 40, 30 or older GPUs.\n\nThe **r** value controls quality: **r32, r128, r256.**\n\nHigher values give better quality but use more VRAM.\n\n---\n## 🟣 Dual Clip Loader (GGUF) 1️⃣\n\n###  Download t5-v1_1-xxl-encoder-Q8_0.gguf from [HERE](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/resolve/main/t5-v1_1-xxl-encoder-Q8_0.gguf?download=true)  \n\n📁 **Place in:** `ComfyUI/models/text_encoders`  \n\n### Or a smaller variant from [HERE](https://huggingface.co/city96/t5-v1_1-xxl-encoder-gguf/tree/main)\n\n## 🟣 Dual Clip Loader (GGUF) 2️⃣\n\n###  Clip L model from [HERE](https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors?download=true)  \n\n📁 **Place in:** `ComfyUI/models/text_encoders`\n\n--- \n\n## 🟣 Load VAE\n\n### Download the **ae.safetensor** (flux 1 vae) from [HERE](https://huggingface.co/Comfy-Org/z_image_turbo/resolve/main/split_files/vae/ae.safetensors)  \n\n📁 **Place in:** `ComfyUI/models/vae`  \n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- ComfyUI-nunchaku (installed with nunchaku.bat from Add-Ons folder)\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 14,
+        "type": "NunchakuFluxDiTLoader",
+        "pos": [
+          -1004.6274185404684,
+          122.94507889430596
+        ],
+        "size": [
+          413.9194010081595,
+          202
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "MODEL",
+            "type": "MODEL",
+            "links": [
+              15
+            ]
+          }
+        ],
+        "properties": {
+          "aux_id": "nunchaku-ai/ComfyUI-nunchaku",
+          "ver": "0a47a348cea71b544e81c71dab7c78915ecf8bd3",
+          "Node name for S&R": "NunchakuFluxDiTLoader"
+        },
+        "widgets_values": [
+          "flux\\svdq-int4_r32-flux.1-dev.safetensors",
+          0,
+          "nunchaku-fp16",
+          "auto",
+          0,
+          "bfloat16",
+          "enabled"
+        ]
+      }
+    ],
+    "links": [
+      [
+        1,
+        6,
+        0,
+        1,
+        0,
+        "CONDITIONING"
+      ],
+      [
+        3,
+        7,
+        0,
+        3,
+        0,
+        "LATENT"
+      ],
+      [
+        4,
+        9,
+        0,
+        3,
+        1,
+        "VAE"
+      ],
+      [
+        5,
+        3,
+        0,
+        4,
+        0,
+        "IMAGE"
+      ],
+      [
+        9,
+        1,
+        0,
+        7,
+        2,
+        "CONDITIONING"
+      ],
+      [
+        10,
+        5,
+        0,
+        7,
+        3,
+        "LATENT"
+      ],
+      [
+        12,
+        6,
+        0,
+        12,
+        0,
+        "CONDITIONING"
+      ],
+      [
+        13,
+        12,
+        0,
+        7,
+        1,
+        "CONDITIONING"
+      ],
+      [
+        15,
+        14,
+        0,
+        7,
+        0,
+        "MODEL"
+      ],
+      [
+        16,
+        15,
+        0,
+        6,
+        0,
+        "CLIP"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 0.8390545288824096,
+        "offset": [
+          1639.5952707062565,
+          169.67597275482558
+        ]
+      },
+      "frontendVersion": "1.36.14",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "0589cb14f36b1a16a7615c43405ca7a35f21e4de92a532be023c3db94091f7d0",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "conditioning": [
+          "6",
+          0
+        ]
+      },
+      "class_type": "ConditioningZeroOut",
+      "_meta": {
+        "title": "Conditioning Zero Out"
+      }
+    },
+    "3": {
+      "inputs": {
+        "samples": [
+          "7",
+          0
+        ],
+        "vae": [
+          "9",
+          0
+        ]
+      },
+      "class_type": "VAEDecode",
+      "_meta": {
+        "title": "VAE Decode"
+      }
+    },
+    "4": {
+      "inputs": {
+        "filename_prefix": "img",
+        "images": [
+          "3",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image Original"
+      }
+    },
+    "5": {
+      "inputs": {
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1
+      },
+      "class_type": "EmptySD3LatentImage",
+      "_meta": {
+        "title": "EmptySD3LatentImage"
+      }
+    },
+    "6": {
+      "inputs": {
+        "text": "photo of a cute 3D cartoon bunny kung fu master inside a dark ancient kung fu temple interior, pure white fluffy fur with soft plush texture, big expressive eyes and rounded cheeks radiating adorability, standing confidently in a classic martial arts stance, dressed in a bright orange kung fu outfit with flowing fabric folds and a tied sash, small paws poised with disciplined grace, friendly yet focused expression, the temple interior lit by low warm lantern light, wooden pillars, stone floor, hanging scrolls, incense smoke drifting through the air, deep shadows and moody atmosphere framing the character, subtle rim light outlining the bunny against the darkness, high-quality 3D character rendering with smooth geometry and gentle fur detail, cinematic contrast between the vibrant orange outfit and the shadowy environment, charming and heroic tone designed for strong visual impact on social media, shot on ARRI Alexa 65, 50mm lens, f/2.8, clean high-resolution digital render\n",
+        "clip": [
+          "15",
+          0
+        ]
+      },
+      "class_type": "CLIPTextEncode",
+      "_meta": {
+        "title": "CLIP Text Encode (Prompt)"
+      }
+    },
+    "7": {
+      "inputs": {
+        "seed": 504177664038289,
+        "steps": 30,
+        "cfg": 1,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "sgm_uniform",
+        "denoise": 1,
+        "model": [
+          "14",
+          0
+        ],
+        "positive": [
+          "12",
+          0
+        ],
+        "negative": [
+          "1",
+          0
+        ],
+        "latent_image": [
+          "5",
+          0
+        ]
+      },
+      "class_type": "KSampler",
+      "_meta": {
+        "title": "KSampler"
+      }
+    },
+    "9": {
+      "inputs": {
+        "vae_name": "ae.safetensors"
+      },
+      "class_type": "VAELoader",
+      "_meta": {
+        "title": "Load VAE"
+      }
+    },
+    "12": {
+      "inputs": {
+        "guidance": 3.5,
+        "conditioning": [
+          "6",
+          0
+        ]
+      },
+      "class_type": "FluxGuidance",
+      "_meta": {
+        "title": "FluxGuidance"
+      }
+    },
+    "14": {
+      "inputs": {
+        "UNKNOWN": "flux\\svdq-int4_r32-flux.1-dev.safetensors",
+        "UNKNOWN_1": 0,
+        "UNKNOWN_2": "nunchaku-fp16",
+        "UNKNOWN_3": "auto",
+        "UNKNOWN_4": 0,
+        "UNKNOWN_5": "bfloat16",
+        "UNKNOWN_6": "enabled"
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::NunchakuFluxDiTLoader"
+    },
+    "15": {
+      "inputs": {
+        "clip_name1": "t5-v1_1-xxl-encoder-Q8_0.gguf",
+        "clip_name2": "clip_l.safetensors",
+        "type": "flux"
+      },
+      "class_type": "DualCLIPLoaderGGUF",
+      "_meta": {
+        "title": "DualCLIPLoader (GGUF)"
+      }
+    }
+  },
+  "sha256": "32b253898343c191950dcb8b473ca9787f0b622ca0677177e7201606051ef9b2",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

@@ -132,7 +132,7 @@ class CreateOrchestrationRunRequest(BaseModel):
     manual_routes: list[ManualTaskRoute] = Field(default_factory=list)
     prefer_local_providers: bool = True
     prefer_hosted_providers: bool = False
-    max_steps: int = Field(default=10, ge=1, le=50)
+    max_steps: int = Field(default=6, ge=1, le=50)
     repair_budget: int = Field(default=3, ge=0, le=20)
     time_budget_sec: int = Field(default=300, ge=30, le=3600)
     transport_retry_limit: int = Field(default=2, ge=0, le=5)

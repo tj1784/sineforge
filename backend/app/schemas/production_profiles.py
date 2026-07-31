@@ -42,13 +42,15 @@ class ProductionProfileRead(BaseModel):
     version: int
     display_name: str
     model_family: Literal["ltx", "wan"]
-    status: Literal["qualified", "qualification_required"]
+    status: Literal["qualified", "qualification_required", "on_hold"]
     execution_qualified: bool
+    selectable_for_execution: bool
     approved_video_model_keys: list[str]
     approved_video_models: list[str]
     capabilities: VideoCapabilityPolicyRead
     frame_policy: VideoFramePolicyRead
     qualification_notes: list[str]
+    hold_reason: str | None
 
     @classmethod
     def from_domain(cls, profile: ProductionProfile) -> "ProductionProfileRead":
@@ -60,6 +62,7 @@ class ProductionProfileRead(BaseModel):
             model_family=profile.model_family,
             status=profile.status,
             execution_qualified=profile.execution_qualified,
+            selectable_for_execution=profile.selectable_for_execution,
             approved_video_model_keys=sorted(profile.approved_video_model_keys),
             approved_video_models=sorted(profile.approved_video_models),
             capabilities=VideoCapabilityPolicyRead(
@@ -67,6 +70,7 @@ class ProductionProfileRead(BaseModel):
             ),
             frame_policy=VideoFramePolicyRead(**profile.frame_policy.__dict__),
             qualification_notes=list(profile.qualification_notes),
+            hold_reason=profile.hold_reason,
         )
 
 

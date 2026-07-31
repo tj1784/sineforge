@@ -1,0 +1,9 @@
+{
+  "schema_version": "sineforge.orchestration-prompt-history/v1",
+  "artifact_format": "json",
+  "artifact_filename": "rapid_openai.json",
+  "status": "historical_reference",
+  "source": {
+    "user_text": "You are Grok 4.5 High implementing the configurable OpenAI planning-provider adapter for CineForge Storyboard Phase 1. No tools; use controller context; return strict complete-file patches. Own only `backend/app/core/config.py`, `backend/app/services/planning/provider.py`, new `backend/app/services/planning/openai_provider.py`, new `backend/app/services/planning/provider_registry.py`, and new `backend/tests/services/planning/test_openai_provider.py`. Do not edit ORM/migrations/router/main or dependencies.\r\n\r\nAdd configuration-only logical Sol/Terra/Luna model identifiers, enable flag, timeout, bounded transient retries, max response bytes, repair/wall-time settings, and no credential persistence. Reuse existing HTTP dependencies only. Implement strict structured-output request/response validation, input/output hashes, idempotency, sanitized errors, no full payload logging, no chain-of-thought, no retries for schema/semantic/policy rejection, and a registry that keeps anthropic/xai/local_cli/custom represented as explicitly not implemented/not configured while Qwen is a configured local LM Studio adapter. Never accept shell commands or arbitrary executable paths. Qwen 3.6 40B is the default local planning agent; the deterministic mock is reserved for tests and explicit fallback coverage.\r\n"
+  }
+}

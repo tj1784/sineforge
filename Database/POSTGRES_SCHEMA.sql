@@ -20,6 +20,8 @@ CREATE TABLE projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   description TEXT,
+  workflow_lane TEXT NOT NULL DEFAULT 'cineforge_studio'
+    CHECK (workflow_lane IN ('cineforge_studio', 'agentless')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

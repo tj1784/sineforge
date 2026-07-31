@@ -39,7 +39,7 @@ from backend.app.services.planning.executor import (
 
 
 router = APIRouter(prefix="/orchestration", tags=["orchestration"])
-MAX_RETRY_CHAIN = 3
+TERMINAL_RETRY_STATUSES = {"completed", "failed", "canceled"}
 
 
 class RetryOrchestrationRunRequest(BaseModel):
@@ -208,26 +208,20 @@ def retry_orchestration_run(
     payload: RetryOrchestrationRunRequest | None = None,
     db: Session = Depends(get_db),
 ) -> CreateOrchestrationRunResponse:
-    """Create a bounded, audited pending retry without rewriting prior history."""
+    """Create an audited pending iteration without rewriting prior history."""
 
     engine = _engine(db)
     try:
         prior = engine.get_run(run_id)
-        if prior.status not in {"failed", "canceled"}:
+        if prior.status not in TERMINAL_RETRY_STATUSES:
             raise PlanningError(
                 PlanningErrorCode.INVALID_TRANSITION,
-                "Only failed or canceled planning runs can be retried",
+                "Only terminal planning runs can be retried",
                 details={"run_id": str(prior.id), "status": prior.status},
             )
 
         prior_snapshot = dict(prior.routing_snapshot_json or {})
         retry_attempt = int(prior_snapshot.get("retry_attempt") or 0) + 1
-        if retry_attempt > MAX_RETRY_CHAIN:
-            raise PlanningError(
-                PlanningErrorCode.BUDGET_EXHAUSTED,
-                f"Planning retry budget of {MAX_RETRY_CHAIN} is exhausted",
-                details={"run_id": str(prior.id), "retry_attempt": retry_attempt},
-            )
 
         raw_tasks = list(prior_snapshot.get("task_types") or [])
         if not raw_tasks:
@@ -293,7 +287,6 @@ def retry_orchestration_run(
                         prior_snapshot.get("retry_root_run_id") or prior.id
                     ),
                     "retry_attempt": retry_attempt,
-                    "retry_limit": MAX_RETRY_CHAIN,
                 }
             )
             retry.routing_snapshot_json = retry_snapshot
@@ -306,7 +299,6 @@ def retry_orchestration_run(
                 details={
                     "retry_of_run_id": expected_parent,
                     "retry_attempt": retry_attempt,
-                    "retry_limit": MAX_RETRY_CHAIN,
                 },
             )
             engine.repo.commit()

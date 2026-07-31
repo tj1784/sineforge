@@ -1,5 +1,6 @@
 import { createContext, useContext, type Dispatch, type FormEvent, type SetStateAction } from 'react'
 import type { PageId } from '../components/AppShell'
+import type { ProjectWorkflowLane } from '../workflowLanes'
 import type {
   Readiness,
   Shot,
@@ -15,6 +16,7 @@ export type LoadState = 'idle' | 'loading' | 'ready' | 'error' | 'empty'
 export type StudioContextValue = {
   backendStatus: string
   navigate: (page: PageId) => void
+  workflowLane: ProjectWorkflowLane | null
   projectId: string
   setProjectId: (value: string) => void
   storyId: string

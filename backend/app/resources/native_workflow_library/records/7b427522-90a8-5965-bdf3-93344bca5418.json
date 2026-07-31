@@ -1,0 +1,180 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "7b427522-90a8-5965-bdf3-93344bca5418",
+  "name": "Crop Pixaroma Workflow",
+  "version": "1.0",
+  "description": "Crop Pixaroma Workflow is a image utilities workflow designed to inspect, transform, compare, or compose image assets using the models configured in the graph. Its 2-node graph exposes 0 prompt/text field(s), 0 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Image Editing & Composition",
+  "subcategory": "Image utilities",
+  "episode": "EP13",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. No required media file was detected in the converted graph; begin with the prompt and generation controls.\n4. Check image order, masks, crop/resize behavior, denoise strength, and edit prompt. Preview the mask or composite before spending time on the final sample.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP13",
+    "Image Editing & Composition",
+    "Image utilities"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "PixaromaCrop",
+      "PreviewImage"
+    ],
+    "model_files": [],
+    "media_inputs": [],
+    "prompt_field_count": 0,
+    "output_node_count": 1,
+    "documentation_notes": null
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep13 workflows/ep13 workflows/crop pixaroma workflow.json",
+  "source_filename": "Crop Pixaroma Workflow.json",
+  "source_archive": "Ep13 Workflows.zip",
+  "source_entry": "Ep13 Workflows/Ep13 Workflows/Crop Pixaroma Workflow.json",
+  "source_workflow": {
+    "id": "80ceab5b-a0d7-438e-b586-d713da768a19",
+    "revision": 0,
+    "last_node_id": 5,
+    "last_link_id": 4,
+    "nodes": [
+      {
+        "id": 2,
+        "type": "PreviewImage",
+        "pos": [
+          979.2106236072927,
+          405.5335588180974
+        ],
+        "size": [
+          435.06181271771015,
+          477.7692603124358
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 4
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.18.1",
+          "Node name for S&R": "PreviewImage"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 5,
+        "type": "PixaromaCrop",
+        "pos": [
+          648.487968050979,
+          406.2668809616521
+        ],
+        "size": [
+          300,
+          300
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "links": [
+              4
+            ]
+          },
+          {
+            "name": "width",
+            "type": "INT",
+            "links": null
+          },
+          {
+            "name": "height",
+            "type": "INT",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "69d6a57404dc8bddaa588b6bdd5fbf63c5b69535",
+          "Node name for S&R": "PixaromaCrop"
+        },
+        "widgets_values": [
+          null,
+          {
+            "crop_json": "{}"
+          }
+        ]
+      }
+    ],
+    "links": [
+      [
+        4,
+        5,
+        0,
+        2,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 1.4641000000000006,
+        "offset": [
+          -500.0455420031937,
+          -283.4530242642699
+        ]
+      },
+      "frontendVersion": "1.42.10",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "c476d81007f44e10c38c82b0f65301a6b70606f3c33d40c1d5f315fcf821f29d",
+  "workflow": {
+    "2": {
+      "inputs": {
+        "images": [
+          "5",
+          0
+        ]
+      },
+      "class_type": "PreviewImage",
+      "_meta": {
+        "title": "Preview Image"
+      }
+    },
+    "5": {
+      "inputs": {
+        "Open Crop": null,
+        "CropWidget": {
+          "crop_json": "{}"
+        }
+      },
+      "class_type": "PixaromaCrop",
+      "_meta": {
+        "title": "Image Crop Pixaroma"
+      }
+    }
+  },
+  "sha256": "6802e7784699c346a99f60514ab6ca394325d198f1341beebd6cb5462f792994",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

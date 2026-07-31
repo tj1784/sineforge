@@ -21,7 +21,7 @@ DEFAULT_FPS = 24.0
 DEFAULT_PRODUCTION_PROFILE_KEY = "ltx_base@1"
 DEFAULT_STITCH_STAGE = "phase7_before_audio"
 
-ProductionProfileKey = Literal["ltx_base@1", "wan_base@1"]
+ProductionProfileKey = Literal["ltx_base@1", "ltx_base@2", "wan_base@1"]
 StitchStage = Literal["phase7_before_audio", "phase8_before_foley"]
 
 DEFAULT_CONTINUITY_POLICY: dict = {
@@ -79,7 +79,7 @@ class ProjectStoryboardSettingsBase(BaseModel):
     allow_model_download: bool = False
     allow_rendering: bool = False
     require_voice_consent: bool = True
-    require_production_plan_approval: bool = True
+    require_production_plan_approval: bool = False
 
     @model_validator(mode="after")
     def validate_duration_bounds(self):

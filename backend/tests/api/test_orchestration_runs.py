@@ -18,6 +18,7 @@ from backend.app.db.base import (
     Base,
     ComfyJob,
     FFmpegJob,
+    OrchestrationRun,
     Project,
     Story,
     WorkflowRun,
@@ -145,6 +146,23 @@ def _wait_for_run(client: TestClient, run_id: str, statuses: set[str], *, timeou
             return last
         time.sleep(0.02)
     raise AssertionError(f"run did not reach {statuses}; last={last}")
+
+
+def _force_run_status(SessionLocal, run_id: str, status: str) -> None:  # noqa: ANN001
+    with SessionLocal() as db:
+        run = db.get(OrchestrationRun, uuid.UUID(run_id))
+        assert run is not None
+        run.status = status
+        if status == "completed":
+            run.completed_at = datetime.utcnow()
+        elif status == "failed":
+            run.failed_at = datetime.utcnow()
+            run.failure_category = "test"
+            run.failure_message = "forced terminal state"
+        elif status == "canceled":
+            run.canceled_at = datetime.utcnow()
+            run.cancel_reason = "forced terminal state"
+        db.commit()
 
 
 def test_start_is_nonblocking_and_progress_is_observable(client_and_db):
@@ -291,7 +309,7 @@ def test_retry_creates_new_audited_pending_run_without_rewriting_parent(client_a
     retry_snapshot = body["run"]["routing_snapshot_json"]
     assert retry_snapshot["retry_of_run_id"] == parent_id
     assert retry_snapshot["retry_attempt"] == 1
-    assert retry_snapshot["retry_limit"] == 3
+    assert "retry_limit" not in retry_snapshot
 
     replay = client.post(
         f"/orchestration/runs/{parent_id}/retry",
@@ -306,21 +324,84 @@ def test_retry_creates_new_audited_pending_run_without_rewriting_parent(client_a
     assert parent_after["events"] == parent_before["events"]
 
 
-def test_retry_chain_is_bounded(client_and_db):
+def test_completed_run_can_be_retried_for_user_iteration(client_and_db):
+    client, story_id, _sessions, provider, _bind = client_and_db
+    provider.release.set()
+    parent_id = _create_run(client, story_id)
+    assert client.post(f"/orchestration/runs/{parent_id}/start").status_code == 202
+    completed = _wait_for_run(client, parent_id, {"completed"})
+    assert completed["status"] == "completed"
+
+    retried = client.post(
+        f"/orchestration/runs/{parent_id}/retry",
+        json={"requested_by": "iteration-tester"},
+    )
+    assert retried.status_code == 201, retried.text
+    body = retried.json()
+    assert body["created"] is True
+    assert body["run"]["status"] == "pending"
+    assert body["run"]["id"] != parent_id
+    assert body["run"]["routing_snapshot_json"]["retry_of_run_id"] == parent_id
+    assert body["run"]["routing_snapshot_json"]["retry_attempt"] == 1
+
+
+@pytest.mark.parametrize("terminal_status", ["failed", "canceled"])
+def test_failed_and_canceled_runs_can_be_retried_for_user_iteration(
+    client_and_db,
+    terminal_status,
+):
+    client, story_id, SessionLocal, _provider, _bind = client_and_db
+    parent_id = _create_run(client, story_id)
+    _force_run_status(SessionLocal, parent_id, terminal_status)
+
+    retried = client.post(
+        f"/orchestration/runs/{parent_id}/retry",
+        json={"requested_by": "iteration-tester"},
+    )
+
+    assert retried.status_code == 201, retried.text
+    body = retried.json()
+    assert body["created"] is True
+    assert body["run"]["status"] == "pending"
+    assert body["run"]["id"] != parent_id
+    assert body["run"]["routing_snapshot_json"]["retry_of_run_id"] == parent_id
+    assert body["run"]["routing_snapshot_json"]["retry_attempt"] == 1
+
+
+def test_pending_run_cannot_be_retried(client_and_db):
+    client, story_id, _sessions, _provider, _bind = client_and_db
+    run_id = _create_run(client, story_id)
+
+    retried = client.post(f"/orchestration/runs/{run_id}/retry")
+    assert retried.status_code == 409
+    assert retried.json()["detail"]["code"] == "invalid_transition"
+
+
+def test_running_run_cannot_be_retried(client_and_db):
+    client, story_id, _sessions, provider, _bind = client_and_db
+    run_id = _create_run(client, story_id)
+    started = client.post(f"/orchestration/runs/{run_id}/start")
+    assert started.status_code == 202, started.text
+    assert provider.entered.wait(timeout=2)
+
+    retried = client.post(f"/orchestration/runs/{run_id}/retry")
+
+    assert retried.status_code == 409
+    assert retried.json()["detail"]["code"] == "invalid_transition"
+    provider.release.set()
+
+
+def test_retry_chain_does_not_exhaust_normal_iterations(client_and_db):
     client, story_id, _sessions, _provider, _bind = client_and_db
     current_id = _create_run(client, story_id)
     assert client.post(f"/orchestration/runs/{current_id}/cancel").status_code == 200
 
-    for expected_attempt in range(1, 4):
+    for expected_attempt in range(1, 6):
         retried = client.post(f"/orchestration/runs/{current_id}/retry")
         assert retried.status_code == 201, retried.text
         current_id = retried.json()["run"]["id"]
         assert retried.json()["run"]["routing_snapshot_json"]["retry_attempt"] == expected_attempt
         assert client.post(f"/orchestration/runs/{current_id}/cancel").status_code == 200
-
-    exhausted = client.post(f"/orchestration/runs/{current_id}/retry")
-    assert exhausted.status_code == 409
-    assert exhausted.json()["detail"]["code"] == "budget_exhausted"
 
 
 def test_list_story_runs_and_unknown_run(client_and_db):

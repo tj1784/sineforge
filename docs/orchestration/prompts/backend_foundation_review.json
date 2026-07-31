@@ -1,0 +1,9 @@
+{
+  "schema_version": "sineforge.orchestration-prompt-history/v1",
+  "artifact_format": "json",
+  "artifact_filename": "backend_foundation_review.json",
+  "status": "historical_reference",
+  "source": {
+    "user_text": "You are the main implementation reviewer for CineForge Storyboard Phase 1.\r\n\r\nWork read-only. Do not edit files, run terminal commands, invoke nested agents,\r\ninstall packages, download models, access credentials, or touch another\r\nworktree.\r\n\r\nInspect the current backend foundation and return a concise implementation\r\npacket for the first coding checkpoint. Cover:\r\n\r\n1. The exact successor migration additions required for Storyboard settings,\r\n   planning runs/steps/events/invocations, voice previews and recipes, proposal\r\n   linkage, factual model audio capabilities, and shared GPU resource leases.\r\n2. Transaction boundaries required for atomic proposal apply.\r\n3. The smallest safe split of backend files that permits parallel workers with\r\n   no ownership overlap.\r\n4. Test-first acceptance criteria, including negative assertions for ComfyUI,\r\n   FFmpeg, media queues, package/model installation, Qwen duplication, voice\r\n   cloning, and arbitrary CLI execution.\r\n5. Any contradiction that must block implementation.\r\n\r\nTreat the installed Qwen runtime as existing and reusable. Recommend Qwen only\r\nwhen voice is required and the selected video model factually lacks suitable\r\nnative speech. Wan is an example; LTX Eros and other native-speech models do not\r\nneed Qwen. Never overwrite an approved voice assignment.\r\n\r\nThis prompt is retained only as the invalidated, pre-hardening audit record. It\r\nmust not be executed again. Its original response contract predated strict\r\ninner-result validation and cannot pass the current controller schema.\r\n"
+  }
+}

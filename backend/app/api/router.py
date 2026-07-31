@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from backend.app.api.routes import (
+    agentless_workflow,
     api_caller,
     audio,
     assets,
@@ -8,6 +9,7 @@ from backend.app.api.routes import (
     health,
     jobs,
     lm_studio,
+    native_api_runner,
     orchestration_runs,
     projects,
     production,
@@ -15,6 +17,7 @@ from backend.app.api.routes import (
     proposal_review,
     providers,
     runtime_catalog,
+    sequence_sheets,
     storyboard,
     storyboard_crud,
     storyboard_settings,
@@ -26,16 +29,19 @@ from backend.app.api.routes import (
 
 api_router = APIRouter()
 api_router.include_router(api_caller.router)
+api_router.include_router(native_api_runner.router)
 api_router.include_router(lm_studio.router)
 api_router.include_router(health.router)
 api_router.include_router(audio.router)
 api_router.include_router(storyboard_settings.router)
 api_router.include_router(projects.router)
+api_router.include_router(agentless_workflow.router)
 api_router.include_router(production.router)
 api_router.include_router(production_profiles.router)
 api_router.include_router(campaigns.router)
 api_router.include_router(jobs.router)
 api_router.include_router(runtime_catalog.router)
+api_router.include_router(sequence_sheets.router)
 api_router.include_router(providers.router)
 api_router.include_router(assets.router)
 api_router.include_router(voices.router)

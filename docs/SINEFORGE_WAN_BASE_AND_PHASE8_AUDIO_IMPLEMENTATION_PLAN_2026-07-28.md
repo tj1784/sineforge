@@ -1343,7 +1343,8 @@ Tasks:
 
 Acceptance:
 
-- WAN, LTX, and uploaded silent video use the same Phase 8 path;
+- WAN video uses the Phase 8 path; LTX retains its own synchronized native
+  audio and never enters Phase 8;
 - audio retry never rerenders video;
 - A/V mismatch is no more than one video frame before exact final enforcement;
 - final file fully decodes and has complete provenance.
@@ -1600,7 +1601,7 @@ Local evidence sources:
 
 ## 26. Final implementation recommendation
 
-Implement `ltx_base@1` first as a frozen compatibility profile, then build and qualify `wan_base@1` without changing historical LTX behavior. Expand the product contract to eight phases. Make Phase 7 the owner of generated/uploaded video, continuity, EDL, post-processing, the stitch-stage choice, and picture lock. Make Phase 8 the owner of bounded Foley generation, audio candidates, stems, mix/master, one final mux, and delivery QA.
+Implement `ltx_base@1` first as a frozen compatibility profile, then build and qualify `wan_base@1` without changing historical LTX behavior. Expand the WAN product contract to eight phases. Make WAN Phase 7 the owner of generated video, continuity, EDL, post-processing, the stitch-stage choice, and picture lock. Make WAN Phase 8 the owner of bounded Foley generation, audio candidates, stems, mix/master, one final mux, and delivery QA. LTX is a separate synchronized-native-audio path and does not enter WAN Phase 8.
 
 Use **Phase 7 silent stitch before audio** as the default because it establishes the exact visual timing once, lets Foley analyze the real final picture, avoids repeated video encoding, enables video stream-copy during mux, and allows audio retries without rerendering video. Preserve **defer stitch to Phase 8** as an advanced option, but require Phase 8 to materialize the already-frozen EDL before any Foley request.
 

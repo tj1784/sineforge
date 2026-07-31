@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, Numeric, PrimaryKeyConstraint, String, Text, UniqueConstraint, text
+from sqlalchemy import BigInteger, Boolean, CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, Numeric, PrimaryKeyConstraint, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
@@ -58,7 +58,19 @@ class Project(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "projects"
     name: Mapped[str] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text)
+    workflow_lane: Mapped[str] = mapped_column(
+        String(32),
+        default="cineforge_studio",
+        server_default="cineforge_studio",
+        nullable=False,
+    )
     campaigns: Mapped[list["Campaign"]] = relationship(back_populates="project")
+    __table_args__ = (
+        CheckConstraint(
+            "workflow_lane IN ('cineforge_studio', 'agentless')",
+            name="ck_projects_workflow_lane",
+        ),
+    )
 
 
 class ProjectWorkspaceCreation(UUIDMixin, TimestampMixin, Base):
@@ -968,7 +980,7 @@ class ProjectStoryboardSettings(UUIDMixin, StoryboardTimestampMixin, Base):
     allow_model_download: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     allow_rendering: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     require_voice_consent: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    require_production_plan_approval: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    require_production_plan_approval: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     settings_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     __table_args__ = (
         UniqueConstraint("project_id", name="uq_project_storyboard_settings_project_id"),
@@ -1232,5 +1244,446 @@ class GpuResourceLease(UUIDMixin, TimestampMixin, Base):
             unique=True,
             postgresql_where=text("status = 'active' AND exclusive_group IS NOT NULL"),
             sqlite_where=text("status = 'active' AND exclusive_group IS NOT NULL"),
+        ),
+    )
+
+
+# LTX Sequence Sheet records are deliberately additive.  They preserve an
+# immutable authoring revision and per-row execution ledger instead of
+# repurposing the older TimelineSlot/Clip tables or the WAN evidence.
+class SequencePlan(UUIDMixin, StoryboardTimestampMixin, Base):
+    __tablename__ = "sequence_plans"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    # Kept as an application-validated pointer to avoid a DDL cycle with
+    # sequence_plan_revisions on SQLite.  The revision owns the strong FK.
+    active_revision_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        nullable=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default="draft",
+        nullable=False,
+    )
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'validated', 'approved', 'executing', "
+            "'completed', 'failed', 'canceled')",
+            name="ck_sequence_plans_status",
+        ),
+        Index("ix_sequence_plans_project_created", "project_id", "created_at"),
+    )
+
+
+class SequencePlanRevision(UUIDMixin, StoryboardTimestampMixin, Base):
+    __tablename__ = "sequence_plan_revisions"
+
+    sequence_plan_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_plans.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    revision: Mapped[int] = mapped_column(Integer, nullable=False)
+    schema_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    profile_ref: Mapped[str] = mapped_column(String(128), nullable=False)
+    source_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    source_filename: Mapped[str | None] = mapped_column(String(255))
+    source_sha256: Mapped[str | None] = mapped_column(String(64))
+    canonical_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    compiled_plan_sha256: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default="validated",
+        nullable=False,
+    )
+    source_json: Mapped[dict] = mapped_column(
+        json_type(),
+        default=dict,
+        nullable=False,
+    )
+    canonical_json: Mapped[dict] = mapped_column(
+        json_type(),
+        default=dict,
+        nullable=False,
+    )
+    compiled_plan_json: Mapped[dict] = mapped_column(
+        json_type(),
+        default=dict,
+        nullable=False,
+    )
+    validation_json: Mapped[dict] = mapped_column(
+        json_type(),
+        default=dict,
+        nullable=False,
+    )
+    created_by: Mapped[str | None] = mapped_column(String(200))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint(
+            "sequence_plan_id",
+            "revision",
+            name="uq_sequence_plan_revision_number",
+        ),
+        CheckConstraint(
+            "revision > 0",
+            name="ck_sequence_plan_revisions_revision_positive",
+        ),
+        CheckConstraint(
+            "status IN ('draft', 'invalid', 'validated', 'approved', "
+            "'executing', 'completed', 'failed', 'canceled')",
+            name="ck_sequence_plan_revisions_status",
+        ),
+        Index(
+            "ix_sequence_plan_revisions_plan_created",
+            "sequence_plan_id",
+            "created_at",
+        ),
+    )
+
+
+class SequenceRow(UUIDMixin, StoryboardTimestampMixin, Base):
+    __tablename__ = "sequence_rows"
+
+    sequence_plan_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_plan_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    row_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    row_revision: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    workflow_template_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    workflow_version: Mapped[str] = mapped_column(String(80), nullable=False)
+    workflow_sha256: Mapped[str | None] = mapped_column(String(64))
+    profile_ref: Mapped[str] = mapped_column(String(128), nullable=False)
+    generation_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    prompt: Mapped[str] = mapped_column(Text, nullable=False)
+    negative_prompt: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    requested_duration_sec: Mapped[float] = mapped_column(Numeric, nullable=False)
+    compiled_frame_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    compiled_duration_sec: Mapped[float] = mapped_column(Numeric, nullable=False)
+    fps_numerator: Mapped[int] = mapped_column(Integer, nullable=False)
+    fps_denominator: Mapped[int] = mapped_column(Integer, nullable=False)
+    concrete_seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    seed_origin: Mapped[str] = mapped_column(String(16), nullable=False)
+    continuity_source: Mapped[str] = mapped_column(String(32), nullable=False)
+    continuity_asset_id: Mapped[str | None] = mapped_column(String(128))
+    continuity_row_id: Mapped[str | None] = mapped_column(String(128))
+    character_ids_json: Mapped[list] = mapped_column(
+        json_type(),
+        default=list,
+        nullable=False,
+    )
+    asset_ids_json: Mapped[list] = mapped_column(
+        json_type(),
+        default=list,
+        nullable=False,
+    )
+    reference_asset_ids_json: Mapped[list] = mapped_column(
+        json_type(),
+        default=list,
+        nullable=False,
+    )
+    output_basename: Mapped[str] = mapped_column(String(120), nullable=False)
+    canonical_row_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    compiled_segment_json: Mapped[dict] = mapped_column(
+        json_type(),
+        default=dict,
+        nullable=False,
+    )
+    __table_args__ = (
+        UniqueConstraint(
+            "sequence_plan_revision_id",
+            "row_id",
+            name="uq_sequence_rows_revision_row_id",
+        ),
+        UniqueConstraint(
+            "sequence_plan_revision_id",
+            "order_index",
+            name="uq_sequence_rows_revision_order",
+        ),
+        CheckConstraint("row_revision > 0", name="ck_sequence_rows_revision_positive"),
+        CheckConstraint("order_index > 0", name="ck_sequence_rows_order_positive"),
+        CheckConstraint(
+            "requested_duration_sec >= 8 AND requested_duration_sec <= 15",
+            name="ck_sequence_rows_duration_8_15",
+        ),
+        CheckConstraint(
+            "compiled_frame_count > 0 AND compiled_frame_count % 8 = 1",
+            name="ck_sequence_rows_frame_policy",
+        ),
+        CheckConstraint(
+            "fps_numerator > 0 AND fps_denominator > 0",
+            name="ck_sequence_rows_fps_positive",
+        ),
+        CheckConstraint(
+            "generation_mode IN ('i2v', 't2v')",
+            name="ck_sequence_rows_generation_mode",
+        ),
+        CheckConstraint(
+            "seed_origin IN ('explicit', 'derived')",
+            name="ck_sequence_rows_seed_origin",
+        ),
+        Index(
+            "ix_sequence_rows_revision_order",
+            "sequence_plan_revision_id",
+            "order_index",
+        ),
+    )
+
+
+class SequenceRowDependency(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "sequence_row_dependencies"
+
+    sequence_plan_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_plan_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    predecessor_row_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_rows.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    successor_row_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_rows.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    dependency_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    required_artifact_kind: Mapped[str | None] = mapped_column(String(64))
+    __table_args__ = (
+        UniqueConstraint(
+            "sequence_plan_revision_id",
+            "predecessor_row_id",
+            "successor_row_id",
+            "dependency_kind",
+            name="uq_sequence_row_dependencies_edge",
+        ),
+        CheckConstraint(
+            "predecessor_row_id <> successor_row_id",
+            name="ck_sequence_row_dependencies_not_self",
+        ),
+    )
+
+
+class SequenceExecutionRun(UUIDMixin, StoryboardTimestampMixin, Base):
+    __tablename__ = "sequence_execution_runs"
+
+    project_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sequence_plan_revision_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_plan_revisions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    profile_ref: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default="pending",
+        nullable=False,
+    )
+    allow_rendering_snapshot: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    failure_category: Mapped[str | None] = mapped_column(String(64))
+    failure_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    canceled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint(
+            "project_id",
+            "idempotency_key",
+            name="uq_sequence_execution_runs_project_idempotency",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'blocked', 'running', 'completed', "
+            "'failed', 'canceled')",
+            name="ck_sequence_execution_runs_status",
+        ),
+        Index(
+            "ix_sequence_execution_runs_revision_status",
+            "sequence_plan_revision_id",
+            "status",
+        ),
+    )
+
+
+class SequenceRowExecution(UUIDMixin, StoryboardTimestampMixin, Base):
+    __tablename__ = "sequence_row_executions"
+
+    sequence_execution_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_execution_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sequence_row_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_rows.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(
+        String(32),
+        default="pending",
+        nullable=False,
+    )
+    current_attempt: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    idempotency_key: Mapped[str] = mapped_column(
+        String(128),
+        nullable=False,
+        unique=True,
+    )
+    lease_owner: Mapped[str | None] = mapped_column(String(200))
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_attempt_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint(
+            "sequence_execution_run_id",
+            "sequence_row_id",
+            name="uq_sequence_row_executions_run_row",
+        ),
+        CheckConstraint(
+            "status IN ('draft', 'invalid', 'pending', 'blocked_on_dependency', "
+            "'ready', 'leased', 'submitting', 'queued', 'running', "
+            "'collecting', 'validating', 'awaiting_selection', 'succeeded', "
+            "'retry_wait', 'failed', 'skipped', 'canceled', 'stale')",
+            name="ck_sequence_row_executions_status",
+        ),
+        CheckConstraint(
+            "current_attempt >= 0",
+            name="ck_sequence_row_executions_attempt_nonnegative",
+        ),
+        Index(
+            "ix_sequence_row_executions_status_lease",
+            "status",
+            "lease_expires_at",
+        ),
+    )
+
+
+class SequenceRowAttempt(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "sequence_row_attempts"
+
+    sequence_row_execution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_row_executions.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    attempt_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    concrete_seed: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    patched_workflow_sha256: Mapped[str | None] = mapped_column(String(64))
+    workflow_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("workflow_runs.id", ondelete="SET NULL"),
+    )
+    comfy_job_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("comfy_jobs.id", ondelete="SET NULL"),
+    )
+    input_asset_hashes_json: Mapped[list] = mapped_column(
+        json_type(),
+        default=list,
+        nullable=False,
+    )
+    handoff_input_sha256: Mapped[str | None] = mapped_column(String(64))
+    output_clip_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("generated_assets.id", ondelete="SET NULL"),
+    )
+    output_audio_asset_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("generated_assets.id", ondelete="SET NULL"),
+    )
+    error_class: Mapped[str | None] = mapped_column(String(128))
+    error_detail: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        UniqueConstraint(
+            "sequence_row_execution_id",
+            "attempt_number",
+            name="uq_sequence_row_attempt_number",
+        ),
+        CheckConstraint(
+            "attempt_number > 0",
+            name="ck_sequence_row_attempts_number_positive",
+        ),
+    )
+
+
+class ContinuityPacket(UUIDMixin, StoryboardTimestampMixin, Base):
+    __tablename__ = "continuity_packets"
+
+    sequence_execution_run_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_execution_runs.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    predecessor_row_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_rows.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    successor_row_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("sequence_rows.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    source_clip_asset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("generated_assets.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    source_clip_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    handoff_image_asset_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("generated_assets.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    handoff_image_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_frame_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_pts_sec: Mapped[float] = mapped_column(Numeric, nullable=False)
+    continuity_metadata_json: Mapped[dict] = mapped_column(
+        json_type(),
+        default=dict,
+        nullable=False,
+    )
+    qa_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    reanchor_decision: Mapped[str | None] = mapped_column(String(64))
+    __table_args__ = (
+        UniqueConstraint(
+            "sequence_execution_run_id",
+            "predecessor_row_id",
+            "successor_row_id",
+            name="uq_continuity_packets_run_edge",
+        ),
+        CheckConstraint(
+            "source_frame_index >= 0",
+            name="ck_continuity_packets_frame_nonnegative",
+        ),
+        CheckConstraint(
+            "source_pts_sec >= 0",
+            name="ck_continuity_packets_pts_nonnegative",
         ),
     )

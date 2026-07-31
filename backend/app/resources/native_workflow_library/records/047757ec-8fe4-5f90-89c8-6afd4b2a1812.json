@@ -1,0 +1,370 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "047757ec-8fe4-5f90-89c8-6afd4b2a1812",
+  "name": "10a. Text Overlay",
+  "version": "1.0",
+  "description": "10a. Text Overlay is a image utilities workflow designed to inspect, transform, compare, or compose image assets using the models configured in the graph. Its 5-node graph exposes 1 prompt/text field(s), 1 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Image Editing & Composition",
+  "subcategory": "Image utilities",
+  "episode": "EP18",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Check image order, masks, crop/resize behavior, denoise strength, and edit prompt. Preview the mask or composite before spending time on the final sample.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP18",
+    "Image Editing & Composition",
+    "Image utilities"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "LoadImage",
+      "PixaromaLabel",
+      "PixaromaPreview",
+      "PixaromaTextOverlay"
+    ],
+    "model_files": [],
+    "media_inputs": [
+      {
+        "node_id": "1",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "BunnyExplorer.png"
+      }
+    ],
+    "prompt_field_count": 1,
+    "output_node_count": 1,
+    "documentation_notes": null
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep18 workflows/ep18 workflows/10a. text overlay.json",
+  "source_filename": "10a. Text Overlay.json",
+  "source_archive": "Ep18 Workflows.zip",
+  "source_entry": "Ep18 Workflows/Ep18 Workflows/10a. Text Overlay.json",
+  "source_workflow": {
+    "id": "pix-text-overlay-demo",
+    "revision": 0,
+    "last_node_id": 5,
+    "last_link_id": 2,
+    "nodes": [
+      {
+        "id": 4,
+        "type": "PixaromaLabel",
+        "pos": [
+          80,
+          40
+        ],
+        "size": [
+          210,
+          51
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "820854712e38e750204075e1f43f4f45f8b61db1",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"Text Overlay\", \"fontSize\": 31, \"fontFamily\": \"Arial\", \"fontColor\": \"#ffffff\", \"textAlign\": \"left\", \"backgroundColor\": \"#f66744\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1}"
+        ],
+        "color": "transparent",
+        "bgcolor": "transparent"
+      },
+      {
+        "id": 5,
+        "type": "PixaromaLabel",
+        "pos": [
+          80,
+          91
+        ],
+        "size": [
+          726,
+          57
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "820854712e38e750204075e1f43f4f45f8b61db1",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"Click Run: the upstream image gets the text from the Text Overlay node painted on top, and the result flows to the Preview.\\nClick 'Open Text Editor' on the Text Overlay node for a fullscreen drag, scale, rotate WYSIWYG editor.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#c0c0c0\", \"textAlign\": \"left\", \"backgroundColor\": \"#333333\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.4}"
+        ],
+        "color": "transparent",
+        "bgcolor": "transparent"
+      },
+      {
+        "id": 1,
+        "type": "LoadImage",
+        "pos": [
+          80,
+          211
+        ],
+        "size": [
+          290,
+          314
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "slot_index": 0,
+            "links": [
+              1
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "slot_index": 1,
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.21.1",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "BunnyExplorer.png",
+          "image"
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 3,
+        "type": "PixaromaPreview",
+        "pos": [
+          790,
+          211
+        ],
+        "size": [
+          400,
+          460
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 2
+          }
+        ],
+        "outputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "820854712e38e750204075e1f43f4f45f8b61db1",
+          "Node name for S&R": "PixaromaPreview",
+          "pixaromaFrames": [
+            {
+              "filename": "pixaroma_preview_065b99eff4204d09b97d48ede92af001.png",
+              "subfolder": "",
+              "type": "temp"
+            }
+          ],
+          "pixaromaSelected": 0,
+          "pixaromaExpanded": false
+        },
+        "widgets_values": [
+          "img",
+          "preview"
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 2,
+        "type": "PixaromaTextOverlay",
+        "pos": [
+          410,
+          211
+        ],
+        "size": [
+          320,
+          470
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 1
+          },
+          {
+            "name": "text",
+            "shape": 7,
+            "type": "STRING",
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "slot_index": 0,
+            "links": [
+              2
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "820854712e38e750204075e1f43f4f45f8b61db1",
+          "Node name for S&R": "PixaromaTextOverlay",
+          "textOverlayState": {
+            "version": 3,
+            "text": "Adventure Time!",
+            "font": "Roboto",
+            "weight": 700,
+            "italic": false,
+            "align": "center",
+            "fontSize": 66,
+            "lineHeight": 1.2,
+            "letterSpacing": 0,
+            "x": 476.4658203125,
+            "y": 29,
+            "rotation": 0,
+            "opacity": 1,
+            "color": "#FFFFFF",
+            "bgColor": "#000000"
+          }
+        },
+        "widgets_values": [
+          ""
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      }
+    ],
+    "links": [
+      [
+        1,
+        1,
+        0,
+        2,
+        0,
+        "IMAGE"
+      ],
+      [
+        2,
+        2,
+        0,
+        3,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 1.446236559139785,
+        "offset": [
+          126.51670048937038,
+          66.51486285468455
+        ]
+      },
+      "frontendVersion": "1.43.18",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "1455095b553582e8a45bd62d79a738ec748fb9f45bbd34b009a5419874f62586",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "image": "BunnyExplorer.png"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    },
+    "2": {
+      "inputs": {
+        "image": [
+          "1",
+          0
+        ],
+        "TextOverlayState": "{\"version\":3,\"text\":\"Adventure Time!\",\"font\":\"Roboto\",\"weight\":700,\"italic\":false,\"align\":\"center\",\"fontSize\":66,\"lineHeight\":1.2,\"letterSpacing\":0,\"x\":476.4658203125,\"y\":29,\"rotation\":0,\"opacity\":1,\"color\":\"#FFFFFF\",\"bgColor\":\"#000000\"}"
+      },
+      "class_type": "PixaromaTextOverlay",
+      "_meta": {
+        "title": "Text Overlay Pixaroma"
+      }
+    },
+    "3": {
+      "inputs": {
+        "filename_prefix": "img",
+        "save_mode": "preview",
+        "pixaroma_buttons": null,
+        "pixaroma_strip": null,
+        "image": [
+          "2",
+          0
+        ],
+        "CivitaiMeta": "0"
+      },
+      "class_type": "PixaromaPreview",
+      "_meta": {
+        "title": "Preview Image Pixaroma"
+      }
+    },
+    "4": {
+      "inputs": {
+        "label_json": "{\"text\": \"Text Overlay\", \"fontSize\": 31, \"fontFamily\": \"Arial\", \"fontColor\": \"#ffffff\", \"textAlign\": \"left\", \"backgroundColor\": \"#f66744\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "5": {
+      "inputs": {
+        "label_json": "{\"text\": \"Click Run: the upstream image gets the text from the Text Overlay node painted on top, and the result flows to the Preview.\\nClick 'Open Text Editor' on the Text Overlay node for a fullscreen drag, scale, rotate WYSIWYG editor.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#c0c0c0\", \"textAlign\": \"left\", \"backgroundColor\": \"#333333\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.4}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    }
+  },
+  "sha256": "1f0ff25030de3c45f3d6f0e1dd4a95704712bcaf6ce994655c0ad940ee256cf9",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

@@ -1,0 +1,501 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "a5f2d690-ae96-51ae-b81c-ad121c6f51f7",
+  "name": "2 Upscale Simple With Model",
+  "version": "1.0",
+  "description": "2 Upscale Simple With Model is a local upscaling workflow designed to increase image or video resolution with a locally loaded model using the models configured in the graph. Its 6-node graph exposes 0 prompt/text field(s), 1 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Upscaling & Restoration",
+  "subcategory": "Local upscaling",
+  "episode": "EP05",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Review the model-file entries in Requirements and place each checkpoint, text encoder, VAE, LoRA, or auxiliary model in the folder documented by the source workflow. Refresh ComfyUI after adding files.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Select the intended scale/model and verify output dimensions before running. Use one representative asset first to estimate VRAM and processing time.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP05",
+    "Local upscaling",
+    "Upscaling & Restoration"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "pixaroma",
+      "Pixaroma YouTube Channel",
+      "rgthree-comfy"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "Image Comparer (rgthree)",
+      "ImageScaleBy",
+      "ImageUpscaleWithModel",
+      "LoadImage",
+      "SaveImage",
+      "UpscaleModelLoader"
+    ],
+    "model_files": [
+      {
+        "node_id": "7",
+        "node_type": "UpscaleModelLoader",
+        "input": "model_name",
+        "value": "4x_NMKD-Siax_200k.pth"
+      }
+    ],
+    "media_inputs": [
+      {
+        "node_id": "2",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "Woman1.jpg"
+      }
+    ],
+    "prompt_field_count": 0,
+    "output_node_count": 1,
+    "documentation_notes": "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🆙 Load Upscale Model  \n\n### Download 4x_NMKD-Siax_200k.pth mode from [HERE](https://huggingface.co/Akumetsu971/SD_Anime_Futuristic_Armor/resolve/main/4x_NMKD-Siax_200k.pth?download=true)  \n\n📁 **Place in:** `ComfyUI/models/upscale_models`\n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)"
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep05 workflows/ep05 workflows/2 upscale simple with model.json",
+  "source_filename": "2 Upscale Simple With Model.json",
+  "source_archive": "EP05 Workflows.zip",
+  "source_entry": "EP05 Workflows/EP05 Workflows/2 Upscale Simple With Model.json",
+  "source_workflow": {
+    "id": "23b41169-8935-4a6e-8fa6-010f051cf667",
+    "revision": 0,
+    "last_node_id": 9,
+    "last_link_id": 9,
+    "nodes": [
+      {
+        "id": 2,
+        "type": "LoadImage",
+        "pos": [
+          -595.3457036137837,
+          163.34029579945317
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              3,
+              6
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "Woman1.jpg",
+          "image"
+        ]
+      },
+      {
+        "id": 6,
+        "type": "Image Comparer (rgthree)",
+        "pos": [
+          367.4564043047593,
+          163.34029579945317
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          {
+            "dir": 3,
+            "name": "image_a",
+            "type": "IMAGE",
+            "link": 3
+          },
+          {
+            "dir": 3,
+            "name": "image_b",
+            "type": "IMAGE",
+            "link": 9
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "rgthree-comfy",
+          "ver": "8ff50e4521881eca1fe26aec9615fc9362474931",
+          "comparer_mode": "Slide"
+        },
+        "widgets_values": [
+          [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_dcqno_00007_.png&type=temp&subfolder=&rand=0.9546159251152824"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_dcqno_00008_.png&type=temp&subfolder=&rand=0.9848141169919911"
+            }
+          ]
+        ]
+      },
+      {
+        "id": 1,
+        "type": "MarkdownNote",
+        "pos": [
+          -1159.932394224641,
+          163.34029579945317
+        ],
+        "size": [
+          539.7419169846861,
+          309.0809054291223
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "👑 Pixaroma - Note - START HERE",
+        "properties": {},
+        "widgets_values": [
+          "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🆙 Load Upscale Model  \n\n### Download 4x_NMKD-Siax_200k.pth mode from [HERE](https://huggingface.co/Akumetsu971/SD_Anime_Futuristic_Armor/resolve/main/4x_NMKD-Siax_200k.pth?download=true)  \n\n📁 **Place in:** `ComfyUI/models/upscale_models`\n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 4,
+        "type": "SaveImage",
+        "pos": [
+          798.669371427238,
+          163.34029579945317
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 8
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "Up"
+        ]
+      },
+      {
+        "id": 7,
+        "type": "UpscaleModelLoader",
+        "pos": [
+          -496.37348422647466,
+          53.94260522725555
+        ],
+        "size": [
+          312.0254860047787,
+          58
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "UPSCALE_MODEL",
+            "type": "UPSCALE_MODEL",
+            "links": [
+              5
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "UpscaleModelLoader"
+        },
+        "widgets_values": [
+          "4x_NMKD-Siax_200k.pth"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 9,
+        "type": "ImageScaleBy",
+        "pos": [
+          113.9804177399817,
+          163.34029579945317
+        ],
+        "size": [
+          235.1976913694782,
+          82
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 7
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              8,
+              9
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "ImageScaleBy"
+        },
+        "widgets_values": [
+          "lanczos",
+          1
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 8,
+        "type": "ImageUpscaleWithModel",
+        "pos": [
+          -164.13273649130497,
+          163.34029579945317
+        ],
+        "size": [
+          259.8348590359873,
+          46
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "upscale_model",
+            "type": "UPSCALE_MODEL",
+            "link": 5
+          },
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 6
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              7
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "ImageUpscaleWithModel"
+        },
+        "widgets_values": [],
+        "color": "#432",
+        "bgcolor": "#653"
+      }
+    ],
+    "links": [
+      [
+        3,
+        2,
+        0,
+        6,
+        0,
+        "IMAGE"
+      ],
+      [
+        5,
+        7,
+        0,
+        8,
+        0,
+        "UPSCALE_MODEL"
+      ],
+      [
+        6,
+        2,
+        0,
+        8,
+        1,
+        "IMAGE"
+      ],
+      [
+        7,
+        8,
+        0,
+        9,
+        0,
+        "IMAGE"
+      ],
+      [
+        8,
+        9,
+        0,
+        4,
+        0,
+        "IMAGE"
+      ],
+      [
+        9,
+        9,
+        0,
+        6,
+        1,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 1.0152559799477616,
+        "offset": [
+          1251.6507042332166,
+          102.00373832850221
+        ]
+      },
+      "frontendVersion": "1.38.13",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "4ff89bcdedcba3dfb403d7f5e87fd66d7d6bb04c7a2fa9935ad1d70c15af8856",
+  "workflow": {
+    "2": {
+      "inputs": {
+        "image": "Woman1.jpg"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    },
+    "4": {
+      "inputs": {
+        "filename_prefix": "Up",
+        "images": [
+          "9",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image"
+      }
+    },
+    "6": {
+      "inputs": {
+        "rgthree_comparer": {
+          "images": [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_dcqno_00007_.png&type=temp&subfolder=&rand=0.9546159251152824"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_dcqno_00008_.png&type=temp&subfolder=&rand=0.9848141169919911"
+            }
+          ]
+        },
+        "image_a": [
+          "2",
+          0
+        ],
+        "image_b": [
+          "9",
+          0
+        ]
+      },
+      "class_type": "Image Comparer (rgthree)",
+      "_meta": {
+        "title": "Image Comparer (rgthree)"
+      }
+    },
+    "7": {
+      "inputs": {
+        "model_name": "4x_NMKD-Siax_200k.pth"
+      },
+      "class_type": "UpscaleModelLoader",
+      "_meta": {
+        "title": "Load Upscale Model"
+      }
+    },
+    "8": {
+      "inputs": {
+        "upscale_model": [
+          "7",
+          0
+        ],
+        "image": [
+          "2",
+          0
+        ]
+      },
+      "class_type": "ImageUpscaleWithModel",
+      "_meta": {
+        "title": "Upscale Image (using Model)"
+      }
+    },
+    "9": {
+      "inputs": {
+        "upscale_method": "lanczos",
+        "scale_by": 1,
+        "image": [
+          "8",
+          0
+        ]
+      },
+      "class_type": "ImageScaleBy",
+      "_meta": {
+        "title": "Upscale Image By"
+      }
+    }
+  },
+  "sha256": "3e0d01bc17717ad6825cd8503c88204617685eeb216d32159333e350118a0284",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

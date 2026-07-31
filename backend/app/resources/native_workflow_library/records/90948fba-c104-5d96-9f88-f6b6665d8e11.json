@@ -1,0 +1,407 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "90948fba-c104-5d96-9f88-f6b6665d8e11",
+  "name": "AudioReact Workflow",
+  "version": "1.0",
+  "description": "AudioReact Workflow is a audio reactive workflow designed to drive visual behavior from an audio track using the models configured in the graph. Its 4-node graph exposes 0 prompt/text field(s), 2 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Speech, Audio & Music",
+  "subcategory": "Audio reactive",
+  "episode": "EP15",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Review text, speaker/voice references, language, duration, sample rate, and seed. For cloning, use a clean reference clip and confirm you have permission to use the voice.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "Audio reactive",
+    "EP15",
+    "Speech, Audio & Music"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "LoadAudio",
+      "LoadImage",
+      "PixaromaAudioStudio",
+      "PixaromaSaveMp4"
+    ],
+    "model_files": [],
+    "media_inputs": [
+      {
+        "node_id": "1",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "BunnyExplorer.png"
+      },
+      {
+        "node_id": "3",
+        "node_type": "LoadAudio",
+        "input": "audio",
+        "default": "WomanSong9Sec.mp3"
+      }
+    ],
+    "prompt_field_count": 0,
+    "output_node_count": 1,
+    "documentation_notes": null
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep15 workflows/ep15 workflows/audioreact workflow.json",
+  "source_filename": "AudioReact Workflow.json",
+  "source_archive": "Ep15 Workflows.zip",
+  "source_entry": "Ep15 Workflows/Ep15 Workflows/AudioReact Workflow.json",
+  "source_workflow": {
+    "id": "2461414c-34c1-4353-b6ec-317306eedd55",
+    "revision": 0,
+    "last_node_id": 35,
+    "last_link_id": 94,
+    "nodes": [
+      {
+        "id": 3,
+        "type": "LoadAudio",
+        "pos": [
+          454.0291748046875,
+          563.7969339027553
+        ],
+        "size": [
+          282.798828125,
+          136
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "AUDIO",
+            "type": "AUDIO",
+            "links": [
+              85
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.19.3",
+          "Node name for S&R": "LoadAudio"
+        },
+        "widgets_values": [
+          "WomanSong9Sec.mp3",
+          null,
+          null
+        ]
+      },
+      {
+        "id": 1,
+        "type": "LoadImage",
+        "pos": [
+          454.0291748046875,
+          199.72863316107575
+        ],
+        "size": [
+          282.798828125,
+          314
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              84
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.19.3",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "BunnyExplorer.png",
+          "image"
+        ]
+      },
+      {
+        "id": 31,
+        "type": "PixaromaAudioStudio",
+        "pos": [
+          757.9595429732206,
+          199.72863316107575
+        ],
+        "size": [
+          210,
+          98
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": 84
+          },
+          {
+            "name": "audio",
+            "shape": 7,
+            "type": "AUDIO",
+            "link": 85
+          }
+        ],
+        "outputs": [
+          {
+            "name": "video_frames",
+            "type": "IMAGE",
+            "links": [
+              92
+            ]
+          },
+          {
+            "name": "audio",
+            "type": "AUDIO",
+            "links": [
+              93
+            ]
+          },
+          {
+            "name": "fps",
+            "type": "FLOAT",
+            "links": [
+              94
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "52daaba187bd9a1964938a73c60e72dffbb025c2",
+          "audioStudioState": {
+            "schema_version": 1,
+            "motion_mode": "scale_pulse",
+            "intensity": 0.8,
+            "audio_band": "full",
+            "motion_speed": 0.2,
+            "motion_direction": 1,
+            "shake_axis": "both",
+            "ripple_density": 1,
+            "slit_density": 1,
+            "glitch_bands": 30,
+            "wave_density": 1,
+            "pixelate_blocks": 24,
+            "squeeze_axis": "x",
+            "smoothing": 5,
+            "loop_safe": true,
+            "fps": 24,
+            "glitch_strength": 0,
+            "bloom_strength": 0,
+            "vignette_strength": 0,
+            "hue_shift_strength": 0,
+            "grade_strength": 0,
+            "letterbox_strength": 0,
+            "scanline_strength": 0,
+            "grain_strength": 0,
+            "aspect_ratio": "Original",
+            "custom_width": 1024,
+            "custom_height": 1024,
+            "image_source": "upstream",
+            "image_path": null,
+            "audio_source": "upstream",
+            "audio_path": null,
+            "image_force_inline": false,
+            "audio_force_inline": false,
+            "image_uploaded_at": 0,
+            "audio_uploaded_at": 0
+          },
+          "Node name for S&R": "PixaromaAudioStudio"
+        },
+        "widgets_values": [
+          null
+        ]
+      },
+      {
+        "id": 35,
+        "type": "PixaromaSaveMp4",
+        "pos": [
+          989.0910830167536,
+          199.72863316107575
+        ],
+        "size": [
+          320,
+          474
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "video_frames",
+            "type": "IMAGE",
+            "link": 92
+          },
+          {
+            "name": "audio",
+            "shape": 7,
+            "type": "AUDIO",
+            "link": 93
+          },
+          {
+            "name": "fps",
+            "type": "FLOAT",
+            "widget": {
+              "name": "fps"
+            },
+            "link": 94
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "278bcd5143bc00ecef8fab04535c395570438697",
+          "Node name for S&R": "PixaromaSaveMp4"
+        },
+        "widgets_values": [
+          24,
+          "Video",
+          "save",
+          true,
+          ""
+        ]
+      }
+    ],
+    "links": [
+      [
+        84,
+        1,
+        0,
+        31,
+        0,
+        "IMAGE"
+      ],
+      [
+        85,
+        3,
+        0,
+        31,
+        1,
+        "AUDIO"
+      ],
+      [
+        92,
+        31,
+        0,
+        35,
+        0,
+        "IMAGE"
+      ],
+      [
+        93,
+        31,
+        1,
+        35,
+        1,
+        "AUDIO"
+      ],
+      [
+        94,
+        31,
+        2,
+        35,
+        2,
+        "FLOAT"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 1.1479573566752286,
+        "offset": [
+          -159.27495019741832,
+          -6.098118687498573
+        ]
+      },
+      "frontendVersion": "1.42.11",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "146f59b0904b269f59a49ba850a9805a68563be44dffd6bbb4dca4ae7c633f05",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "image": "BunnyExplorer.png"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    },
+    "3": {
+      "inputs": {
+        "audio": "WomanSong9Sec.mp3"
+      },
+      "class_type": "LoadAudio",
+      "_meta": {
+        "title": "Load Audio"
+      }
+    },
+    "31": {
+      "inputs": {
+        "Open AudioReact": null,
+        "image": [
+          "1",
+          0
+        ],
+        "audio": [
+          "3",
+          0
+        ],
+        "studio_json": "{\"schema_version\":1,\"motion_mode\":\"scale_pulse\",\"intensity\":0.8,\"audio_band\":\"full\",\"motion_speed\":0.2,\"motion_direction\":1,\"shake_axis\":\"both\",\"ripple_density\":1,\"slit_density\":1,\"glitch_bands\":30,\"wave_density\":1,\"pixelate_blocks\":24,\"squeeze_axis\":\"x\",\"smoothing\":5,\"loop_safe\":true,\"fps\":24,\"glitch_strength\":0,\"bloom_strength\":0,\"vignette_strength\":0,\"hue_shift_strength\":0,\"grade_strength\":0,\"letterbox_strength\":0,\"scanline_strength\":0,\"grain_strength\":0,\"aspect_ratio\":\"Original\",\"custom_width\":1024,\"custom_height\":1024,\"image_source\":\"upstream\",\"image_path\":null,\"audio_source\":\"upstream\",\"audio_path\":null,\"image_force_inline\":false,\"audio_force_inline\":false,\"image_uploaded_at\":0,\"audio_uploaded_at\":0}"
+      },
+      "class_type": "PixaromaAudioStudio",
+      "_meta": {
+        "title": "AudioReact Pixaroma"
+      }
+    },
+    "35": {
+      "inputs": {
+        "fps": [
+          "31",
+          2
+        ],
+        "filename_prefix": "Video",
+        "save_mode": "save",
+        "trim_to_audio": true,
+        "video_frames": [
+          "31",
+          0
+        ],
+        "audio": [
+          "31",
+          1
+        ]
+      },
+      "class_type": "PixaromaSaveMp4",
+      "_meta": {
+        "title": "Save Mp4 Pixaroma"
+      }
+    }
+  },
+  "sha256": "bee73b26f9766ff0f55cbaa345f1bd475c02bbd2f456c609fa3e6c89aa8b7be8",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

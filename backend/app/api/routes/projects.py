@@ -1,11 +1,14 @@
+import hashlib
+import json
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_settings
 from backend.app.core.errors import not_found
-from backend.app.db.base import Project
+from backend.app.db.base import Project, ProjectStoryboardSettings
 from backend.app.db.session import get_db
 from backend.app.schemas.api import (
     ProjectCreate,
@@ -21,7 +24,6 @@ from backend.app.services.planning.sulphur_project_intake import (
     SulphurProjectIntakeError,
     build_sulphur_project_intake,
 )
-from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.services.project_workspace import (
     ProjectWorkspaceConflictError,
     ProjectWorkspaceResult,
@@ -38,6 +40,7 @@ def project_to_response(project: Project) -> ProjectRead:
         id=project.id,
         name=project.name,
         description=project.description,
+        workflow_lane=project.workflow_lane,
         created_at=project.created_at,
         persistence="db",
     )
@@ -58,7 +61,11 @@ def workspace_to_response(
 
 @router.post("", response_model=ProjectRead, status_code=201)
 def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> ProjectRead:
-    project = Project(name=payload.name, description=payload.description)
+    project = Project(
+        name=payload.name,
+        description=payload.description,
+        workflow_lane=payload.workflow_lane.value,
+    )
     db.add(project)
     db.commit()
     db.refresh(project)
@@ -73,6 +80,11 @@ def create_workspace(
         result = create_project_workspace(db, payload)
     except ProjectWorkspaceConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except production_phases.ProductionPhaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     return workspace_to_response(db, result)
 
 
@@ -97,11 +109,17 @@ def create_workspace_from_sulphur(
         ) from exc
     except ProjectWorkspaceConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except production_phases.ProductionPhaseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
 
     workspace = workspace_to_response(db, result)
     return SulphurProjectWorkspaceRead(
         **workspace.model_dump(),
-        intake_model=get_active_lm_studio_model_id(),
+        intake_provider=intake.planning_agent,
+        intake_model=intake.intake_model,
         target_duration_sec=intake.clip_plan.target_duration_sec,
         planned_scene_count=intake.clip_plan.planned_scene_count,
     )
@@ -111,6 +129,50 @@ def create_workspace_from_sulphur(
 def list_projects(db: Session = Depends(get_db)) -> list[ProjectRead]:
     projects = db.query(Project).order_by(Project.created_at.desc()).all()
     return [project_to_response(project) for project in projects]
+
+
+@router.get("/{project_id}/planning-prompt.json")
+def get_project_planning_prompt(
+    project_id: UUID,
+    db: Session = Depends(get_db),
+) -> Response:
+    """Download the canonical project-planning prompt as a JSON artifact."""
+
+    project = db.get(Project, project_id)
+    project_settings = db.scalar(
+        select(ProjectStoryboardSettings).where(
+            ProjectStoryboardSettings.project_id == project_id
+        )
+    )
+    if project is None or project_settings is None:
+        raise not_found("Project planning prompt not found.")
+    policy = dict(project_settings.prompting_policy_json or {})
+    artifact = policy.get("prompt_artifact")
+    if not isinstance(artifact, dict):
+        raise not_found("Project planning prompt not found.")
+    content = json.dumps(
+        artifact,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    digest = hashlib.sha256(content).hexdigest()
+    expected_digest = policy.get("prompt_artifact_sha256")
+    if expected_digest != digest:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Project planning prompt failed its stored SHA-256 check.",
+        )
+    return Response(
+        content=content,
+        media_type="application/json",
+        headers={
+            "Content-Disposition": (
+                'attachment; filename="project-planning-prompt.json"'
+            ),
+            "X-Content-SHA256": digest,
+        },
+    )
 
 
 @router.get("/{project_id}", response_model=ProjectRead)

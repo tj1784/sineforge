@@ -49,7 +49,7 @@ const DEFAULT_DRAFT: ProjectStoryboardSettingsUpdate = {
   allow_model_download: true,
   allow_rendering: true,
   require_voice_consent: true,
-  require_production_plan_approval: true,
+  require_production_plan_approval: false,
 }
 
 function editableSettings(settings: ProjectStoryboardSettings): ProjectStoryboardSettingsUpdate {
@@ -82,7 +82,7 @@ function editableSettings(settings: ProjectStoryboardSettings): ProjectStoryboar
 }
 
 export function SettingsPage() {
-  const { data, busy, setMessage, backendStatus } = useStudio()
+  const { data, busy, setMessage, backendStatus, workflowLane } = useStudio()
   const [settings, setSettings] = useState<ProjectStoryboardSettings | null>(null)
   const [available, setAvailable] = useState(true)
   const [loading, setLoading] = useState(true)
@@ -177,6 +177,8 @@ export function SettingsPage() {
   }
 
   const savingDisabled = saving || busy
+  const agentlessPolicyLocked = workflowLane === 'agentless'
+  const laneLockedDisabled = savingDisabled || agentlessPolicyLocked
 
   return (
     <form className="panel stack-form" style={{ maxWidth: 760 }} onSubmit={(event) => void onSave(event)}>
@@ -194,6 +196,13 @@ export function SettingsPage() {
       </div>
 
       {error ? <ErrorState detail={error} onRetry={() => void load()} /> : null}
+      {agentlessPolicyLocked ? (
+        <p className="notice" role="status">
+          Agentless policy locks LTX Base v2, 3–10 second generation units,
+          24 fps, model downloads off, and rendering off until the
+          project-scoped execution boundary is implemented.
+        </p>
+      ) : null}
 
       <div className="split-2">
         <label>
@@ -204,15 +213,20 @@ export function SettingsPage() {
               ...draft,
               production_profile_key: event.target.value as ProjectStoryboardSettingsUpdate['production_profile_key'],
             })}
-            disabled={savingDisabled}
+            disabled={laneLockedDisabled}
           >
-            <option value="ltx_base@1">LTX Base v1</option>
-            <option value="wan_base@1">WAN Base v1 · qualification required</option>
+            <option value="ltx_base@1">LTX Base v1 · qualified compatibility</option>
+            <option value="ltx_base@2">LTX Base v2 · 8–15 second Sequence Sheet</option>
+            <option value="wan_base@1" disabled>WAN Base v1 · on hold after failed dry run</option>
           </select>
           <small>
-            {draft.production_profile_key === 'wan_base@1'
-              ? 'WAN is a persisted planning selection; this UI does not claim that its runtime has been qualified.'
-              : 'Preserves the current LTX compatibility profile.'}
+            {agentlessPolicyLocked
+              ? 'Agentless scenes compile into independently anchored LTX-2.3 units; exact FLUX and LTX workflow admission is still required.'
+              : draft.production_profile_key === 'wan_base@1'
+              ? 'WAN remains readable for existing projects, but it is disabled and cannot execute while on hold.'
+              : draft.production_profile_key === 'ltx_base@2'
+                ? 'One LTX request per 8–15 second row. Execution requires the exact static API workflow to pass qualification.'
+                : 'Preserves the existing qualified 6–10 second LTX compatibility profile.'}
           </small>
         </label>
         <label>
@@ -241,7 +255,7 @@ export function SettingsPage() {
             step={0.1}
             value={draft.shot_duration_min_sec}
             onChange={(event) => setDraft({ ...draft, shot_duration_min_sec: Number(event.target.value) })}
-            disabled={savingDisabled}
+            disabled={laneLockedDisabled}
           />
         </label>
         <label>
@@ -252,7 +266,7 @@ export function SettingsPage() {
             step={0.1}
             value={draft.shot_duration_max_sec}
             onChange={(event) => setDraft({ ...draft, shot_duration_max_sec: Number(event.target.value) })}
-            disabled={savingDisabled}
+            disabled={laneLockedDisabled}
           />
         </label>
       </div>
@@ -279,7 +293,7 @@ export function SettingsPage() {
             step={1}
             value={draft.fps}
             onChange={(event) => setDraft({ ...draft, fps: Number(event.target.value) })}
-            disabled={savingDisabled}
+            disabled={laneLockedDisabled}
           />
         </label>
       </div>
@@ -345,7 +359,7 @@ export function SettingsPage() {
           type="checkbox"
           checked={Boolean(draft.allow_model_download)}
           onChange={(event) => setDraft({ ...draft, allow_model_download: event.target.checked })}
-          disabled={savingDisabled}
+          disabled={laneLockedDisabled}
           style={{ width: 20, height: 20, minHeight: 20 }}
         />
         <span>
@@ -358,7 +372,7 @@ export function SettingsPage() {
           type="checkbox"
           checked={Boolean(draft.allow_rendering)}
           onChange={(event) => setDraft({ ...draft, allow_rendering: event.target.checked })}
-          disabled={savingDisabled}
+          disabled={laneLockedDisabled}
           style={{ width: 20, height: 20, minHeight: 20 }}
         />
         <span>Allow rendering / video generation jobs when the runtime worker is enabled</span>
@@ -372,8 +386,9 @@ export function SettingsPage() {
       </div>
 
       <p className="form-hint">
-        Model/LoRA download and rendering flags are project policy. Downloads still require a configured
-        runtime and worker; enabling the flags does not auto-fetch weights by itself.
+        {agentlessPolicyLocked
+          ? 'The locked controls are enforced again by the backend on every settings update.'
+          : 'Model/LoRA download and rendering flags are project policy. Downloads still require a configured runtime and worker; enabling the flags does not auto-fetch weights by itself.'}
       </p>
     </form>
   )

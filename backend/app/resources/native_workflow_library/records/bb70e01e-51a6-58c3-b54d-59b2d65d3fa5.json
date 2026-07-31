@@ -1,0 +1,263 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "bb70e01e-51a6-58c3-b54d-59b2d65d3fa5",
+  "name": "QwenVL 3",
+  "version": "1.0",
+  "description": "QwenVL 3 is a captioning & transcription workflow designed to extract structured text or prompts from media using QwenVL 3. Its 3-node graph exposes 0 prompt/text field(s), 1 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The imported graph contains unresolved custom-node classes, so install or map the listed nodes and reconvert from the included editor graph before production use.",
+  "category": "Prompting & Language",
+  "subcategory": "Captioning & transcription",
+  "episode": "EP03",
+  "instructions": "1. Install or map the unresolved node classes listed in Requirements, open the included editor-format source in the main LTX ComfyUI install, and export API format again before attempting a run.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Edit the source text or media, review the system/instruction fields, and inspect the generated text before passing it into another generation workflow.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "Captioning & transcription",
+    "EP03",
+    "Prompting & Language",
+    "QwenVL 3"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [],
+    "unresolved_node_classes": [
+      "AILab_QwenVL_GGUF"
+    ],
+    "node_classes": [
+      "AILab_QwenVL_GGUF",
+      "LoadImage",
+      "PreviewAny"
+    ],
+    "model_files": [],
+    "media_inputs": [
+      {
+        "node_id": "3",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "Architecture.png"
+      }
+    ],
+    "prompt_field_count": 0,
+    "output_node_count": 1,
+    "documentation_notes": null
+  },
+  "workflow_status": "requires_custom_nodes",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep03 workflows/ep03 workflows/qwenvl 3.json",
+  "source_filename": "QwenVL 3.json",
+  "source_archive": "EP03 Workflows.zip",
+  "source_entry": "EP03 Workflows/EP03 Workflows/QwenVL 3.json",
+  "source_workflow": {
+    "id": "be755236-2f72-43bb-af49-ee8a6cb87efa",
+    "revision": 0,
+    "last_node_id": 3,
+    "last_link_id": 2,
+    "nodes": [
+      {
+        "id": 1,
+        "type": "AILab_QwenVL_GGUF",
+        "pos": [
+          244.00006103515625,
+          250.3333740234375
+        ],
+        "size": [
+          340,
+          252
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": 2
+          },
+          {
+            "name": "video",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "RESPONSE",
+            "type": "STRING",
+            "links": [
+              1
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-QwenVL",
+          "ver": "fcd1ada87a28f922cb887f779db32429f78a022c",
+          "Node name for S&R": "AILab_QwenVL_GGUF"
+        },
+        "widgets_values": [
+          "Qwen3VL-8B-Instruct-Q8_0.gguf",
+          "🖼️ Detailed Description",
+          "",
+          512,
+          true,
+          34486939,
+          "randomize"
+        ],
+        "color": "#474539",
+        "bgcolor": "#2c4045"
+      },
+      {
+        "id": 3,
+        "type": "LoadImage",
+        "pos": [
+          -68.82533263013741,
+          249.33513473407564
+        ],
+        "size": [
+          282.798828125,
+          314
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              2
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "Architecture.png",
+          "image"
+        ]
+      },
+      {
+        "id": 2,
+        "type": "PreviewAny",
+        "pos": [
+          616.4975535036656,
+          250.00179881748622
+        ],
+        "size": [
+          480,
+          428
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "source",
+            "type": "*",
+            "link": 1
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "PreviewAny"
+        },
+        "widgets_values": [
+          null,
+          null,
+          false
+        ]
+      }
+    ],
+    "links": [
+      [
+        1,
+        1,
+        0,
+        2,
+        0,
+        "STRING"
+      ],
+      [
+        2,
+        3,
+        0,
+        1,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 1.3310000000000004,
+        "offset": [
+          232.72309789507094,
+          -21.911615636812666
+        ]
+      },
+      "frontendVersion": "1.38.13",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "8cf4f6c730e7f10ffbe85785fca00c4ba4e5cd13fed4725b95814a7a82de0a89",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "UNKNOWN": "Qwen3VL-8B-Instruct-Q8_0.gguf",
+        "UNKNOWN_1": "🖼️ Detailed Description",
+        "UNKNOWN_2": "",
+        "UNKNOWN_3": 512,
+        "UNKNOWN_4": true,
+        "UNKNOWN_5": 34486939,
+        "UNKNOWN_6": "randomize",
+        "image": [
+          "3",
+          0
+        ]
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::AILab_QwenVL_GGUF"
+    },
+    "2": {
+      "inputs": {
+        "source": [
+          "1",
+          0
+        ]
+      },
+      "class_type": "PreviewAny",
+      "_meta": {
+        "title": "Preview as Text"
+      }
+    },
+    "3": {
+      "inputs": {
+        "image": "Architecture.png"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    }
+  },
+  "sha256": "2a1f5233efd0ad640b0e2e1a0545a7892f8dda9a6d979018e9420c371ec68c48",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

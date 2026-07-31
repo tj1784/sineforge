@@ -1,0 +1,287 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "1d69fea7-808d-5809-9b5e-9b08e5565df4",
+  "name": "08c. Prompt Multi - Queue Text",
+  "version": "1.0",
+  "description": "08c. Prompt Multi - Queue Text is a prompt batching workflow designed to assemble, vary, queue, or iterate over prompt text using the models configured in the graph. Its 4-node graph exposes 2 prompt/text field(s), 0 media input target(s), and 0 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Prompting & Language",
+  "subcategory": "Prompt batching",
+  "episode": "EP18",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. No required media file was detected in the converted graph; begin with the prompt and generation controls.\n4. Edit the source text or media, review the system/instruction fields, and inspect the generated text before passing it into another generation workflow.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP18",
+    "Prompt batching",
+    "Prompting & Language"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "PixaromaLabel",
+      "PixaromaPromptMulti",
+      "PixaromaShowText"
+    ],
+    "model_files": [],
+    "media_inputs": [],
+    "prompt_field_count": 2,
+    "output_node_count": 0,
+    "documentation_notes": null
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep18 workflows/ep18 workflows/08c. prompt multi - queue text.json",
+  "source_filename": "08c. Prompt Multi - Queue Text.json",
+  "source_archive": "Ep18 Workflows.zip",
+  "source_entry": "Ep18 Workflows/Ep18 Workflows/08c. Prompt Multi - Queue Text.json",
+  "source_workflow": {
+    "id": "pix-prompt-multi-from-list-demo",
+    "revision": 0,
+    "last_node_id": 9,
+    "last_link_id": 7,
+    "nodes": [
+      {
+        "id": 5,
+        "type": "PixaromaShowText",
+        "pos": [
+          507,
+          211
+        ],
+        "size": [
+          350,
+          140
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "source",
+            "type": "*",
+            "link": 7
+          }
+        ],
+        "outputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "slot_index": 0,
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "a3d3f7ffb758f9eed552bc5b60493ac1af301a57",
+          "Node name for S&R": "PixaromaShowText"
+        },
+        "widgets_values": [
+          "a black cat"
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 3,
+        "type": "PixaromaPromptMulti",
+        "pos": [
+          80,
+          211
+        ],
+        "size": [
+          394.48083764235236,
+          357
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "slot_index": 0,
+            "links": [
+              7
+            ]
+          },
+          {
+            "name": "prompts",
+            "type": "PIXAROMA_PROMPT_LIST",
+            "slot_index": 1,
+            "links": []
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "a3d3f7ffb758f9eed552bc5b60493ac1af301a57",
+          "Node name for S&R": "PixaromaPromptMulti",
+          "promptMultiState": {
+            "version": 2,
+            "mode": "queue",
+            "rows": [
+              {
+                "id": "r1",
+                "enabled": true,
+                "label": "",
+                "text": "a cute bunny"
+              },
+              {
+                "id": "r2",
+                "enabled": true,
+                "label": "",
+                "text": "a dog in the forest"
+              },
+              {
+                "id": "r3",
+                "enabled": true,
+                "label": "",
+                "text": "a black cat"
+              }
+            ],
+            "activeIndex": 2
+          }
+        },
+        "widgets_values": [
+          ""
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 1,
+        "type": "PixaromaLabel",
+        "pos": [
+          80,
+          40
+        ],
+        "size": [
+          388,
+          51
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "a3d3f7ffb758f9eed552bc5b60493ac1af301a57",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\":\"Prompt Multi + Queue Text\",\"fontSize\":31,\"fontFamily\":\"Arial\",\"fontColor\":\"#ffffff\",\"textAlign\":\"left\",\"backgroundColor\":\"#f66744\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1}"
+        ],
+        "color": "transparent",
+        "bgcolor": "transparent"
+      },
+      {
+        "id": 2,
+        "type": "PixaromaLabel",
+        "pos": [
+          80,
+          91
+        ],
+        "size": [
+          388,
+          57
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "a3d3f7ffb758f9eed552bc5b60493ac1af301a57",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\":\"Click Run: Workflow run once for each prompt, so if you have\\n3 prompts it will run the workflow 3 times, once for each prompt.\",\"fontSize\":13,\"fontFamily\":\"Arial\",\"fontColor\":\"#c0c0c0\",\"textAlign\":\"left\",\"backgroundColor\":\"#333333\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1.4}"
+        ],
+        "color": "transparent",
+        "bgcolor": "transparent"
+      }
+    ],
+    "links": [
+      [
+        7,
+        3,
+        0,
+        5,
+        0,
+        "STRING"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 1.1969827586206896,
+        "offset": [
+          138.3711439202977,
+          77.17185413478268
+        ]
+      },
+      "frontendVersion": "1.43.18",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "826a20e6571da5a53b141c04f19b14f175f06dafc4b7cb3dfc69554549d36b8b",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "label_json": "{\"text\":\"Prompt Multi + Queue Text\",\"fontSize\":31,\"fontFamily\":\"Arial\",\"fontColor\":\"#ffffff\",\"textAlign\":\"left\",\"backgroundColor\":\"#f66744\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "2": {
+      "inputs": {
+        "label_json": "{\"text\":\"Click Run: Workflow run once for each prompt, so if you have\\n3 prompts it will run the workflow 3 times, once for each prompt.\",\"fontSize\":13,\"fontFamily\":\"Arial\",\"fontColor\":\"#c0c0c0\",\"textAlign\":\"left\",\"backgroundColor\":\"#333333\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1.4}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "3": {
+      "inputs": {
+        "PromptMultiState": "{\"version\":2,\"mode\":\"queue\",\"activePrompt\":\"a black cat\",\"rowTexts\":[\"a cute bunny\",\"a dog in the forest\",\"a black cat\"]}"
+      },
+      "class_type": "PixaromaPromptMulti",
+      "_meta": {
+        "title": "Prompt Multi Pixaroma"
+      }
+    },
+    "5": {
+      "inputs": {
+        "text": "a black cat",
+        "source": [
+          "3",
+          0
+        ]
+      },
+      "class_type": "PixaromaShowText",
+      "_meta": {
+        "title": "Show Text Pixaroma"
+      }
+    }
+  },
+  "sha256": "cb0dd0236e49a9339eec634f8aac08785986dbac0a4a081344a0afe085fcced3",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

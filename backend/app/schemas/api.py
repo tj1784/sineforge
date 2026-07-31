@@ -5,6 +5,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from backend.app.schemas.project_workflows import (
+    AGENTLESS_PRODUCTION_PROFILE_REF,
+    DEFAULT_PROJECT_WORKFLOW_LANE,
+    ProjectWorkflowLane,
+)
 from backend.app.schemas.storyboard import StoryRead
 from backend.app.schemas.storyboard_settings import (
     DEFAULT_FINAL_HEIGHT,
@@ -25,12 +30,14 @@ from backend.app.schemas.production import PhaseOneBaselineKey, ProductionPipeli
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
+    workflow_lane: ProjectWorkflowLane
 
 
 class ProjectRead(BaseModel):
     id: UUID
     name: str
     description: str | None = None
+    workflow_lane: ProjectWorkflowLane = DEFAULT_PROJECT_WORKFLOW_LANE
     created_at: datetime
     persistence: str = "stub"
 
@@ -55,6 +62,18 @@ class ProjectWorkspaceCreate(BaseModel):
 
     idempotency_key: str = Field(min_length=8, max_length=128)
     name: str = Field(min_length=1, max_length=200)
+    workflow_lane: ProjectWorkflowLane
+    planning_agent: Literal["sulphur", "qwen"] = "qwen"
+    planning_model_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,199}$",
+    )
+    prompt_artifact_format: Literal["json"] = "json"
+    prompt_schema_version: Literal["sineforge.local-planning-prompt/v1"] = (
+        "sineforge.local-planning-prompt/v1"
+    )
     auto_title: bool = False
     description: str | None = Field(default=None, max_length=2000)
     source_mode: Literal["story", "blank", "import"]
@@ -94,11 +113,32 @@ class ProjectWorkspaceCreate(BaseModel):
     # Operators may enable local model/LoRA download and rendering for video quality work.
     allow_model_download: bool = True
     allow_rendering: bool = True
-    require_production_plan_approval: bool = True
+    require_production_plan_approval: bool = False
     orchestration_mode: str = Field(min_length=1, max_length=64)
     privacy_preference: str = Field(min_length=1, max_length=100)
     quality_preference: str = Field(min_length=1, max_length=100)
     cost_sensitivity: str = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="before")
+    @classmethod
+    def reject_noncanonical_agentless_profile_before_literal_validation(
+        cls,
+        values: object,
+    ) -> object:
+        """Keep Agentless policy errors authoritative over catalog type errors."""
+
+        if isinstance(values, dict) and values.get("workflow_lane") == "agentless":
+            profile = values.get(
+                "production_profile_key",
+                DEFAULT_PRODUCTION_PROFILE_KEY,
+            )
+            if profile != AGENTLESS_PRODUCTION_PROFILE_REF:
+                raise ValueError(
+                    "Agentless Workflow requires canonical fail-closed creation "
+                    "settings: production_profile_key="
+                    f"'{AGENTLESS_PRODUCTION_PROFILE_REF}'."
+                )
+        return values
 
     @model_validator(mode="after")
     def require_source_material(self):
@@ -113,6 +153,34 @@ class ProjectWorkspaceCreate(BaseModel):
         chapter_indexes = sorted(chapter.order_index for chapter in self.chapter_intake)
         if chapter_indexes and chapter_indexes != list(range(len(chapter_indexes))):
             raise ValueError("chapter_intake order_index values must be contiguous from 0.")
+        if self.workflow_lane is ProjectWorkflowLane.agentless:
+            violations: list[str] = []
+            if self.fps != 24:
+                violations.append("fps=24")
+            if self.production_profile_key != AGENTLESS_PRODUCTION_PROFILE_REF:
+                violations.append(
+                    "production_profile_key="
+                    f"'{AGENTLESS_PRODUCTION_PROFILE_REF}'"
+                )
+            if self.orchestration_mode != "deterministic_python":
+                violations.append("orchestration_mode='deterministic_python'")
+            if self.prefer_hosted_providers:
+                violations.append("hosted planning providers disabled")
+            if not self.prefer_local_providers:
+                violations.append("local planning provider required")
+            if self.allow_model_download:
+                violations.append("allow_model_download=false")
+            if self.allow_rendering:
+                violations.append("allow_rendering=false")
+            if self.privacy_preference != "Local only":
+                violations.append("privacy_preference='Local only'")
+            if self.source_mode != "blank" and not self.run_phase_one:
+                violations.append("run_phase_one=true for non-blank sources")
+            if violations:
+                raise ValueError(
+                    "Agentless Workflow requires canonical fail-closed creation "
+                    "settings: " + ", ".join(violations) + "."
+                )
         return self
 
 
@@ -130,11 +198,23 @@ class SulphurProjectPromptCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     idempotency_key: str = Field(min_length=8, max_length=128)
+    workflow_lane: Literal["cineforge_studio"]
+    planning_agent: Literal["sulphur", "qwen"] = "qwen"
+    planning_model_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,199}$",
+    )
+    prompt_artifact_format: Literal["json"] = "json"
+    prompt_schema_version: Literal["sineforge.local-planning-prompt/v1"] = (
+        "sineforge.local-planning-prompt/v1"
+    )
     prompt: str = Field(min_length=12, max_length=24_000)
 
 
 class SulphurProjectWorkspaceRead(ProjectWorkspaceRead):
-    intake_provider: Literal["sulphur"] = "sulphur"
+    intake_provider: Literal["sulphur", "qwen"]
     intake_model: str
     source_prompt_preserved: Literal[True] = True
     target_duration_sec: float
@@ -174,7 +254,13 @@ class StubStore:
 
     @classmethod
     def create_project(cls, payload: ProjectCreate) -> ProjectRead:
-        item = ProjectRead(id=uuid4(), name=payload.name, description=payload.description, created_at=datetime.utcnow())
+        item = ProjectRead(
+            id=uuid4(),
+            name=payload.name,
+            description=payload.description,
+            workflow_lane=payload.workflow_lane,
+            created_at=datetime.utcnow(),
+        )
         cls.projects[item.id] = item
         return item
 

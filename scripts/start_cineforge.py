@@ -41,12 +41,9 @@ def apply_primary_workstation_defaults() -> None:
 
     defaults = {
         "CINEFORGE_COMFYUI_BASE_URL": "http://127.0.0.1:8888",
-        "CINEFORGE_COMFYUI_WORKING_DIR": r"C:\ComfyUI\BlokeyUI",
-        "CINEFORGE_COMFYUI_LAUNCHER": r"C:\ComfyUI\BlokeyUI\run_blokeyui.bat",
-        "CINEFORGE_COMFY_API_RUNNER_BASE_URL": "http://127.0.0.1:8022",
-        "CINEFORGE_COMFY_API_RUNNER_WORKING_DIR": r"C:\ComfyUI\BlokeyUI",
-        "CINEFORGE_COMFY_API_RUNNER_LAUNCHER": (
-            r"C:\ComfyUI\BlokeyUI\run_comfy_api_runner.bat"
+        "CINEFORGE_COMFYUI_WORKING_DIR": r"C:\ComfyUI\LTX\ComfyUI",
+        "CINEFORGE_COMFYUI_LAUNCHER": (
+            r"C:\ComfyUI\LTX\ComfyUI\run_cineforge_ltx.bat"
         ),
         "CINEFORGE_LMS_EXECUTABLE": (
             str(Path.home() / ".lmstudio" / "bin" / "lms.exe")
@@ -178,19 +175,11 @@ def _npm_executable() -> Path:
 def build_services() -> list[Service]:
     comfy_root = _env_path(
         "CINEFORGE_COMFYUI_WORKING_DIR",
-        Path(r"C:\ComfyUI\BlokeyUI"),
+        Path(r"C:\ComfyUI\LTX\ComfyUI"),
     )
     comfy_launcher = _env_path(
         "CINEFORGE_COMFYUI_LAUNCHER",
-        comfy_root / "run_blokeyui.bat",
-    )
-    runner_root = _env_path(
-        "CINEFORGE_COMFY_API_RUNNER_WORKING_DIR",
-        Path(r"C:\ComfyUI\BlokeyUI"),
-    )
-    runner_launcher = _env_path(
-        "CINEFORGE_COMFY_API_RUNNER_LAUNCHER",
-        runner_root / "run_comfy_api_runner.bat",
+        comfy_root / "run_cineforge_ltx.bat",
     )
     python = _env_path(
         "CINEFORGE_PYTHON_EXECUTABLE",
@@ -201,10 +190,6 @@ def build_services() -> list[Service]:
     comfy_base_url = _loopback_base_url(
         "CINEFORGE_COMFYUI_BASE_URL",
         "http://127.0.0.1:8888",
-    )
-    runner_base_url = _loopback_base_url(
-        "CINEFORGE_COMFY_API_RUNNER_BASE_URL",
-        "http://127.0.0.1:8022",
     )
     sulphur_base_url = _loopback_base_url(
         "CINEFORGE_SULPHUR_BASE_URL",
@@ -225,31 +210,12 @@ def build_services() -> list[Service]:
     except ValueError as exc:
         raise ValueError("ComfyUI launcher must be located inside CINEFORGE_COMFYUI_WORKING_DIR") from exc
 
-    if runner_launcher.suffix.lower() not in {".bat", ".cmd", ".exe"}:
-        raise ValueError(
-            "ComfyAPI Runner launcher must be an administrator-configured .bat, .cmd, or .exe"
-        )
-    try:
-        runner_launcher.relative_to(runner_root)
-    except ValueError as exc:
-        raise ValueError(
-            "ComfyAPI Runner launcher must be located inside "
-            "CINEFORGE_COMFY_API_RUNNER_WORKING_DIR"
-        ) from exc
-
     if comfy_launcher.suffix.lower() in {".bat", ".cmd"}:
         command = command_processor
         comfy_args = ("/d", "/c", str(comfy_launcher))
     else:
         command = comfy_launcher
         comfy_args = ()
-
-    if runner_launcher.suffix.lower() in {".bat", ".cmd"}:
-        runner_command = command_processor
-        runner_args = ("/d", "/c", str(runner_launcher))
-    else:
-        runner_command = runner_launcher
-        runner_args = ()
 
     return [
         Service(
@@ -272,21 +238,6 @@ def build_services() -> list[Service]:
                 comfy_base_url + "/object_info",
             ),
             timeout_seconds=_timeout("CINEFORGE_COMFYUI_STARTUP_TIMEOUT_SEC", 180),
-        ),
-        Service(
-            name="comfy_api_runner",
-            cwd=runner_root,
-            executable=runner_command,
-            args=runner_args,
-            readiness_urls=(
-                runner_base_url
-                + "/api/health?url="
-                + urllib.parse.quote(comfy_base_url, safe=""),
-            ),
-            timeout_seconds=_timeout(
-                "CINEFORGE_COMFY_API_RUNNER_STARTUP_TIMEOUT_SEC",
-                90,
-            ),
         ),
         Service(
             name="backend",

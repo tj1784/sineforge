@@ -719,6 +719,9 @@ describe('ProductionPhases', () => {
       'story-1',
       expect.objectContaining({
         original_prompt: 'A complete source story.',
+        planning_agent: 'qwen',
+        prompt_artifact_format: 'json',
+        prompt_schema_version: 'sineforge.local-planning-prompt/v1',
         target_duration_sec: 300,
         requested_by: 'CineForge UI reviewer: Director review',
       }),
@@ -1046,7 +1049,7 @@ describe('ProductionPhases', () => {
     fireEvent.click(await screen.findByRole('tab', { name: /Video Generation, Continuity, Assembly, and Picture Lock/ }))
 
     expect(await screen.findByText('WAN Base v1')).toBeTruthy()
-    expect(screen.getByText('Persisted selection · runtime qualification required')).toBeTruthy()
+    expect(screen.getByText('Persisted selection · on hold after failed dry run')).toBeTruthy()
     expect(screen.getByText('Picture stitch is deferred until the audio/delivery phase')).toBeTruthy()
     expect(screen.queryByText(/WAN.*qualified runtime/i)).toBeNull()
   })

@@ -1,0 +1,188 @@
+.workflow-lane-fieldset {
+  min-width: 0;
+  margin: 0 0 18px;
+  padding: 0;
+  border: 0;
+}
+
+.workflow-lane-fieldset > legend {
+  margin-bottom: 8px;
+  color: #d8dce0;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.workflow-lane-fieldset > legend em {
+  margin-left: 7px;
+  color: #8eb0c4;
+  font-size: 7px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.workflow-lane-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.workflow-lane-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  min-height: 92px;
+  align-content: center;
+  padding: 13px;
+  border: 1px solid #30343a;
+  border-radius: 9px;
+  background: #1b1d1f;
+  cursor: pointer;
+}
+
+.workflow-lane-card:hover {
+  border-color: #4b5965;
+  background: #1e2123;
+}
+
+.workflow-lane-card:has(input:checked) {
+  border-color: #527b9b;
+  background: #192833;
+  box-shadow: inset 0 0 0 1px rgb(168 199 250 / 10%);
+}
+
+.workflow-lane-card:has(input:focus-visible) {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgb(168 199 250 / 65%);
+}
+
+.workflow-lane-card input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: #a8c7fa;
+}
+
+.workflow-lane-card b,
+.workflow-lane-card small {
+  display: block;
+}
+
+.workflow-lane-card b {
+  color: #eef0f2;
+  font-size: 10px;
+}
+
+.workflow-lane-card small {
+  margin-top: 5px;
+  color: #858a92;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.studio-composer .workflow-lane-fieldset {
+  margin-bottom: 12px;
+}
+
+.studio-composer .planning-agent-fieldset {
+  padding-top: 11px;
+  border-top: 1px solid rgb(255 255 255 / 8%);
+}
+
+.planning-agent-policy {
+  margin: -2px 0 9px;
+  color: #9ba1a8;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.planning-model-options {
+  max-height: 330px;
+  padding-right: 3px;
+  overflow-y: auto;
+  scrollbar-color: #4b5965 transparent;
+}
+
+.planning-model-card {
+  min-height: 76px;
+}
+
+.planning-model-card:has(input:disabled) {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.planning-model-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  color: #858a92;
+  font-size: 8px;
+}
+
+.planning-model-status button {
+  min-height: 26px;
+  padding: 4px 9px;
+  border: 1px solid #30343a;
+  border-radius: 999px;
+  background: #1b1d1f;
+  color: #c7cbd0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.planning-model-status button:hover:not(:disabled) {
+  border-color: #527b9b;
+  color: #eef0f2;
+}
+
+.planning-model-status button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.studio-composer .workflow-lane-fieldset > legend {
+  font-size: 11px;
+}
+
+.studio-composer .workflow-lane-options {
+  gap: 8px;
+}
+
+.studio-composer .workflow-lane-card {
+  min-height: 74px;
+  padding: 10px 12px;
+  background: rgb(255 255 255 / 2%);
+}
+
+.studio-composer .workflow-lane-card b {
+  font-size: 11px;
+}
+
+.studio-composer .workflow-lane-card small {
+  font-size: 9px;
+}
+
+.studio-composer textarea:disabled {
+  color: #7f8388;
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.project-workflow-lane {
+  color: #9ebbd0;
+}
+
+@media (max-width: 620px) {
+  .workflow-lane-options {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-lane-card,
+  .studio-composer .workflow-lane-card {
+    min-height: 74px;
+  }
+}

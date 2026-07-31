@@ -12,8 +12,8 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field
 
 from backend.app.core.config import Settings, get_settings
-from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.schemas.api import ProjectWorkspaceCreate, SulphurProjectPromptCreate
+from backend.app.schemas.project_workflows import ProjectWorkflowLane
 from backend.app.services.clip_planning import (
     MAX_CLIP_DURATION_SEC,
     MIN_CLIP_DURATION_SEC,
@@ -33,7 +33,7 @@ _OUTPUT_DIMENSIONS: dict[str, tuple[tuple[int, int], tuple[int, int]]] = {
 }
 
 _SYSTEM_PROMPT = (
-    "You are Sulphur, CineForge's local project intake producer. "
+    "You are CineForge's selected local project intake producer. "
     "Extract a complete production brief from the user's message and return only the requested JSON. "
     "Preserve explicit facts, creative constraints, runtime, audience, style, language, and format. "
     "Use conservative defaults only when a field is not supplied. Convert all requested runtimes to "
@@ -154,6 +154,8 @@ class SulphurProjectIntakeResult(BaseModel):
     brief: SulphurProjectBrief
     workspace_payload: ProjectWorkspaceCreate
     clip_plan: SceneClipPlan
+    planning_agent: Literal["sulphur", "qwen"]
+    intake_model: str
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -217,21 +219,45 @@ def build_sulphur_project_intake(
     """Extract a validated brief, then prepare the existing atomic workspace request."""
 
     cfg = settings or get_settings()
-    if not cfg.sulphur_configured:
-        raise SulphurProjectIntakeError("Sulphur is not configured or its GGUF is unavailable")
+    model_id = request.planning_model_id or (
+        cfg.sulphur_model_id
+        if request.planning_agent == "sulphur"
+        else cfg.qwen_model_id
+    )
+    if not cfg.sulphur_planning_enabled:
+        agent_name = "Sulphur 2 Base" if request.planning_agent == "sulphur" else "Qwen3 4B Hivemind"
+        raise SulphurProjectIntakeError(
+            f"{agent_name} local planning is disabled"
+        )
 
     prompt = request.prompt.strip()
-    active_model_id = get_active_lm_studio_model_id(cfg)
     body = {
-        "model": active_model_id,
+        "model": model_id,
         "temperature": 0.1,
         "max_tokens": 1800,
         "messages": [
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": json.dumps(
+                    {
+                        "schema_version": "sineforge.local-agent-system/v1",
+                        "agent_role": "project_intake",
+                        "instructions": [_SYSTEM_PROMPT],
+                        "response_artifact_format": "json",
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+            },
             {
                 "role": "user",
                 "content": json.dumps(
                     {
+                        "schema_version": request.prompt_schema_version,
+                        "prompt_artifact_format": request.prompt_artifact_format,
+                        "workflow_lane": request.workflow_lane,
+                        "planning_agent": request.planning_agent,
+                        "planning_model_id": model_id,
                         "task": "Create a complete CineForge project intake brief.",
                         "source_message": prompt,
                         "runtime_rule": (
@@ -324,6 +350,11 @@ def build_sulphur_project_intake(
     workspace_payload = ProjectWorkspaceCreate(
         idempotency_key=request.idempotency_key,
         name=brief.title,
+        workflow_lane=ProjectWorkflowLane.cineforge_studio,
+        planning_agent=request.planning_agent,
+        planning_model_id=model_id,
+        prompt_artifact_format=request.prompt_artifact_format,
+        prompt_schema_version=request.prompt_schema_version,
         auto_title=False,
         description=brief.description,
         source_mode="story",
@@ -358,9 +389,9 @@ def build_sulphur_project_intake(
         prefer_local_providers=True,
         allow_model_download=True,
         allow_rendering=True,
-        require_production_plan_approval=True,
+        require_production_plan_approval=False,
         orchestration_mode="Local-first",
-        privacy_preference="Local-only Sulphur planning",
+        privacy_preference=f"Local-only {request.planning_agent.title()} planning",
         quality_preference="Quality weighted",
         cost_sensitivity="Local compute preferred",
     )
@@ -369,10 +400,12 @@ def build_sulphur_project_intake(
         hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
         clip_plan.target_duration_sec,
         clip_plan.planned_scene_count,
-        active_model_id,
+        model_id,
     )
     return SulphurProjectIntakeResult(
         brief=brief,
         workspace_payload=workspace_payload,
         clip_plan=clip_plan,
+        planning_agent=request.planning_agent,
+        intake_model=model_id,
     )

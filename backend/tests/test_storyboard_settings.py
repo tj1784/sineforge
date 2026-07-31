@@ -121,7 +121,10 @@ def test_put_settings_persists_canonical_wan_planning_snapshot(db_session):
     )
 
     assert updated.production_profile_key == "wan_base@1"
-    assert updated.production_profile_snapshot_json["status"] == "qualification_required"
+    assert updated.production_profile_snapshot_json["status"] == "on_hold"
+    assert updated.production_profile_snapshot_json["hold_reason"] == (
+        "Local WAN dry run did not complete successfully."
+    )
     assert updated.production_profile_snapshot_json["execution_qualified"] is False
     assert "forged" not in updated.production_profile_snapshot_json
     assert updated.stitch_stage == "phase8_before_foley"

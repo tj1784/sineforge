@@ -1,0 +1,9 @@
+{
+  "schema_version": "sineforge.orchestration-prompt-history/v1",
+  "artifact_format": "json",
+  "artifact_filename": "rapid_settings.json",
+  "status": "historical_reference",
+  "source": {
+    "user_text": "You are Grok 4.5 High implementing CineForge Storyboard Phase 1 settings, canonical snapshots, readiness, approval, and Phase A aggregate APIs. No tools are available; use only controller context. Return strict controller JSON with complete-file patches and supplied SHA-256 values. Never call providers, Qwen, Parler, ComfyUI, FFmpeg, queues, installers, or render code.\r\n\r\nOwn only: `backend/app/schemas/storyboard.py`, new `backend/app/schemas/storyboard_settings.py`, `backend/app/services/storyboard.py`, new `backend/app/services/storyboard_settings.py`, new `backend/app/services/storyboard_snapshot.py`, `backend/app/api/routes/storyboard.py`, new `backend/app/api/routes/storyboard_settings.py`, and new tests named `test_storyboard_settings.py`, `test_storyboard_snapshot.py`, `test_storyboard_approval.py`.\r\n\r\nImplement GET/PUT project storyboard settings; complete deterministic snapshot and SHA-256 content hash; full readiness gates; immutable, transactional, idempotent approval; revision-aware project Phase A snapshot for frontend; story update with stale-revision conflict; exact target duration; 6–12 second shot policy with reasoned overrides; placeholder/manual voices nonblocking when policy permits; approved snapshots never mutate. Existing CRUD public behavior must remain compatible. Do not edit ORM/migrations/router/main.\r\n"
+  }
+}

@@ -46,7 +46,11 @@ def client(tmp_path) -> Generator[TestClient, None, None]:
 def test_create_and_get_project_db_backed(client):
     create_response = client.post(
         "/projects",
-        json={"name": "Launch Film", "description": "Hero cut"},
+        json={
+            "name": "Launch Film",
+            "description": "Hero cut",
+            "workflow_lane": "cineforge_studio",
+        },
     )
     assert create_response.status_code == 201
     created = create_response.json()
@@ -61,8 +65,14 @@ def test_create_and_get_project_db_backed(client):
 
 
 def test_list_projects_returns_created_projects(client):
-    first_response = client.post("/projects", json={"name": "First Project"})
-    second_response = client.post("/projects", json={"name": "Second Project"})
+    first_response = client.post(
+        "/projects",
+        json={"name": "First Project", "workflow_lane": "cineforge_studio"},
+    )
+    second_response = client.post(
+        "/projects",
+        json={"name": "Second Project", "workflow_lane": "cineforge_studio"},
+    )
 
     response = client.get("/projects")
 
@@ -93,7 +103,13 @@ def test_create_campaign_requires_existing_project(client):
 
 
 def test_create_and_get_campaign_db_backed(client):
-    project_response = client.post("/projects", json={"name": "Project for Campaign"})
+    project_response = client.post(
+        "/projects",
+        json={
+            "name": "Project for Campaign",
+            "workflow_lane": "cineforge_studio",
+        },
+    )
     project_id = project_response.json()["id"]
 
     create_response = client.post(
@@ -114,8 +130,14 @@ def test_create_and_get_campaign_db_backed(client):
 
 
 def test_list_campaigns_can_filter_by_project(client):
-    first_project = client.post("/projects", json={"name": "Project One"}).json()
-    second_project = client.post("/projects", json={"name": "Project Two"}).json()
+    first_project = client.post(
+        "/projects",
+        json={"name": "Project One", "workflow_lane": "cineforge_studio"},
+    ).json()
+    second_project = client.post(
+        "/projects",
+        json={"name": "Project Two", "workflow_lane": "cineforge_studio"},
+    ).json()
     first_campaign = client.post(
         "/campaigns",
         json={"project_id": first_project["id"], "name": "Project One Campaign"},

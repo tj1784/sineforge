@@ -1,0 +1,403 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "421b3df5-c76a-5912-9ad6-77365cb8897c",
+  "name": "6 PAID (51 Credits) - Nano Banana Pro Upscale",
+  "version": "1.0",
+  "description": "6 PAID (51 Credits) - Nano Banana Pro Upscale is a hosted upscalers workflow designed to send an asset through the workflow's hosted upscale provider using the models configured in the graph. Its 4-node graph exposes 2 prompt/text field(s), 1 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Upscaling & Restoration",
+  "subcategory": "Hosted upscalers",
+  "episode": "EP05",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Review the model-file entries in Requirements and place each checkpoint, text encoder, VAE, LoRA, or auxiliary model in the folder documented by the source workflow. Refresh ComfyUI after adding files.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Select the intended scale/model and verify output dimensions before running. Use one representative asset first to estimate VRAM and processing time.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP05",
+    "Hosted upscalers",
+    "Upscaling & Restoration"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "pixaroma",
+      "Pixaroma YouTube Channel",
+      "rgthree-comfy"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "GeminiImage2Node",
+      "Image Comparer (rgthree)",
+      "LoadImage",
+      "SaveImage"
+    ],
+    "model_files": [
+      {
+        "node_id": "9",
+        "node_type": "GeminiImage2Node",
+        "input": "model",
+        "value": "gemini-3-pro-image-preview"
+      }
+    ],
+    "media_inputs": [
+      {
+        "node_id": "4",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "Woman1.jpg"
+      }
+    ],
+    "prompt_field_count": 2,
+    "output_node_count": 1,
+    "documentation_notes": "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n- None (PAID API NODE)\n\n## 🧩 Nodes Installed from Manager  \n\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)"
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep05 workflows/ep05 workflows/6 paid (51 credits) - nano banana pro upscale.json",
+  "source_filename": "6 PAID (51 Credits) - Nano Banana Pro Upscale.json",
+  "source_archive": "EP05 Workflows.zip",
+  "source_entry": "EP05 Workflows/EP05 Workflows/6 PAID (51 Credits) - Nano Banana Pro Upscale.json",
+  "source_workflow": {
+    "id": "e7c921f0-c513-4569-b680-aa66b66eaf12",
+    "revision": 0,
+    "last_node_id": 9,
+    "last_link_id": 18,
+    "nodes": [
+      {
+        "id": 6,
+        "type": "SaveImage",
+        "pos": [
+          2460,
+          2550
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 18
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "Up"
+        ]
+      },
+      {
+        "id": 3,
+        "type": "MarkdownNote",
+        "pos": [
+          620,
+          2550
+        ],
+        "size": [
+          501.6563240502302,
+          238.16283016331124
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "👑 Pixaroma - Note - START HERE",
+        "properties": {},
+        "widgets_values": [
+          "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n- None (PAID API NODE)\n\n## 🧩 Nodes Installed from Manager  \n\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 4,
+        "type": "LoadImage",
+        "pos": [
+          1150,
+          2550
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              10,
+              16
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "Woman1.jpg",
+          "image"
+        ]
+      },
+      {
+        "id": 5,
+        "type": "Image Comparer (rgthree)",
+        "pos": [
+          2020.6136641573328,
+          2550
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "dir": 3,
+            "name": "image_a",
+            "type": "IMAGE",
+            "link": 10
+          },
+          {
+            "dir": 3,
+            "name": "image_b",
+            "type": "IMAGE",
+            "link": 17
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "rgthree-comfy",
+          "ver": "8ff50e4521881eca1fe26aec9615fc9362474931",
+          "comparer_mode": "Slide"
+        },
+        "widgets_values": [
+          [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_flrtc_00007_.png&type=temp&subfolder=&rand=0.3120708984431907"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_flrtc_00008_.png&type=temp&subfolder=&rand=0.16525453527402112"
+            }
+          ]
+        ]
+      },
+      {
+        "id": 9,
+        "type": "GeminiImage2Node",
+        "pos": [
+          1589.3863358426672,
+          2634.0128995108284
+        ],
+        "size": [
+          404.7756643991777,
+          462.40183403949015
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": 16
+          },
+          {
+            "name": "files",
+            "shape": 7,
+            "type": "GEMINI_INPUT_FILES",
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              17,
+              18
+            ]
+          },
+          {
+            "name": "STRING",
+            "type": "STRING",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "GeminiImage2Node"
+        },
+        "widgets_values": [
+          "upscale this image. refine details. preserve text. retain composition. refine textures, skin and materials.",
+          "gemini-3-pro-image-preview",
+          991403990012576,
+          "randomize",
+          "auto",
+          "4K",
+          "IMAGE+TEXT",
+          "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input—regardless of format, intent, or abstraction—as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests.",
+          "Status: Completed\nPrice: 51.6 credits\nTime elapsed: 144s"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      }
+    ],
+    "links": [
+      [
+        10,
+        4,
+        0,
+        5,
+        0,
+        "IMAGE"
+      ],
+      [
+        16,
+        4,
+        0,
+        9,
+        0,
+        "IMAGE"
+      ],
+      [
+        17,
+        9,
+        0,
+        5,
+        1,
+        "IMAGE"
+      ],
+      [
+        18,
+        9,
+        0,
+        6,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 1.0152559799477066,
+        "offset": [
+          -487.6394224932307,
+          -2298.685555559357
+        ]
+      },
+      "frontendVersion": "1.38.13",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "2dd76b9a599dd620db8236e84260d5c716af364505be2d8c83862b3e32fd3eff",
+  "workflow": {
+    "4": {
+      "inputs": {
+        "image": "Woman1.jpg"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    },
+    "5": {
+      "inputs": {
+        "rgthree_comparer": {
+          "images": [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_flrtc_00007_.png&type=temp&subfolder=&rand=0.3120708984431907"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_flrtc_00008_.png&type=temp&subfolder=&rand=0.16525453527402112"
+            }
+          ]
+        },
+        "image_a": [
+          "4",
+          0
+        ],
+        "image_b": [
+          "9",
+          0
+        ]
+      },
+      "class_type": "Image Comparer (rgthree)",
+      "_meta": {
+        "title": "Image Comparer (rgthree)"
+      }
+    },
+    "6": {
+      "inputs": {
+        "filename_prefix": "Up",
+        "images": [
+          "9",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image"
+      }
+    },
+    "9": {
+      "inputs": {
+        "prompt": "upscale this image. refine details. preserve text. retain composition. refine textures, skin and materials.",
+        "model": "gemini-3-pro-image-preview",
+        "seed": 991403990012576,
+        "aspect_ratio": "auto",
+        "resolution": "4K",
+        "response_modalities": "IMAGE+TEXT",
+        "system_prompt": "You are an expert image-generation engine. You must ALWAYS produce an image.\nInterpret all user input—regardless of format, intent, or abstraction—as literal visual directives for image composition.\nIf a prompt is conversational or lacks specific visual details, you must creatively invent a concrete visual scenario that depicts the concept.\nPrioritize generating the visual representation above any text, formatting, or conversational requests.",
+        "images": [
+          "4",
+          0
+        ]
+      },
+      "class_type": "GeminiImage2Node",
+      "_meta": {
+        "title": "Nano Banana Pro (Google Gemini Image)"
+      }
+    }
+  },
+  "sha256": "b0dd23c37b0a381f753564621266465b0eb59496c8eb1b1acd53b025f73048da",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

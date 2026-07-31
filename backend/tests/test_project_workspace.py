@@ -34,6 +34,7 @@ def _payload(**overrides) -> dict:
     payload = {
         "idempotency_key": "project-workspace-test-key-001",
         "name": "Atomic Project",
+        "workflow_lane": "cineforge_studio",
         "description": "Created in one transaction",
         "source_mode": "story",
         "story_title": "Atomic Project",
@@ -165,8 +166,9 @@ def test_workspace_persists_wan_profile_without_claiming_runtime_qualification(
         f"/projects/{body['project']['id']}/storyboard-settings"
     ).json()
     assert settings["production_profile_key"] == "wan_base@1"
-    assert settings["production_profile_snapshot_json"]["status"] == (
-        "qualification_required"
+    assert settings["production_profile_snapshot_json"]["status"] == "on_hold"
+    assert settings["production_profile_snapshot_json"]["hold_reason"] == (
+        "Local WAN dry run did not complete successfully."
     )
     assert settings["production_profile_snapshot_json"]["execution_qualified"] is False
     assert settings["stitch_stage"] == "phase8_before_foley"
@@ -335,7 +337,7 @@ def test_workspace_safe_defaults_are_persisted(client: TestClient):
     assert settings["prefer_local_providers"] is True
     assert settings["allow_model_download"] is True
     assert settings["allow_rendering"] is True
-    assert settings["require_production_plan_approval"] is True
+    assert settings["require_production_plan_approval"] is False
 
 
 def test_workspace_can_derive_title_from_the_single_prompt(client: TestClient):
@@ -402,6 +404,8 @@ def test_sulphur_intake_route_uses_atomic_workspace_boundary(
             ),
             workspace_payload=workspace_payload,
             clip_plan=plan_scenes_for_duration(125),
+            planning_agent=request.planning_agent,
+            intake_model="sulphur-2-base",
         )
 
     monkeypatch.setattr(project_routes, "build_sulphur_project_intake", fake_intake)
@@ -409,6 +413,8 @@ def test_sulphur_intake_route_uses_atomic_workspace_boundary(
         "/projects/sulphur-intake",
         json={
             "idempotency_key": "sulphur-route-test-001",
+            "workflow_lane": "cineforge_studio",
+            "planning_agent": "sulphur",
             "prompt": source_prompt,
         },
     )
@@ -416,6 +422,7 @@ def test_sulphur_intake_route_uses_atomic_workspace_boundary(
     assert response.status_code == 201
     body = response.json()
     assert body["intake_provider"] == "sulphur"
+    assert body["intake_model"] == "sulphur-2-base"
     assert body["source_prompt_preserved"] is True
     assert body["target_duration_sec"] == 125
     assert body["planned_scene_count"] == 16
@@ -437,6 +444,8 @@ def test_sulphur_intake_failure_creates_no_partial_workspace(
         "/projects/sulphur-intake",
         json={
             "idempotency_key": "sulphur-route-test-002",
+            "workflow_lane": "cineforge_studio",
+            "planning_agent": "sulphur",
             "prompt": "Create a complete one-minute lighthouse story with a clear ending.",
         },
     )

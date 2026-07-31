@@ -1,0 +1,689 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "6d6a0cda-fd4b-5183-8d2e-97c0f7afcf9e",
+  "name": "Loop Pixaroma - Build a List",
+  "version": "1.0",
+  "description": "Loop Pixaroma - Build a List is a lists & iteration workflow designed to demonstrate reusable list, loop, and value-carry patterns using the models configured in the graph. Its 11-node graph exposes 1 prompt/text field(s), 0 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Utilities & Workflow Tools",
+  "subcategory": "Lists & iteration",
+  "episode": "EP23",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. No required media file was detected in the converted graph; begin with the prompt and generation controls.\n4. Edit the positive/negative prompt, resolution, sampler, steps, guidance, and seed. Use a fixed seed while tuning composition, then vary it deliberately.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP23",
+    "Lists & iteration",
+    "Utilities & Workflow Tools"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "PixaromaCombine",
+      "PixaromaLabel",
+      "PixaromaLoopEnd",
+      "PixaromaLoopStart",
+      "PixaromaShowText"
+    ],
+    "model_files": [],
+    "media_inputs": [],
+    "prompt_field_count": 1,
+    "output_node_count": 1,
+    "documentation_notes": null
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep23 workflows/ep23 workflows/loop pixaroma - build a list.json",
+  "source_filename": "Loop Pixaroma - Build a List.json",
+  "source_archive": "Ep23 Workflows.zip",
+  "source_entry": "Ep23 Workflows/Ep23 Workflows/Loop Pixaroma - Build a List.json",
+  "source_workflow": {
+    "id": "loop-pixaroma---build-a-list",
+    "revision": 0,
+    "last_node_id": 30,
+    "last_link_id": 5,
+    "nodes": [
+      {
+        "id": 1,
+        "type": "PixaromaLabel",
+        "pos": [
+          60,
+          36
+        ],
+        "size": [
+          383,
+          56
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"Loop Pixaroma: Build a List\", \"fontSize\": 30, \"fontFamily\": \"Arial\", \"fontColor\": \"#ffffff\", \"textAlign\": \"left\", \"backgroundColor\": \"#f66744\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.2}"
+        ]
+      },
+      {
+        "id": 2,
+        "type": "PixaromaLabel",
+        "pos": [
+          60,
+          92
+        ],
+        "size": [
+          576,
+          57
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"Click Run: the part between Loop Start and Loop End runs 5 times. Each round adds that round's\\nnumber to a running list, so after 5 rounds you get [0, 1, 2, 3, 4], shown on the right.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#c0c0c0\", \"textAlign\": \"left\", \"backgroundColor\": \"#333333\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.4}"
+        ]
+      },
+      {
+        "id": 10,
+        "type": "PixaromaLabel",
+        "pos": [
+          60,
+          187
+        ],
+        "size": [
+          226,
+          73
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 10,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"1. Loop Start\\nSet total = 5 (the number of rounds).\\n'index' counts the rounds: 0,1,2,3,4.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+        ]
+      },
+      {
+        "id": 11,
+        "type": "PixaromaLabel",
+        "pos": [
+          430,
+          187
+        ],
+        "size": [
+          162,
+          73
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 11,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"2. Combine\\nAdds this round's number\\nonto the running list.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+        ]
+      },
+      {
+        "id": 12,
+        "type": "PixaromaLabel",
+        "pos": [
+          720,
+          187
+        ],
+        "size": [
+          188,
+          73
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 12,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"3. Loop End\\nCloses the loop. After the last\\nround it outputs the final list.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+        ]
+      },
+      {
+        "id": 13,
+        "type": "PixaromaLabel",
+        "pos": [
+          1030,
+          187
+        ],
+        "size": [
+          153,
+          73
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 13,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"4. Result\\nShow Text displays the\\nlist built over all rounds.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+        ]
+      },
+      {
+        "id": 20,
+        "type": "PixaromaLoopStart",
+        "pos": [
+          60,
+          312
+        ],
+        "size": [
+          270,
+          178
+        ],
+        "flags": {},
+        "order": 20,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "value1",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "value2",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "value3",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "value4",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "value5",
+            "type": "*",
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value1",
+            "type": "*",
+            "links": [
+              1
+            ],
+            "slot_index": 0
+          },
+          {
+            "name": "value2",
+            "type": "*",
+            "links": [],
+            "slot_index": 1
+          },
+          {
+            "name": "value3",
+            "type": "*",
+            "links": [],
+            "slot_index": 2
+          },
+          {
+            "name": "value4",
+            "type": "*",
+            "links": [],
+            "slot_index": 3
+          },
+          {
+            "name": "value5",
+            "type": "*",
+            "links": [],
+            "slot_index": 4
+          },
+          {
+            "name": "loop",
+            "type": "FLOW_CONTROL",
+            "links": [
+              4
+            ],
+            "slot_index": 5
+          },
+          {
+            "name": "index",
+            "type": "INT",
+            "links": [
+              2
+            ],
+            "slot_index": 6
+          }
+        ],
+        "properties": {
+          "Node name for S&R": "PixaromaLoopStart",
+          "cnr_id": "ComfyUI-Pixaroma"
+        },
+        "widgets_values": [
+          5
+        ]
+      },
+      {
+        "id": 21,
+        "type": "PixaromaCombine",
+        "pos": [
+          430,
+          312
+        ],
+        "size": [
+          165,
+          46
+        ],
+        "flags": {},
+        "order": 21,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "any1",
+            "type": "*",
+            "link": 1
+          },
+          {
+            "name": "any2",
+            "type": "*",
+            "link": 2
+          }
+        ],
+        "outputs": [
+          {
+            "name": "batch",
+            "type": "*",
+            "links": [
+              3
+            ],
+            "slot_index": 0
+          }
+        ],
+        "properties": {
+          "Node name for S&R": "PixaromaCombine",
+          "cnr_id": "ComfyUI-Pixaroma"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 22,
+        "type": "PixaromaLoopEnd",
+        "pos": [
+          720,
+          312
+        ],
+        "size": [
+          168,
+          126
+        ],
+        "flags": {},
+        "order": 22,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "value1",
+            "type": "*",
+            "link": 3
+          },
+          {
+            "name": "value2",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "value3",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "value4",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "value5",
+            "type": "*",
+            "link": null
+          },
+          {
+            "name": "loop",
+            "type": "FLOW_CONTROL",
+            "link": 4
+          }
+        ],
+        "outputs": [
+          {
+            "name": "value1",
+            "type": "*",
+            "links": [
+              5
+            ],
+            "slot_index": 0
+          },
+          {
+            "name": "value2",
+            "type": "*",
+            "links": [],
+            "slot_index": 1
+          },
+          {
+            "name": "value3",
+            "type": "*",
+            "links": [],
+            "slot_index": 2
+          },
+          {
+            "name": "value4",
+            "type": "*",
+            "links": [],
+            "slot_index": 3
+          },
+          {
+            "name": "value5",
+            "type": "*",
+            "links": [],
+            "slot_index": 4
+          }
+        ],
+        "properties": {
+          "Node name for S&R": "PixaromaLoopEnd",
+          "cnr_id": "ComfyUI-Pixaroma"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 23,
+        "type": "PixaromaShowText",
+        "pos": [
+          1030,
+          312
+        ],
+        "size": [
+          260,
+          170
+        ],
+        "flags": {},
+        "order": 23,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "source",
+            "type": "*",
+            "link": 5
+          }
+        ],
+        "outputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "links": [],
+            "slot_index": 0
+          }
+        ],
+        "properties": {
+          "Node name for S&R": "PixaromaShowText",
+          "cnr_id": "ComfyUI-Pixaroma"
+        },
+        "widgets_values": [
+          ""
+        ]
+      },
+      {
+        "id": 30,
+        "type": "PixaromaLabel",
+        "pos": [
+          60,
+          512
+        ],
+        "size": [
+          625,
+          75
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 30,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "Node name for S&R": "PixaromaLabel"
+        },
+        "widgets_values": [
+          "{\"text\": \"How it carries over: Loop Start's value output feeds Combine, and Combine feeds Loop End's value input.\\nEach round that result becomes Loop Start's value for the next round, so the list grows. The 'loop' wire\\n(Loop Start to Loop End) just tells the two ends they belong together.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#c0c0c0\", \"textAlign\": \"left\", \"backgroundColor\": \"#333333\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.4}"
+        ]
+      }
+    ],
+    "links": [
+      [
+        1,
+        20,
+        0,
+        21,
+        0,
+        "*"
+      ],
+      [
+        2,
+        20,
+        6,
+        21,
+        1,
+        "INT"
+      ],
+      [
+        3,
+        21,
+        0,
+        22,
+        0,
+        "*"
+      ],
+      [
+        4,
+        20,
+        5,
+        22,
+        5,
+        "FLOW_CONTROL"
+      ],
+      [
+        5,
+        22,
+        0,
+        23,
+        0,
+        "*"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 0.85,
+        "offset": [
+          69.41,
+          93.41
+        ]
+      },
+      "frontendVersion": "1.45.15"
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "b0dfdb14f35513b1263bfc24adc064fb2c498ac704413993893126035e6ef57f",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "label_json": "{\"text\": \"Loop Pixaroma: Build a List\", \"fontSize\": 30, \"fontFamily\": \"Arial\", \"fontColor\": \"#ffffff\", \"textAlign\": \"left\", \"backgroundColor\": \"#f66744\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.2}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "2": {
+      "inputs": {
+        "label_json": "{\"text\": \"Click Run: the part between Loop Start and Loop End runs 5 times. Each round adds that round's\\nnumber to a running list, so after 5 rounds you get [0, 1, 2, 3, 4], shown on the right.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#c0c0c0\", \"textAlign\": \"left\", \"backgroundColor\": \"#333333\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.4}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "10": {
+      "inputs": {
+        "label_json": "{\"text\": \"1. Loop Start\\nSet total = 5 (the number of rounds).\\n'index' counts the rounds: 0,1,2,3,4.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "11": {
+      "inputs": {
+        "label_json": "{\"text\": \"2. Combine\\nAdds this round's number\\nonto the running list.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "12": {
+      "inputs": {
+        "label_json": "{\"text\": \"3. Loop End\\nCloses the loop. After the last\\nround it outputs the final list.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "13": {
+      "inputs": {
+        "label_json": "{\"text\": \"4. Result\\nShow Text displays the\\nlist built over all rounds.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#dddddd\", \"textAlign\": \"left\", \"backgroundColor\": \"#2b2b2b\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.35}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "20": {
+      "inputs": {
+        "total": 5
+      },
+      "class_type": "PixaromaLoopStart",
+      "_meta": {
+        "title": "Loop Start Pixaroma"
+      }
+    },
+    "21": {
+      "inputs": {
+        "any1": [
+          "20",
+          0
+        ],
+        "any2": [
+          "20",
+          6
+        ]
+      },
+      "class_type": "PixaromaCombine",
+      "_meta": {
+        "title": "Combine Pixaroma"
+      }
+    },
+    "22": {
+      "inputs": {
+        "value1": [
+          "21",
+          0
+        ],
+        "loop": [
+          "20",
+          5
+        ]
+      },
+      "class_type": "PixaromaLoopEnd",
+      "_meta": {
+        "title": "Loop End Pixaroma"
+      }
+    },
+    "23": {
+      "inputs": {
+        "text": "",
+        "source": [
+          "22",
+          0
+        ]
+      },
+      "class_type": "PixaromaShowText",
+      "_meta": {
+        "title": "Show Text Pixaroma"
+      }
+    },
+    "30": {
+      "inputs": {
+        "label_json": "{\"text\": \"How it carries over: Loop Start's value output feeds Combine, and Combine feeds Loop End's value input.\\nEach round that result becomes Loop Start's value for the next round, so the list grows. The 'loop' wire\\n(Loop Start to Loop End) just tells the two ends they belong together.\", \"fontSize\": 13, \"fontFamily\": \"Arial\", \"fontColor\": \"#c0c0c0\", \"textAlign\": \"left\", \"backgroundColor\": \"#333333\", \"padding\": 10, \"borderRadius\": 0, \"opacity\": 1, \"fontWeight\": \"normal\", \"lineHeight\": 1.4}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    }
+  },
+  "sha256": "c9ee77894883ba3df501aa7060d0faae3324005f984624f02dd0fe31e05902cd",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

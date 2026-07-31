@@ -1,3 +1,6 @@
+import type { ProjectWorkflowLane } from '../workflowLanes'
+import type { PlanningAgent } from '../planningAgents'
+
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8010'
 
 export const API_BASE_URL =
@@ -10,10 +13,88 @@ export type Project = {
   description: string | null
   created_at: string
   persistence: string
+  workflow_lane: ProjectWorkflowLane
+}
+
+export type AgentlessWorkflowAdmission = {
+  role: 'flux_anchor' | 'ltx_ingredients_i2v'
+  status:
+    | 'missing_exact_pin'
+    | 'not_found'
+    | 'not_api_format'
+    | 'content_hash_mismatch'
+    | 'not_runtime_qualified'
+    | 'role_mismatch'
+    | 'semantic_mapping_invalid'
+    | 'admitted'
+  admitted: boolean
+  detail: string
+}
+
+export type AgentlessWorkflowBlocker = {
+  code: string
+  message: string
+  workflow_role?: 'flux_anchor' | 'ltx_ingredients_i2v' | null
+}
+
+export type AgentlessWorkflowProfile = {
+  project_id: string
+  workflow_lane: 'agentless'
+  profile_ref: 'agentless-scene-reset@1'
+  display_name: 'Agentless Workflow'
+  agent_runtime_required: true
+  local_planning_agent_required: true
+  hosted_planning_agents_allowed: false
+  default_planning_agent: 'qwen'
+  selected_planning_agent: PlanningAgent
+  prompt_artifact_format: 'json'
+  prompt_artifact_extension: '.json'
+  deterministic_python_orchestrator: true
+  logical_scene_duration_range_sec: [3, 20]
+  default_segment_duration_sec: 10
+  default_fps: 24
+  default_ten_second_frame_count: 241
+  default_ten_second_playback_duration_sec: number
+  ltx_frame_policy: '8n+1'
+  max_logical_scenes: 50
+  allowed_resolutions: Array<[number, number]>
+  batch_size: 1
+  max_active_gpu_jobs: 1
+  max_attempts_per_generation_stage: 3
+  default_master_policy: {
+    intermediate_codec: 'prores_422_hq' | 'ffv1'
+    delivery_codec: 'h264' | 'h265'
+    delivery_encode_count: 1
+    intermediate_reencoding_allowed: false
+    anchor_format: 'png'
+  }
+  pipeline: ['anchor', 'anchor_qa', 'video', 'video_qa', 'master']
+  non_cumulative_guarantees: string[]
+  workflow_requirements: Array<{
+    role: 'flux_anchor' | 'ltx_ingredients_i2v'
+    model_family: 'FLUX.2' | 'LTX-2.3'
+    exact_template_pin_required: true
+    required_pin_fields: Array<'template_id' | 'version' | 'sha256'>
+    manifest_requirements: string[]
+    required_semantic_mappings: string[]
+    configuration_requirements: string[]
+  }>
+  readiness: {
+    ready_to_execute: false
+    workflows_admitted: boolean
+    submission_supported: false
+    admissions: AgentlessWorkflowAdmission[]
+    blockers: AgentlessWorkflowBlocker[]
+  }
 }
 
 export type ProjectWorkspaceCreatePayload = {
   idempotency_key: string
+  workflow_lane: ProjectWorkflowLane
+  planning_agent: PlanningAgent
+  planning_model_id?: string | null
+  prompt_artifact_format?: 'json'
+  prompt_schema_version?: 'sineforge.local-planning-prompt/v1'
   name: string
   auto_title?: boolean
   description?: string | null
@@ -54,7 +135,7 @@ export type ProjectWorkspaceCreatePayload = {
   fps: number
   captions_enabled: boolean
   audio_enabled: boolean
-  production_profile_key?: 'ltx_base@1' | 'wan_base@1'
+  production_profile_key?: 'ltx_base@1' | 'ltx_base@2' | 'wan_base@1'
   stitch_stage?: 'phase7_before_audio' | 'phase8_before_foley'
   speaking_rate: number
   prefer_hosted_providers: boolean
@@ -729,6 +810,270 @@ export type ApiCallerRunResult = Record<string, unknown> & {
   promptIds?: string[]
 }
 
+export type NativeApiRunnerWorkflowRequirements = {
+  custom_node_root?: string
+  custom_node_packs?: string[]
+  unresolved_node_classes?: string[]
+  node_classes?: string[]
+  model_files?: Array<{
+    node_id?: string
+    node_type?: string
+    input?: string
+    value?: string
+  }>
+  media_inputs?: Array<{
+    node_id?: string
+    node_type?: string
+    input?: string
+    default?: string
+  }>
+  prompt_field_count?: number
+  output_node_count?: number
+  documentation_notes?: string | null
+  [key: string]: unknown
+}
+
+export type NativeApiRunnerWorkflowSummary = ApiCallerWorkflowSummary & {
+  category: string
+  subcategory: string
+  episode: string | null
+  instructions: string | null
+  tags: string[]
+  requirements: NativeApiRunnerWorkflowRequirements
+  workflow_status: 'converted' | 'requires_custom_nodes'
+  repository_managed: boolean
+  is_overridden: boolean
+  source_archive: string | null
+  source_entry: string | null
+}
+
+export type NativeApiRunnerWorkflowDetail = NativeApiRunnerWorkflowSummary & {
+  workflow: Record<string, ApiCallerWorkflowNode>
+  source_workflow: Record<string, unknown> | null
+  source_workflow_sha256: string | null
+}
+
+export type NativeApiRunnerComfyUILoadResult = {
+  ok: boolean
+  workflow_id: string
+  workflow_name: string
+  comfy_url: string
+  open_url: string
+  transfer_token: string
+  expires_in_sec: number
+  queued: false
+}
+
+export type NativeApiRunnerIssue = {
+  severity: 'error' | 'warning' | 'info'
+  code: string
+  message: string
+  nodeId: string | null
+  input: string | null
+}
+
+export type NativeApiRunnerAnalysis = {
+  schema: 'sineforge.native-api-runner/v1'
+  ok: boolean
+  format: 'comfyui_api'
+  queueable: boolean
+  workflowSha256: string
+  nodeCount: number
+  editable: ApiCallerEditableField[]
+  mediaTargets: ApiCallerEditableField[]
+  promptFields: ApiCallerEditableField[]
+  outputNodes: Array<{
+    nodeId: string
+    classType: string
+    title: string
+  }>
+  modelRefs: Array<{
+    nodeId: string
+    title: string
+    classType: string
+    input: string
+    name: string
+    available: boolean | null
+  }>
+  issues: NativeApiRunnerIssue[]
+  errorCount: number
+  warningCount: number
+}
+
+export type NativeApiRunnerQueueJob = {
+  promptId: string
+  queueNumber: number | null
+  state: 'running' | 'pending'
+  clientId: string | null
+}
+
+export type NativeApiRunnerRuntime = {
+  schema: 'sineforge.native-api-runner/v1'
+  ok: boolean
+  comfyUrl: string
+  comfy: {
+    status: string
+    reachable: boolean
+    error?: string
+  }
+  objectInfo: {
+    available: boolean
+    classCount: number
+    error: string | null
+  }
+  queue: {
+    running: NativeApiRunnerQueueJob[]
+    pending: NativeApiRunnerQueueJob[]
+    runningCount: number
+    pendingCount: number
+  }
+  externalRunnerUsed: false
+  capabilities: {
+    library: boolean
+    liveValidation: boolean
+    directSubmission: boolean
+    mediaUpload: boolean
+    outputPreview: boolean
+    cancelPending: boolean
+    interruptActive: boolean
+    freeMemory: boolean
+    seedVariation: boolean
+    mergeMovie: boolean
+    saveLatents: boolean
+  }
+}
+
+export type NativeApiRunnerOutput = {
+  nodeId: string
+  kind: string
+  filename: string
+  subfolder: string
+  type: 'input' | 'output' | 'temp'
+}
+
+export type NativeApiRunnerJob = {
+  promptId: string
+  state: 'pending' | 'running' | 'completed' | 'failed' | 'unknown'
+  completed: boolean
+  status: string | null
+  outputs: NativeApiRunnerOutput[]
+  messages: unknown[]
+}
+
+export type NativeApiRunnerRunResult = {
+  contract: 'sineforge.native-api-runner/v1'
+  ok: boolean
+  prompt_id: string
+  queue_number: number | null
+  client_id: string
+  workflow_sha256: string
+  submitted_at: string
+  external_runner_used: false
+}
+
+export type NativeApiRunnerMediaUpload = {
+  ok: boolean
+  filename: string
+  subfolder: string
+  type: 'input'
+}
+
+export const SEQUENCE_SHEET_SCHEMA_VERSION = 'sineforge.sequence-sheet/v1' as const
+
+export type SequenceSheetSeed = number | 'derive'
+
+export type SequenceSheetContinuitySource =
+  | 'none'
+  | 'previous_last_frame'
+  | `asset:${string}`
+  | `row:${string}:last_frame`
+
+export type SequenceSheetRow = {
+  row_id: string
+  order: number
+  enabled: boolean
+  scene_id?: string | null
+  subscene_id?: string | null
+  template_key: string
+  workflow_version?: string | null
+  workflow_sha256?: string | null
+  model_profile: string
+  mode: 'i2v'
+  prompt: string
+  negative_prompt?: string | null
+  duration_sec: number
+  seed: SequenceSheetSeed
+  continuity_source: SequenceSheetContinuitySource
+  input_asset_id?: string | null
+  character_ids: string[]
+  asset_ids: string[]
+  reference_asset_ids: string[]
+  output_name: string
+  max_attempts?: number
+  on_error?: string
+}
+
+export type SequenceSheetRequest = {
+  schema_version: typeof SEQUENCE_SHEET_SCHEMA_VERSION
+  project_id: string
+  model_family: 'ltx'
+  rows: SequenceSheetRow[]
+}
+
+export type SequenceSheetExecuteRequest = SequenceSheetRequest & {
+  idempotency_key: string
+  allow_rendering: true
+}
+
+export type SequenceSheetValidationIssue = {
+  level?: 'error' | 'warning' | string
+  severity?: 'error' | 'warning' | string
+  code?: string
+  message: string
+  row_id?: string | null
+}
+
+export type SequenceSheetSummary = {
+  row_count?: number
+  enabled_row_count?: number
+  total_duration_sec?: number
+  [key: string]: unknown
+}
+
+export type SequenceSheetDryRunResponse = Record<string, unknown> & {
+  ok?: boolean
+  valid?: boolean
+  status?: string
+  schema_version?: string
+  project_id?: string
+  model_family?: string
+  ready_to_execute?: boolean
+  summary?: SequenceSheetSummary
+  issues?: SequenceSheetValidationIssue[]
+  diagnostics?: SequenceSheetValidationIssue[]
+  validation?: {
+    valid?: boolean
+    issues?: SequenceSheetValidationIssue[]
+    errors?: SequenceSheetValidationIssue[]
+    warnings?: SequenceSheetValidationIssue[]
+    [key: string]: unknown
+  }
+  qualification?: {
+    qualified?: boolean
+    blockers?: Array<{
+      code?: string
+      message: string
+      profile_ref?: string
+    }>
+  }
+  compiled?: Record<string, unknown> | null
+}
+
+export type SequenceSheetExecuteResponse = SequenceSheetDryRunResponse & {
+  job_id?: string | null
+  run_id?: string | null
+}
+
 export type RuntimeCatalogSummary = {
   models: number
   model_variants: number
@@ -918,7 +1263,7 @@ export type ProjectStoryboardSettings = {
   fps: number
   captions_enabled: boolean
   audio_enabled: boolean
-  production_profile_key: 'ltx_base@1' | 'wan_base@1'
+  production_profile_key: 'ltx_base@1' | 'ltx_base@2' | 'wan_base@1'
   production_profile_snapshot_json: Record<string, unknown>
   stitch_stage: 'phase7_before_audio' | 'phase8_before_foley'
   prefer_hosted_providers: boolean
@@ -945,13 +1290,23 @@ export type ProjectWorkspace = {
 }
 
 export type SulphurProjectWorkspace = ProjectWorkspace & {
-  intake_provider: 'sulphur'
+  intake_provider: PlanningAgent
   intake_model: string
   source_prompt_preserved: true
   target_duration_sec: number
   planned_scene_count: number
   nominal_scene_duration_sec: 8
   clip_duration_range_sec: [6, 10]
+}
+
+export type SulphurProjectCreatePayload = {
+  idempotency_key: string
+  prompt: string
+  workflow_lane: 'cineforge_studio'
+  planning_agent: PlanningAgent
+  planning_model_id?: string | null
+  prompt_artifact_format?: 'json'
+  prompt_schema_version?: 'sineforge.local-planning-prompt/v1'
 }
 
 export type ComfyRestartRequest = {
@@ -1032,6 +1387,9 @@ export type PhaseOnePackage = {
 
 export type PhaseOneGenerationPayload = {
   original_prompt: string
+  planning_agent?: PlanningAgent
+  prompt_artifact_format?: 'json'
+  prompt_schema_version?: 'sineforge.local-planning-prompt/v1'
   target_duration_sec: number
   audience?: string | null
   genre?: string | null
@@ -1726,6 +2084,26 @@ export function exportShotListCsvUrl(storyId: string): string {
   return `${API_BASE_URL}/storyboard/stories/${storyId}/shot-list.csv`
 }
 
+export function nativeApiRunnerOutputUrl(
+  promptId: string,
+  output: NativeApiRunnerOutput,
+): string {
+  const query = new URLSearchParams({
+    prompt_id: promptId,
+    filename: output.filename,
+    subfolder: output.subfolder,
+    type: output.type,
+  })
+  return `${API_BASE_URL}/native-api-runner/outputs?${query.toString()}`
+}
+
+export function nativeApiRunnerWorkflowOpenUrl(workflowId: string): string {
+  return (
+    `${API_BASE_URL}/native-api-runner/workflows/` +
+    `${encodeURIComponent(workflowId)}/open-in-comfyui`
+  )
+}
+
 export function planningAssetContentUrl(assetId: string): string {
   return `${API_BASE_URL}/assets/${assetId}/content`
 }
@@ -1752,16 +2130,24 @@ export const api = {
     request<ComfyRestartStatus>(`/runtime/comfyui/restart/${encodeURIComponent(restartId)}`),
 
   listProjects: () => request<Project[]>('/projects'),
-  createProject: (payload: { name: string; description?: string | null }) =>
+  createProject: (payload: {
+    name: string
+    description?: string | null
+    workflow_lane: ProjectWorkflowLane
+  }) =>
     request<Project>('/projects', { method: 'POST', body: JSON.stringify(payload) }),
   createProjectWorkspace: (payload: ProjectWorkspaceCreatePayload) =>
     request<ProjectWorkspace>('/projects/workspace', { method: 'POST', body: JSON.stringify(payload) }),
-  createProjectFromSulphur: (payload: { idempotency_key: string; prompt: string }) =>
+  createProjectFromSulphur: (payload: SulphurProjectCreatePayload) =>
     request<SulphurProjectWorkspace>('/projects/sulphur-intake', {
       method: 'POST',
       body: JSON.stringify(payload),
     }),
   getProject: (projectId: string) => request<Project>(`/projects/${projectId}`),
+  getAgentlessWorkflowProfile: (projectId: string) =>
+    request<AgentlessWorkflowProfile>(
+      `/projects/${encodeURIComponent(projectId)}/agentless-workflow`,
+    ),
   getProductionPipeline: (storyId: string) =>
     request<ProductionPipeline>(`/production/stories/${storyId}`),
   generatePhaseOne: (storyId: string, payload: PhaseOneGenerationPayload) =>
@@ -2246,6 +2632,130 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ workflow_ids: workflowIds ?? null }),
     }),
+  listNativeApiRunnerWorkflows: () =>
+    request<NativeApiRunnerWorkflowSummary[]>('/native-api-runner/workflows'),
+  getNativeApiRunnerWorkflow: (workflowId: string) =>
+    request<NativeApiRunnerWorkflowDetail>(
+      `/native-api-runner/workflows/${encodeURIComponent(workflowId)}`,
+    ),
+  loadNativeApiRunnerWorkflowInComfyUI: (workflowId: string) =>
+    request<NativeApiRunnerComfyUILoadResult>(
+      `/native-api-runner/workflows/${encodeURIComponent(workflowId)}/load-in-comfyui`,
+      { method: 'POST' },
+    ),
+  createNativeApiRunnerWorkflow: (payload: {
+    name: string
+    version?: string
+    description?: string | null
+    category?: string
+    subcategory?: string
+    episode?: string | null
+    instructions?: string | null
+    tags?: string[]
+    requirements?: NativeApiRunnerWorkflowRequirements
+    source_filename?: string | null
+    workflow: Record<string, unknown>
+  }) =>
+    request<NativeApiRunnerWorkflowDetail>('/native-api-runner/workflows', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  updateNativeApiRunnerWorkflow: (
+    workflowId: string,
+    payload: {
+      name?: string
+      version?: string
+      description?: string | null
+      category?: string
+      subcategory?: string
+      episode?: string | null
+      instructions?: string | null
+      tags?: string[]
+      requirements?: NativeApiRunnerWorkflowRequirements
+      workflow?: Record<string, unknown>
+    },
+  ) =>
+    request<NativeApiRunnerWorkflowDetail>(
+      `/native-api-runner/workflows/${encodeURIComponent(workflowId)}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      },
+    ),
+  removeNativeApiRunnerWorkflow: (workflowId: string) =>
+    request<{ ok: boolean; id: string; name: string; archived: boolean }>(
+      `/native-api-runner/workflows/${encodeURIComponent(workflowId)}`,
+      { method: 'DELETE' },
+    ),
+  getNativeApiRunnerRuntime: () =>
+    request<NativeApiRunnerRuntime>('/native-api-runner/runtime'),
+  analyzeNativeApiRunnerWorkflow: (workflow: Record<string, unknown>) =>
+    request<NativeApiRunnerAnalysis>('/native-api-runner/analyze', {
+      method: 'POST',
+      body: JSON.stringify({ workflow }),
+    }),
+  runNativeApiRunnerWorkflow: (payload: {
+    workflow: Record<string, unknown>
+    workflow_name: string
+    workflow_sha256: string
+    confirmation: true
+    idempotency_key: string
+  }) =>
+    request<NativeApiRunnerRunResult>('/native-api-runner/run', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getNativeApiRunnerJob: (promptId: string) =>
+    request<NativeApiRunnerJob>(
+      `/native-api-runner/jobs/${encodeURIComponent(promptId)}`,
+    ),
+  cancelNativeApiRunnerJob: (promptId: string, interruptActive = false) =>
+    request<{ ok: boolean; promptId: string; action: string }>(
+      `/native-api-runner/jobs/${encodeURIComponent(promptId)}/cancel?interrupt_active=${interruptActive}`,
+      { method: 'POST' },
+    ),
+  freeNativeApiRunnerMemory: () =>
+    request<{ ok: boolean; action: string; externalRunnerUsed: false }>(
+      '/native-api-runner/memory/free',
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          confirmation: true,
+          unload_models: true,
+          free_memory: true,
+        }),
+      },
+    ),
+  uploadNativeApiRunnerMedia: (file: File, subfolder = 'sineforge_native') => {
+    const query = new URLSearchParams({
+      filename: file.name,
+      subfolder,
+    })
+    return request<NativeApiRunnerMediaUpload>(
+      `/native-api-runner/media?${query.toString()}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream' },
+        body: file,
+      },
+    )
+  },
+  dryRunSequenceSheet: (projectId: string, payload: SequenceSheetRequest) =>
+    request<SequenceSheetDryRunResponse>(
+      `/projects/${encodeURIComponent(projectId)}/sequence-sheet/dry-run`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
+  executeSequenceSheet: (projectId: string, payload: SequenceSheetExecuteRequest) =>
+    request<SequenceSheetExecuteResponse>(
+      `/projects/${encodeURIComponent(projectId)}/sequence-sheet/execute`,
+      {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      },
+    ),
 
   listProviderProfiles: () => request<ProviderProfile[]>('/storyboard-crud/provider-profiles'),
   listPlanningProviders: () => request<ProviderCatalogResponse>('/providers'),

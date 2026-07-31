@@ -1,0 +1,786 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "b4393829-c0c1-5a62-9a32-1100d368c11e",
+  "name": "Nunchaku Qwen Image txt2img",
+  "version": "1.0",
+  "description": "Nunchaku Qwen Image txt2img is a text to image workflow designed to turn a text prompt into a finished still image using Qwen Image. Its 10-node graph exposes 1 prompt/text field(s), 0 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The imported graph contains unresolved custom-node classes, so install or map the listed nodes and reconvert from the included editor graph before production use.",
+  "category": "Image Generation",
+  "subcategory": "Text to image",
+  "episode": "EP02",
+  "instructions": "1. Install or map the unresolved node classes listed in Requirements, open the included editor-format source in the main LTX ComfyUI install, and export API format again before attempting a run.\n2. Review the model-file entries in Requirements and place each checkpoint, text encoder, VAE, LoRA, or auxiliary model in the folder documented by the source workflow. Refresh ComfyUI after adding files.\n3. No required media file was detected in the converted graph; begin with the prompt and generation controls.\n4. Edit the positive/negative prompt, resolution, sampler, steps, guidance, and seed. Use a fixed seed while tuning composition, then vary it deliberately.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP02",
+    "Image Generation",
+    "Qwen Image",
+    "Text to image"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "ComfyUI-nunchaku",
+      "pixaroma",
+      "Pixaroma YouTube Channel"
+    ],
+    "unresolved_node_classes": [
+      "NunchakuQwenImageDiTLoader"
+    ],
+    "node_classes": [
+      "CLIPLoader",
+      "CLIPTextEncode",
+      "ConditioningZeroOut",
+      "EmptySD3LatentImage",
+      "KSampler",
+      "ModelSamplingAuraFlow",
+      "NunchakuQwenImageDiTLoader",
+      "SaveImage",
+      "VAEDecode",
+      "VAELoader"
+    ],
+    "model_files": [
+      {
+        "node_id": "19",
+        "node_type": "CLIPLoader",
+        "input": "clip_name",
+        "value": "qwen_2.5_vl_7b_fp8_scaled.safetensors"
+      },
+      {
+        "node_id": "20",
+        "node_type": "VAELoader",
+        "input": "vae_name",
+        "value": "qwen_image_vae.safetensors"
+      }
+    ],
+    "media_inputs": [],
+    "prompt_field_count": 1,
+    "output_node_count": 1,
+    "documentation_notes": "photo of a cute 3D cartoon bunny kung fu master inside a dark ancient kung fu temple interior, pure white fluffy fur with soft plush texture, big expressive eyes and rounded cheeks radiating adorability, standing confidently in a classic martial arts stance, dressed in a bright orange kung fu outfit with flowing fabric folds and a tied sash, small paws poised with disciplined grace, friendly yet focused expression, the temple interior lit by low warm lantern light, wooden pillars, stone floor, hanging scrolls, incense smoke drifting through the air, deep shadows and moody atmosphere framing the character, subtle rim light outlining the bunny against the darkness, high-quality 3D character rendering with smooth geometry and gentle fur detail, cinematic contrast between the vibrant orange outfit and the shadowy environment, charming and heroic tone designed for strong visual impact on social media, shot on ARRI Alexa 65, 50mm lens, f/2.8, clean high-resolution digital render\n\n# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🟣 Nunchaku Qwen-Image DiT Loader\n### Download the right **nunchaku qwen image ligthning model** from [HERE](https://huggingface.co/nunchaku-ai/nunchaku-qwen-image/tree/main)\n\n📁 **Place in:** `ComfyUI/models/diffusion_models/qwen` \n\nCreate the `qwen` folder if it does not exist)\n \nUse **FP4 models** if you have an **RTX 50-series or newer GPU**.\n\nUse **INT4 models** for RTX 40, 30 or older GPUs.\n\nThe **r** value controls quality: **r32, r128, r256.**\n\nHigher values give better quality but use more VRAM.\n\nLightning **v1.0** needs 4 steps, faster\n\nLightning **v1.1** needs 8 steps, slower\n\n---\n\n## 🟣 Load CLIP\n\n###  Download **qwen_2.5_vl_7b_fp8_scaled.safetensors** from [HERE](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors) or a bigger model from [HERE](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/tree/main/split_files/text_encoders)\n\n📁 **Place in:** `ComfyUI/models/text_encoders`  \n\n---\n\n## 🟣 Load VAE\n\n### Download **qwen_image_vae.safetensors** vae model from [HERE](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors)  \n\n📁 **Place in:** `ComfyUI/models/vae`  \n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- ComfyUI-nunchaku (installed with nunchaku.bat from Add-Ons folder)\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)"
+  },
+  "workflow_status": "requires_custom_nodes",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep02 workflows/ep02 workflows/nunchaku qwen image txt2img.json",
+  "source_filename": "Nunchaku Qwen Image txt2img.json",
+  "source_archive": "EP02 Workflows.zip",
+  "source_entry": "EP02 Workflows/EP02 Workflows/Nunchaku Qwen Image txt2img.json",
+  "source_workflow": {
+    "id": "e873e1a7-fcf5-4295-84ce-8fed03d370e5",
+    "revision": 0,
+    "last_node_id": 23,
+    "last_link_id": 22,
+    "nodes": [
+      {
+        "id": 6,
+        "type": "CLIPTextEncode",
+        "pos": [
+          -569.190279522594,
+          122.94507889430596
+        ],
+        "size": [
+          424.42708333333337,
+          293.02083333333337
+        ],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "clip",
+            "type": "CLIP",
+            "link": 19
+          }
+        ],
+        "outputs": [
+          {
+            "name": "CONDITIONING",
+            "type": "CONDITIONING",
+            "slot_index": 0,
+            "links": [
+              1,
+              20
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.27",
+          "Node name for S&R": "CLIPTextEncode"
+        },
+        "widgets_values": [
+          "photo of a cute 3D cartoon bunny kung fu master inside a dark ancient kung fu temple interior, pure white fluffy fur with soft plush texture, big expressive eyes and rounded cheeks radiating adorability, standing confidently in a classic martial arts stance, dressed in a bright orange kung fu outfit with flowing fabric folds and a tied sash, small paws poised with disciplined grace, friendly yet focused expression, the temple interior lit by low warm lantern light, wooden pillars, stone floor, hanging scrolls, incense smoke drifting through the air, deep shadows and moody atmosphere framing the character, subtle rim light outlining the bunny against the darkness, high-quality 3D character rendering with smooth geometry and gentle fur detail, cinematic contrast between the vibrant orange outfit and the shadowy environment, charming and heroic tone designed for strong visual impact on social media, shot on ARRI Alexa 65, 50mm lens, f/2.8, clean high-resolution digital render\n"
+        ],
+        "color": "#232",
+        "bgcolor": "#353"
+      },
+      {
+        "id": 22,
+        "type": "ModelSamplingAuraFlow",
+        "pos": [
+          -568.3265754098926,
+          19.604070081607635
+        ],
+        "size": [
+          229.08192443847656,
+          58
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 5,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "model",
+            "type": "MODEL",
+            "link": 21
+          }
+        ],
+        "outputs": [
+          {
+            "name": "MODEL",
+            "type": "MODEL",
+            "links": [
+              22
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.48",
+          "Node name for S&R": "ModelSamplingAuraFlow",
+          "enableTabs": false,
+          "tabWidth": 65,
+          "tabXOffset": 10,
+          "hasSecondTab": false,
+          "secondTabText": "Send Back",
+          "secondTabOffset": 80,
+          "secondTabWidth": 65,
+          "widget_ue_connectable": {}
+        },
+        "widgets_values": [
+          3
+        ]
+      },
+      {
+        "id": 1,
+        "type": "ConditioningZeroOut",
+        "pos": [
+          -352.17554818055476,
+          461.6547439369836
+        ],
+        "size": [
+          204.134765625,
+          26
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 7,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "conditioning",
+            "type": "CONDITIONING",
+            "link": 1
+          }
+        ],
+        "outputs": [
+          {
+            "name": "CONDITIONING",
+            "type": "CONDITIONING",
+            "links": [
+              9
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.76",
+          "Node name for S&R": "ConditioningZeroOut"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 5,
+        "type": "EmptySD3LatentImage",
+        "pos": [
+          -396.3384484771865,
+          534.4153615309427
+        ],
+        "size": [
+          250.61128906920487,
+          106
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "LATENT",
+            "type": "LATENT",
+            "slot_index": 0,
+            "links": [
+              10
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.32",
+          "Node name for S&R": "EmptySD3LatentImage"
+        },
+        "widgets_values": [
+          1024,
+          1024,
+          1
+        ],
+        "color": "#323",
+        "bgcolor": "#535"
+      },
+      {
+        "id": 7,
+        "type": "KSampler",
+        "pos": [
+          -114.45197068995509,
+          122.94507889430596
+        ],
+        "size": [
+          296.2197989449314,
+          262
+        ],
+        "flags": {},
+        "order": 8,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "model",
+            "type": "MODEL",
+            "link": 22
+          },
+          {
+            "name": "positive",
+            "type": "CONDITIONING",
+            "link": 20
+          },
+          {
+            "name": "negative",
+            "type": "CONDITIONING",
+            "link": 9
+          },
+          {
+            "name": "latent_image",
+            "type": "LATENT",
+            "link": 10
+          }
+        ],
+        "outputs": [
+          {
+            "name": "LATENT",
+            "type": "LATENT",
+            "slot_index": 0,
+            "links": [
+              3
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.27",
+          "Node name for S&R": "KSampler"
+        },
+        "widgets_values": [
+          680829105289189,
+          "randomize",
+          8,
+          1,
+          "res_multistep",
+          "simple",
+          1
+        ]
+      },
+      {
+        "id": 3,
+        "type": "VAEDecode",
+        "pos": [
+          203.41128899957127,
+          123.66741466713086
+        ],
+        "size": [
+          140,
+          46
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 9,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "samples",
+            "type": "LATENT",
+            "link": 3
+          },
+          {
+            "name": "vae",
+            "type": "VAE",
+            "link": 17
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              5
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.32",
+          "Node name for S&R": "VAEDecode"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 4,
+        "type": "SaveImage",
+        "pos": [
+          370.8331714075773,
+          125.83432279090998
+        ],
+        "size": [
+          615.0020278469565,
+          679.2872229947789
+        ],
+        "flags": {},
+        "order": 10,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 5
+          }
+        ],
+        "outputs": [],
+        "title": "Save Image Original",
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.27",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "img"
+        ]
+      },
+      {
+        "id": 18,
+        "type": "NunchakuQwenImageDiTLoader",
+        "pos": [
+          -1146.906013904838,
+          122.271005184489
+        ],
+        "size": [
+          553.41436594417,
+          130
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "MODEL",
+            "type": "MODEL",
+            "links": [
+              21
+            ]
+          }
+        ],
+        "properties": {
+          "aux_id": "nunchaku-ai/ComfyUI-nunchaku",
+          "ver": "0a47a348cea71b544e81c71dab7c78915ecf8bd3",
+          "Node name for S&R": "NunchakuQwenImageDiTLoader"
+        },
+        "widgets_values": [
+          "qwen\\svdq-int4_r128-qwen-image-lightningv1.1-8steps.safetensors",
+          "auto",
+          1,
+          "disable"
+        ]
+      },
+      {
+        "id": 19,
+        "type": "CLIPLoader",
+        "pos": [
+          -998.1094076589045,
+          316.2234792875763
+        ],
+        "size": [
+          404.61775969823657,
+          106
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "CLIP",
+            "type": "CLIP",
+            "slot_index": 0,
+            "links": [
+              19
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.48",
+          "Node name for S&R": "CLIPLoader",
+          "models": [
+            {
+              "name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+              "url": "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors",
+              "directory": "text_encoders"
+            }
+          ],
+          "enableTabs": false,
+          "tabWidth": 65,
+          "tabXOffset": 10,
+          "hasSecondTab": false,
+          "secondTabText": "Send Back",
+          "secondTabOffset": 80,
+          "secondTabWidth": 65,
+          "widget_ue_connectable": {}
+        },
+        "widgets_values": [
+          "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+          "qwen_image",
+          "default"
+        ]
+      },
+      {
+        "id": 20,
+        "type": "VAELoader",
+        "pos": [
+          -926.6003484325423,
+          486.1759533906636
+        ],
+        "size": [
+          333.1087004718744,
+          58
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "VAE",
+            "type": "VAE",
+            "slot_index": 0,
+            "links": [
+              17
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.48",
+          "Node name for S&R": "VAELoader",
+          "models": [
+            {
+              "name": "qwen_image_vae.safetensors",
+              "url": "https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors",
+              "directory": "vae"
+            }
+          ],
+          "enableTabs": false,
+          "tabWidth": 65,
+          "tabXOffset": 10,
+          "hasSecondTab": false,
+          "secondTabText": "Send Back",
+          "secondTabOffset": 80,
+          "secondTabWidth": 65,
+          "widget_ue_connectable": {}
+        },
+        "widgets_values": [
+          "qwen_image_vae.safetensors"
+        ]
+      },
+      {
+        "id": 16,
+        "type": "MarkdownNote",
+        "pos": [
+          -1730.1295387014402,
+          120.33086173787417
+        ],
+        "size": [
+          559.7236383779781,
+          660.7786748952616
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 4,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "👑 Pixaroma - Note - START HERE",
+        "properties": {},
+        "widgets_values": [
+          "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🟣 Nunchaku Qwen-Image DiT Loader\n### Download the right **nunchaku qwen image ligthning model** from [HERE](https://huggingface.co/nunchaku-ai/nunchaku-qwen-image/tree/main)\n\n📁 **Place in:** `ComfyUI/models/diffusion_models/qwen` \n\nCreate the `qwen` folder if it does not exist)\n \nUse **FP4 models** if you have an **RTX 50-series or newer GPU**.\n\nUse **INT4 models** for RTX 40, 30 or older GPUs.\n\nThe **r** value controls quality: **r32, r128, r256.**\n\nHigher values give better quality but use more VRAM.\n\nLightning **v1.0** needs 4 steps, faster\n\nLightning **v1.1** needs 8 steps, slower\n\n---\n\n## 🟣 Load CLIP\n\n###  Download **qwen_2.5_vl_7b_fp8_scaled.safetensors** from [HERE](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/text_encoders/qwen_2.5_vl_7b_fp8_scaled.safetensors) or a bigger model from [HERE](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/tree/main/split_files/text_encoders)\n\n📁 **Place in:** `ComfyUI/models/text_encoders`  \n\n---\n\n## 🟣 Load VAE\n\n### Download **qwen_image_vae.safetensors** vae model from [HERE](https://huggingface.co/Comfy-Org/Qwen-Image_ComfyUI/resolve/main/split_files/vae/qwen_image_vae.safetensors)  \n\n📁 **Place in:** `ComfyUI/models/vae`  \n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- ComfyUI-nunchaku (installed with nunchaku.bat from Add-Ons folder)\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      }
+    ],
+    "links": [
+      [
+        1,
+        6,
+        0,
+        1,
+        0,
+        "CONDITIONING"
+      ],
+      [
+        3,
+        7,
+        0,
+        3,
+        0,
+        "LATENT"
+      ],
+      [
+        5,
+        3,
+        0,
+        4,
+        0,
+        "IMAGE"
+      ],
+      [
+        9,
+        1,
+        0,
+        7,
+        2,
+        "CONDITIONING"
+      ],
+      [
+        10,
+        5,
+        0,
+        7,
+        3,
+        "LATENT"
+      ],
+      [
+        17,
+        20,
+        0,
+        3,
+        1,
+        "VAE"
+      ],
+      [
+        19,
+        19,
+        0,
+        6,
+        0,
+        "CLIP"
+      ],
+      [
+        20,
+        6,
+        0,
+        7,
+        1,
+        "CONDITIONING"
+      ],
+      [
+        21,
+        18,
+        0,
+        22,
+        0,
+        "MODEL"
+      ],
+      [
+        22,
+        22,
+        0,
+        7,
+        0,
+        "MODEL"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 0.9229599817706517,
+        "offset": [
+          1802.2650551278534,
+          154.4411260383024
+        ]
+      },
+      "frontendVersion": "1.36.14",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "af1da4d43cf939272aef3a61942ef915d73cad1d3d5ed98510af72d09f13a76a",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "conditioning": [
+          "6",
+          0
+        ]
+      },
+      "class_type": "ConditioningZeroOut",
+      "_meta": {
+        "title": "Conditioning Zero Out"
+      }
+    },
+    "3": {
+      "inputs": {
+        "samples": [
+          "7",
+          0
+        ],
+        "vae": [
+          "20",
+          0
+        ]
+      },
+      "class_type": "VAEDecode",
+      "_meta": {
+        "title": "VAE Decode"
+      }
+    },
+    "4": {
+      "inputs": {
+        "filename_prefix": "img",
+        "images": [
+          "3",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image Original"
+      }
+    },
+    "5": {
+      "inputs": {
+        "width": 1024,
+        "height": 1024,
+        "batch_size": 1
+      },
+      "class_type": "EmptySD3LatentImage",
+      "_meta": {
+        "title": "EmptySD3LatentImage"
+      }
+    },
+    "6": {
+      "inputs": {
+        "text": "photo of a cute 3D cartoon bunny kung fu master inside a dark ancient kung fu temple interior, pure white fluffy fur with soft plush texture, big expressive eyes and rounded cheeks radiating adorability, standing confidently in a classic martial arts stance, dressed in a bright orange kung fu outfit with flowing fabric folds and a tied sash, small paws poised with disciplined grace, friendly yet focused expression, the temple interior lit by low warm lantern light, wooden pillars, stone floor, hanging scrolls, incense smoke drifting through the air, deep shadows and moody atmosphere framing the character, subtle rim light outlining the bunny against the darkness, high-quality 3D character rendering with smooth geometry and gentle fur detail, cinematic contrast between the vibrant orange outfit and the shadowy environment, charming and heroic tone designed for strong visual impact on social media, shot on ARRI Alexa 65, 50mm lens, f/2.8, clean high-resolution digital render\n",
+        "clip": [
+          "19",
+          0
+        ]
+      },
+      "class_type": "CLIPTextEncode",
+      "_meta": {
+        "title": "CLIP Text Encode (Prompt)"
+      }
+    },
+    "7": {
+      "inputs": {
+        "seed": 680829105289189,
+        "steps": 8,
+        "cfg": 1,
+        "sampler_name": "res_multistep",
+        "scheduler": "simple",
+        "denoise": 1,
+        "model": [
+          "22",
+          0
+        ],
+        "positive": [
+          "6",
+          0
+        ],
+        "negative": [
+          "1",
+          0
+        ],
+        "latent_image": [
+          "5",
+          0
+        ]
+      },
+      "class_type": "KSampler",
+      "_meta": {
+        "title": "KSampler"
+      }
+    },
+    "18": {
+      "inputs": {
+        "UNKNOWN": "qwen\\svdq-int4_r128-qwen-image-lightningv1.1-8steps.safetensors",
+        "UNKNOWN_1": "auto",
+        "UNKNOWN_2": 1,
+        "UNKNOWN_3": "disable"
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::NunchakuQwenImageDiTLoader"
+    },
+    "19": {
+      "inputs": {
+        "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+        "type": "qwen_image",
+        "device": "default"
+      },
+      "class_type": "CLIPLoader",
+      "_meta": {
+        "title": "Load CLIP"
+      }
+    },
+    "20": {
+      "inputs": {
+        "vae_name": "qwen_image_vae.safetensors"
+      },
+      "class_type": "VAELoader",
+      "_meta": {
+        "title": "Load VAE"
+      }
+    },
+    "22": {
+      "inputs": {
+        "shift": 3,
+        "model": [
+          "18",
+          0
+        ]
+      },
+      "class_type": "ModelSamplingAuraFlow",
+      "_meta": {
+        "title": "ModelSamplingAuraFlow"
+      }
+    }
+  },
+  "sha256": "506a682f6b70be85770c5246c6d996ba827b52dcdc1cd70acc227d177e8abfd2",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

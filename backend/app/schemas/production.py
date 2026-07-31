@@ -34,6 +34,17 @@ class PhaseOneGenerationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     original_prompt: str = Field(min_length=1)
+    planning_agent: Literal["sulphur", "qwen"] = "qwen"
+    planning_model_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=200,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,199}$",
+    )
+    prompt_artifact_format: Literal["json"] = "json"
+    prompt_schema_version: Literal["sineforge.local-planning-prompt/v1"] = (
+        "sineforge.local-planning-prompt/v1"
+    )
     target_duration_sec: float = Field(gt=0, le=21_600)
     audience: str | None = None
     genre: str | None = None

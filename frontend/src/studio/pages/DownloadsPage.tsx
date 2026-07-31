@@ -1,4 +1,4 @@
-type DownloadStatus = 'Installed' | 'Missing'
+type DownloadStatus = 'Installed' | 'Missing' | 'Downloading'
 
 type DownloadModelRow = {
   id: string
@@ -23,6 +23,17 @@ type ReferenceRow = {
   label: string
   url: string
   disposition: string
+}
+
+type IPAdapterRow = {
+  id: string
+  filename: string
+  family: string
+  sourceUrl: string
+  destination: string
+  sha256: string
+  status: DownloadStatus
+  note: string
 }
 
 const downloadRows: DownloadModelRow[] = [
@@ -250,6 +261,125 @@ const downloadRows: DownloadModelRow[] = [
     movedFromDownloads: true,
   },
   {
+    id: 'ltx23-ic-lora-ingredients-09',
+    name: 'LTX 2.3 Ingredients IC-LoRA',
+    version: '0.9',
+    modelType: 'IC-LoRA',
+    baseModel: 'LTX 2.3 22B',
+    sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Ingredients',
+    modelId: 'Lightricks/LTX-2.3-22b-IC-LoRA-Ingredients',
+    versionId: 'ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors',
+    trainedWords: 'Reference sheet: … / Generated video: …',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\LTX\\2.3\\Official\\IC-LoRA\\Ingredients\\ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors',
+    sha256: '515E4E139001AC6282357A5B35372E42E98B3AFFD5FCC886A52242ABEED19559',
+    status: 'Installed',
+    note: 'Official gated Lightricks IC-LoRA. Exact publisher byte size and local SHA-256 verified; visible in the live LTX IC-LoRA loader.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-ic-lora-dubit-lipdub-09',
+    name: 'LTX 2.3 DubIt Lip-Sync IC-LoRA',
+    version: '0.9',
+    modelType: 'IC-LoRA',
+    baseModel: 'LTX 2.3 22B',
+    sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-DubIt',
+    modelId: 'Lightricks/LTX-2.3-22b-IC-LoRA-DubIt',
+    versionId: 'ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors',
+    trainedWords: 'Not applicable; audio/reference conditioned',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\LTX\\2.3\\Official\\IC-LoRA\\DubIt\\ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors',
+    sha256: 'FC415B12CB639E78511BC264F85080C2F7B188E334C1D9FADE76B310E2BC419C',
+    status: 'Installed',
+    note: 'Official gated Lightricks lip-sync IC-LoRA. Exact publisher byte size and local SHA-256 verified; visible in the live LTX IC-LoRA loader.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-ic-lora-pixel-spatial-x2-09',
+    name: 'LTX 2.3 Pixel Spatial Upscaler IC-LoRA — 2×',
+    version: '0.9',
+    modelType: 'IC-LoRA upscaler',
+    baseModel: 'LTX 2.3 22B',
+    sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Pixel-Spatial-Upscaler',
+    modelId: 'Lightricks/LTX-2.3-22b-IC-LoRA-Pixel-Spatial-Upscaler',
+    versionId: 'ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x2-0.9.safetensors',
+    trainedWords: 'Not applicable; low-resolution reference-video conditioned',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\LTX\\2.3\\Official\\IC-LoRA\\Pixel-Spatial-Upscaler\\ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x2-0.9.safetensors',
+    sha256: '0667334E23AF9FC0AB3FDFF2E059C805AC0D162B1F96F18A462801478027451E',
+    status: 'Installed',
+    note: 'Official generative 2× video upscaler. Exact publisher byte size and local SHA-256 verified; visible in the live LTX IC-LoRA loader.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-ic-lora-pixel-spatial-x4-09',
+    name: 'LTX 2.3 Pixel Spatial Upscaler IC-LoRA — 4×',
+    version: '0.9',
+    modelType: 'IC-LoRA upscaler',
+    baseModel: 'LTX 2.3 22B',
+    sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Pixel-Spatial-Upscaler',
+    modelId: 'Lightricks/LTX-2.3-22b-IC-LoRA-Pixel-Spatial-Upscaler',
+    versionId: 'ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors',
+    trainedWords: 'Not applicable; low-resolution reference-video conditioned',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\LTX\\2.3\\Official\\IC-LoRA\\Pixel-Spatial-Upscaler\\ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x4-0.9.safetensors',
+    sha256: '5B6370C3CC3A9A773F3655A411FD8EA4B47F4237BD2288A35B3291E2A33840F5',
+    status: 'Installed',
+    note: 'Official generative 4× video upscaler. Exact publisher byte size and local SHA-256 verified; visible in the live LTX IC-LoRA loader.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-ic-lora-hdr-09',
+    name: 'LTX 2.3 HDR IC-LoRA',
+    version: '0.9',
+    modelType: 'IC-LoRA',
+    baseModel: 'LTX 2.3 22B',
+    sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-HDR',
+    modelId: 'Lightricks/LTX-2.3-22b-IC-LoRA-HDR',
+    versionId: 'ltx-2.3-22b-ic-lora-hdr-0.9.safetensors',
+    trainedWords: 'Not applicable; HDR generation and SDR-to-HDR conversion',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\LTX\\2.3\\Official\\IC-LoRA\\HDR\\ltx-2.3-22b-ic-lora-hdr-0.9.safetensors',
+    sha256: 'C56BFA0F2E4461A8B2F318F494C61C5BF97F462F2220E31ECE93EA7851CA871E',
+    status: 'Installed',
+    note: 'Official 16-bit HDR IC-LoRA. Installed with its companion scene embedding; both are visible in the live LTX IC-LoRA loader.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-hdr-scene-embedding',
+    name: 'LTX 2.3 HDR Scene Embedding',
+    version: 'Companion to HDR 0.9',
+    modelType: 'Scene embedding',
+    baseModel: 'LTX 2.3 22B HDR IC-LoRA',
+    sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-HDR',
+    modelId: 'Lightricks/LTX-2.3-22b-IC-LoRA-HDR',
+    versionId: 'ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors',
+    trainedWords: 'Not applicable',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\LTX\\2.3\\Official\\IC-LoRA\\HDR\\ltx-2.3-22b-ic-lora-hdr-scene-emb.safetensors',
+    sha256: '78BFFA6049BAE2649A4365EC8769DB88052C21348D643E8FC1CE6D483D994C5B',
+    status: 'Installed',
+    note: 'Companion HDR scene embedding from the official gated repository. Exact publisher byte size and local SHA-256 verified.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-ic-lora-in-outpainting-09',
+    name: 'LTX 2.3 In/Outpainting IC-LoRA',
+    version: '0.9',
+    modelType: 'IC-LoRA',
+    baseModel: 'LTX 2.3 22B',
+    sourceUrl: 'https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting',
+    modelId: 'Lightricks/LTX-2.3-22b-IC-LoRA-In-Outpainting',
+    versionId: 'ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors',
+    trainedWords: 'Not applicable; reference video plus binary mask',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\LTX\\2.3\\Official\\IC-LoRA\\In-Outpainting\\ltx-2.3-22b-ic-lora-in-outpainting-0.9.safetensors',
+    sha256: '73DD0841C0D4F0EB26FB1F017781B841B2752021944AC5ECEFE57917F6DAE6B5',
+    status: 'Installed',
+    note: 'Official video inpainting/outpainting IC-LoRA. Exact publisher byte size and local SHA-256 verified; visible in the live LTX IC-LoRA loader.',
+    movedFromDownloads: true,
+  },
+  {
     id: 'ltx-23-gtanimation-int4-convrot',
     name: 'LTX 2.3 GTAnimation — INT4 ConvRot',
     version: 'LTXV 2.3高速版 INT4 ConvRot',
@@ -278,8 +408,157 @@ const downloadRows: DownloadModelRow[] = [
     localPath:
       'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\diffusion_models\\LTX 2.3\\10Eros\\ltx2310eros_v14.safetensors',
     sha256: '54BCB40427FF1A3E54CFA6087DF765B617BEE238D58AA49947C517A727722AD2',
+    status: 'Missing',
+    note:
+      'Operator deleted the previously verified full checkpoint on 2026-07-29. Its provenance and blur-forensics research remain archived in docs.',
+  },
+  {
+    id: 'sulphur-2-base-quants-dev',
+    name: 'Sulphur 2 Base Quants',
+    version: 'Dev — official FP8 mixed quant',
+    modelType: 'Checkpoint',
+    baseModel: 'LTXV 2.3',
+    sourceUrl: 'https://civitai.red/models/2630742/sulphur-2-base-quants?modelVersionId=2953675',
+    modelId: '2630742',
+    versionId: '2953675',
+    trainedWords: 'None documented (no trigger word)',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\checkpoints\\LTX 2.3\\Sulphur 2\\sulphur2BaseQuants_dev.safetensors',
+    sha256: '41C999575859C528FF108022246A5524960A778C18742696971C9B0AADB4F70F',
     status: 'Installed',
-    note: 'Already verified locally. This row pins the full checkpoint artifact, not the smaller same-name auxiliary file.',
+    note: 'Hash verified; an organized hardlink alias was added for existing Sulphur workflows.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'rebels-sulphur-2-gguf-workflow',
+    name: 'Rebels Sulphur 2 GGUF (LTX-2.3 NSFW Model)',
+    version: 'gguf',
+    modelType: 'Workflow',
+    baseModel: 'LTXV 2.3',
+    sourceUrl: 'https://civitai.red/models/2606616/rebels-sulphur-2-gguf-ltx-23-nsfw-model?modelVersionId=2926883',
+    modelId: '2606616',
+    versionId: '2926883',
+    trainedWords: 'None documented (no trigger word)',
+    localPath: 'C:\\Users\\Blokey\\Documents\\Sineforge\\Workflows\\Sulphur2\\Sulphur_2_GGUF_LTX23.workflow.json',
+    sha256: '3BA0EAB2017B180AC0C76E37E6C8FB9A82132C0D21AD8908BCBF0981EB54E456',
+    status: 'Installed',
+    note:
+      'Workflow JSON was copied into SineForge and ComfyUI user workflows; the original zip archive was moved into Workflows\\Sulphur2.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'sulphur-distil-q6-k-gguf',
+    name: 'Sulphur distil Q6_K GGUF',
+    version: 'Q6_K transformer GGUF',
+    modelType: 'GGUF transformer',
+    baseModel: 'LTXV 2.3 / Sulphur 2',
+    sourceUrl: 'https://civitai.red/models/2606616/rebels-sulphur-2-gguf-ltx-23-nsfw-model?modelVersionId=2926883',
+    modelId: '2606616',
+    versionId: '2926883',
+    trainedWords: 'None documented (no trigger word)',
+    localPath: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\gguf\\sulphur_distil-Q6_K.gguf',
+    sha256: 'B3E19985A4283936B179CC00A8542A49D2BD1FE8A0770E6D2A5027CC526EDF59',
+    status: 'Installed',
+    note: 'Moved from Downloads into the ComfyUI gguf folder and verified in the LTX2_SM_Model GGUF dropdown.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-distilled-transformer-11-q6-k-gguf',
+    name: 'LTX 2.3 22B distilled transformer 1.1 GGUF',
+    version: '1.1 Q6_K transformer GGUF',
+    modelType: 'GGUF transformer',
+    baseModel: 'LTX 2.3',
+    sourceUrl: 'https://huggingface.co/smthem/LTX-2.3-test-gguf/tree/main',
+    modelId: 'smthem/LTX-2.3-test-gguf',
+    versionId: 'ltx-2.3-22b-distilled-transformer-1.1-Q6_K.gguf',
+    trainedWords: 'Not applicable',
+    localPath:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\gguf\\ltx-2.3-22b-distilled-transformer-1.1-Q6_K.gguf',
+    sha256: '26B760168FBD5431E05F5C974A8D0614D9EF7D907ACC09254F23223200D55201',
+    status: 'Installed',
+    note: 'Moved from Downloads into the ComfyUI gguf folder and verified in the LTX2_SM_Model GGUF dropdown.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'gemma-3-12b-it-qat-q4-0-gguf',
+    name: 'Gemma 3 12B IT QAT Q4_0 GGUF',
+    version: 'Q4_0 text encoder GGUF',
+    modelType: 'Text encoder GGUF',
+    baseModel: 'LTX 2 / LTX 2.3',
+    sourceUrl: 'https://huggingface.co/smthem/LTX-2.3-test-gguf/tree/main',
+    modelId: 'smthem/LTX-2.3-test-gguf',
+    versionId: 'gemma-3-12b-it-qat-Q4_0.gguf',
+    trainedWords: 'Not applicable',
+    localPath: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\gguf\\gemma-3-12b-it-qat-Q4_0.gguf',
+    sha256: '4703E568CC5A9B15F76FE93FFCDE33C05278A5A8565C5DABDC6DE45230C4430F',
+    status: 'Installed',
+    note: 'Moved from Downloads into the ComfyUI gguf folder and verified in the LTX2_SM_Clip clip dropdown.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'connector-11-safetensors',
+    name: 'LTX 2.3 connector-11',
+    version: 'connector-11 text-encoder bridge',
+    modelType: 'Connector checkpoint',
+    baseModel: 'LTX 2.3',
+    sourceUrl: 'https://huggingface.co/smthem/LTX-2.3-test-gguf/tree/main',
+    modelId: 'smthem/LTX-2.3-test-gguf',
+    versionId: 'connector-11.safetensors',
+    trainedWords: 'Not applicable',
+    localPath: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\checkpoints\\connector-11.safetensors',
+    sha256: '696D5B5759CD69FA941F7DD79014A9B894AB503F22ED671D3456AD985E34A718',
+    status: 'Installed',
+    note: 'Moved from Downloads into the ComfyUI checkpoints folder and verified in the LTX2_SM_Clip connector dropdown.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-distilled-audio-vae-sm',
+    name: 'LTX 2.3 22B distilled audio VAE',
+    version: 'BF16 audio VAE',
+    modelType: 'Audio VAE',
+    baseModel: 'LTX 2.3',
+    sourceUrl: 'https://huggingface.co/unsloth/LTX-2.3-GGUF/tree/main/vae',
+    modelId: 'unsloth/LTX-2.3-GGUF',
+    versionId: 'ltx-2.3-22b-distilled_audio_vae.safetensors',
+    trainedWords: 'Not applicable',
+    localPath: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\vae\\ltx-2.3-22b-distilled_audio_vae.safetensors',
+    sha256: '3CD6A6EB8CB28F5ECC12F1F3126952B2A3D2B0B42AD3270E63CEFAFAFE0D9B57',
+    status: 'Installed',
+    note: 'Moved from Downloads into the ComfyUI vae folder for SM/Unsloth-name workflow compatibility.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'ltx23-distilled-video-vae-sm',
+    name: 'LTX 2.3 22B distilled video VAE',
+    version: 'BF16 video VAE',
+    modelType: 'Video VAE',
+    baseModel: 'LTX 2.3',
+    sourceUrl: 'https://huggingface.co/unsloth/LTX-2.3-GGUF/tree/main/vae',
+    modelId: 'unsloth/LTX-2.3-GGUF',
+    versionId: 'ltx-2.3-22b-distilled_video_vae.safetensors',
+    trainedWords: 'Not applicable',
+    localPath: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\vae\\ltx-2.3-22b-distilled_video_vae.safetensors',
+    sha256: 'E68D6D8F8A42942AC9B862CC315BEB3BC30805A8876C7AD63BA5BF7A2B8E168A',
+    status: 'Installed',
+    note: 'Moved from Downloads into the ComfyUI vae folder for SM/Unsloth-name workflow compatibility.',
+    movedFromDownloads: true,
+  },
+  {
+    id: 'sulphur-lora-rank-768',
+    name: 'Sulphur rank-768 distillation LoRA',
+    version: 'rank 768',
+    modelType: 'Distillation LoRA',
+    baseModel: 'LTXV 2.3 / Sulphur 2',
+    sourceUrl: 'https://huggingface.co/a4rtx/Sulphur-2-base/blob/main/sulphur_lora_rank_768.safetensors',
+    modelId: 'a4rtx/Sulphur-2-base',
+    versionId: 'sulphur_lora_rank_768.safetensors',
+    trainedWords: 'None documented (no trigger word)',
+    localPath: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\sulphur_lora_rank_768.safetensors',
+    sha256: 'B7151FC78066457A38153F3F1C899851C667527AA2108E39A7F4BE3E3B5E4F2D',
+    status: 'Installed',
+    note:
+      'Root-level hardlink alias added so the Rebels workflow can resolve the exact basename expected by its LTX2_SM_Model node.',
+    movedFromDownloads: true,
   },
   {
     id: 'ltx23-all-in-one-workflow-v40',
@@ -382,6 +661,338 @@ const downloadRows: DownloadModelRow[] = [
     sha256: '84EC722DDAB93F6489C5315BCA25DE5DD1A7B7EC5045A3C4CE2F97F62E54E8E6',
     status: 'Installed',
     note: 'Active copy already existed; matching duplicate from Downloads was moved to models\\duplicates\\Downloads.',
+  },
+]
+
+const ipAdapterRows: IPAdapterRow[] = [
+  {
+    id: 'ipadapter-clip-vit-h',
+    filename: 'CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors',
+    family: 'CLIP vision encoder',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/image_encoder/model.safetensors',
+    destination:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\clip_vision\\CLIP-ViT-H-14-laion2B-s32B-b79K.safetensors',
+    sha256: '64A7EF761BFCCBADBAA3DA77366AAC4185A6C58FA5DE5F589B42A65BCC21F161',
+    status: 'Installed',
+    note: 'Installed as an exact-name hardlink to the existing clip_vision_h.safetensors file.',
+  },
+  {
+    id: 'ipadapter-clip-vit-bigg',
+    filename: 'CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors',
+    family: 'CLIP vision encoder',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/image_encoder/model.safetensors',
+    destination:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\clip_vision\\CLIP-ViT-bigG-14-laion2B-39B-b160k.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download started but was canceled after C: reached near-zero free space.',
+  },
+  {
+    id: 'ipadapter-clip-kolors',
+    filename: 'clip-vit-large-patch14-336.bin',
+    family: 'CLIP vision encoder for Kolors',
+    sourceUrl: 'https://huggingface.co/Kwai-Kolors/Kolors-IP-Adapter-Plus/resolve/main/image_encoder/pytorch_model.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\clip_vision\\clip-vit-large-patch14-336.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space; required only for Kolors IPAdapter models.',
+  },
+  {
+    id: 'ipadapter-sd15-basic',
+    filename: 'ip-adapter_sd15.safetensors',
+    family: 'IPAdapter SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter_sd15.safetensors',
+    sha256: '289B45F16D043D0BF542E45831F971DCDAABE18B656F11E86D9DFBA7E9EE3369',
+    status: 'Installed',
+    note: 'Installed in the shared ipadapter folder.',
+  },
+  {
+    id: 'ipadapter-sd15-light-v11',
+    filename: 'ip-adapter_sd15_light_v11.bin',
+    family: 'IPAdapter SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_light_v11.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter_sd15_light_v11.bin',
+    sha256: '350B63A57847C163E2E984B01090F85FFE60EAAE20F32B2B2C9E1CCC7DDD972B',
+    status: 'Installed',
+    note: 'Installed in the shared ipadapter folder.',
+  },
+  {
+    id: 'ipadapter-sd15-plus',
+    filename: 'ip-adapter-plus_sd15.safetensors',
+    family: 'IPAdapter SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus_sd15.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-plus_sd15.safetensors',
+    sha256: 'A1C250BE40455CC61A43DA1201EC3F1EDAEA71214865FB47F57927E06CBE4996',
+    status: 'Installed',
+    note: 'Installed in the shared ipadapter folder.',
+  },
+  {
+    id: 'ipadapter-sd15-plus-face',
+    filename: 'ip-adapter-plus-face_sd15.safetensors',
+    family: 'IPAdapter SD1.5 face',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-plus-face_sd15.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-plus-face_sd15.safetensors',
+    sha256: '1C9EDC21AF6F737DC1D6E0E734190E976CFACF802D6B024B77AA3BE922F7569B',
+    status: 'Installed',
+    note: 'Installed in the shared ipadapter folder.',
+  },
+  {
+    id: 'ipadapter-sd15-full-face',
+    filename: 'ip-adapter-full-face_sd15.safetensors',
+    family: 'IPAdapter SD1.5 face',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter-full-face_sd15.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-full-face_sd15.safetensors',
+    sha256: 'F4A17FB643BF876235A45A0E87A49DA2855BE6584B28CA04C62A97AB5FF1C6F3',
+    status: 'Installed',
+    note: 'Installed in the shared ipadapter folder.',
+  },
+  {
+    id: 'ipadapter-sd15-vit-g',
+    filename: 'ip-adapter_sd15_vit-G.safetensors',
+    family: 'IPAdapter SD1.5 bigG',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_vit-G.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter_sd15_vit-G.safetensors',
+    sha256: 'A26F736AF07BB341A83DFEA23713531D0575760E8ED947C68CB31A4C62D9C90B',
+    status: 'Installed',
+    note: 'Installed, but runtime use still needs the missing bigG CLIP vision encoder.',
+  },
+  {
+    id: 'ipadapter-sdxl-vit-h',
+    filename: 'ip-adapter_sdxl_vit-h.safetensors',
+    family: 'IPAdapter SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter_sdxl_vit-h.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter_sdxl_vit-h.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download started but was canceled after C: reached near-zero free space.',
+  },
+  {
+    id: 'ipadapter-sdxl-plus-vit-h',
+    filename: 'ip-adapter-plus_sdxl_vit-h.safetensors',
+    family: 'IPAdapter SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus_sdxl_vit-h.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-plus_sdxl_vit-h.safetensors',
+    sha256: '3F5062B8400C94B7159665B21BA5C62ACDCD7682262743D7F2AEFEDEF00E6581',
+    status: 'Installed',
+    note: 'Installed in the shared ipadapter folder.',
+  },
+  {
+    id: 'ipadapter-sdxl-plus-face-vit-h',
+    filename: 'ip-adapter-plus-face_sdxl_vit-h.safetensors',
+    family: 'IPAdapter SDXL face',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter-plus-face_sdxl_vit-h.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-plus-face_sdxl_vit-h.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download started but was canceled after C: reached near-zero free space.',
+  },
+  {
+    id: 'ipadapter-sdxl-vit-g',
+    filename: 'ip-adapter_sdxl.safetensors',
+    family: 'IPAdapter SDXL bigG',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/sdxl_models/ip-adapter_sdxl.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter_sdxl.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space; runtime use also needs the missing bigG CLIP vision encoder.',
+  },
+  {
+    id: 'ipadapter-sd15-light-deprecated',
+    filename: 'ip-adapter_sd15_light.safetensors',
+    family: 'IPAdapter SD1.5 deprecated',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter/resolve/main/models/ip-adapter_sd15_light.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter_sd15_light.safetensors',
+    sha256: '0747D08DB670535BFA286452A77D93CEBAD5C677B46D038543F9F2DE8690BB26',
+    status: 'Installed',
+    note: 'Installed for legacy workflows.',
+  },
+  {
+    id: 'ipadapter-faceid-sd15',
+    filename: 'ip-adapter-faceid_sd15.bin',
+    family: 'FaceID SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid_sd15.bin',
+    sha256: '201344E22E6F55849CF07CA7A6E53D8C3B001327C66CB9710D69FD5DA48A8DA7',
+    status: 'Installed',
+    note: 'Installed. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-plusv2-sd15',
+    filename: 'ip-adapter-faceid-plusv2_sd15.bin',
+    family: 'FaceID SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid-plusv2_sd15.bin',
+    sha256: '26D0D86A1D60D6CC811D3B8862178B461E1EEB651E6FE2B72BA17AA95411E313',
+    status: 'Installed',
+    note: 'Installed. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-portrait-v11-sd15',
+    filename: 'ip-adapter-faceid-portrait-v11_sd15.bin',
+    family: 'FaceID SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait-v11_sd15.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid-portrait-v11_sd15.bin',
+    sha256: 'A48CB4F89ED18E02C6000F65AA9EFEC452E87EAED4A1BC9FCF4A460C8D0E3BC6',
+    status: 'Installed',
+    note: 'Installed. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-sdxl',
+    filename: 'ip-adapter-faceid_sdxl.bin',
+    family: 'FaceID SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sdxl.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid_sdxl.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-plusv2-sdxl',
+    filename: 'ip-adapter-faceid-plusv2_sdxl.bin',
+    family: 'FaceID SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid-plusv2_sdxl.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-portrait-sdxl',
+    filename: 'ip-adapter-faceid-portrait_sdxl.bin',
+    family: 'FaceID SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait_sdxl.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid-portrait_sdxl.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-portrait-sdxl-unnorm',
+    filename: 'ip-adapter-faceid-portrait_sdxl_unnorm.bin',
+    family: 'FaceID SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait_sdxl_unnorm.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid-portrait_sdxl_unnorm.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-plus-sd15-deprecated',
+    filename: 'ip-adapter-faceid-plus_sd15.bin',
+    family: 'FaceID SD1.5 deprecated',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plus_sd15.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid-plus_sd15.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space. Legacy FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-portrait-sd15-deprecated',
+    filename: 'ip-adapter-faceid-portrait_sd15.bin',
+    family: 'FaceID SD1.5 deprecated',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-portrait_sd15.bin',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip-adapter-faceid-portrait_sd15.bin',
+    sha256: '68570F3C14FE125B00D4ABF416AF33D8B13BB496F4E55AF2EB5D0A6017EE99A4',
+    status: 'Installed',
+    note: 'Installed for legacy workflows. FaceID workflows also require InsightFace.',
+  },
+  {
+    id: 'ipadapter-faceid-sd15-lora',
+    filename: 'ip-adapter-faceid_sd15_lora.safetensors',
+    family: 'FaceID LoRA SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sd15_lora.safetensors',
+    destination:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\IPAdapter-FaceID\\ip-adapter-faceid_sd15_lora.safetensors',
+    sha256: '70699F0DBFADD47DE1F81D263CF4C86BD4B7271D841304AF9B340B3A7F38E86A',
+    status: 'Installed',
+    note: 'Installed in the FaceID LoRA subfolder.',
+  },
+  {
+    id: 'ipadapter-faceid-plusv2-sd15-lora',
+    filename: 'ip-adapter-faceid-plusv2_sd15_lora.safetensors',
+    family: 'FaceID LoRA SD1.5',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sd15_lora.safetensors',
+    destination:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\IPAdapter-FaceID\\ip-adapter-faceid-plusv2_sd15_lora.safetensors',
+    sha256: '8ABFF87A15A049F3E0186C2E82C1C8E77783BAF2CFB63F34C412656052EB57B0',
+    status: 'Installed',
+    note: 'Installed in the FaceID LoRA subfolder.',
+  },
+  {
+    id: 'ipadapter-faceid-sdxl-lora',
+    filename: 'ip-adapter-faceid_sdxl_lora.safetensors',
+    family: 'FaceID LoRA SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid_sdxl_lora.safetensors',
+    destination:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\IPAdapter-FaceID\\ip-adapter-faceid_sdxl_lora.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space.',
+  },
+  {
+    id: 'ipadapter-faceid-plusv2-sdxl-lora',
+    filename: 'ip-adapter-faceid-plusv2_sdxl_lora.safetensors',
+    family: 'FaceID LoRA SDXL',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plusv2_sdxl_lora.safetensors',
+    destination:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\IPAdapter-FaceID\\ip-adapter-faceid-plusv2_sdxl_lora.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space.',
+  },
+  {
+    id: 'ipadapter-faceid-plus-sd15-lora-deprecated',
+    filename: 'ip-adapter-faceid-plus_sd15_lora.safetensors',
+    family: 'FaceID LoRA SD1.5 deprecated',
+    sourceUrl: 'https://huggingface.co/h94/IP-Adapter-FaceID/resolve/main/ip-adapter-faceid-plus_sd15_lora.safetensors',
+    destination:
+      'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\loras\\IPAdapter-FaceID\\ip-adapter-faceid-plus_sd15_lora.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space.',
+  },
+  {
+    id: 'ipadapter-composition-sd15',
+    filename: 'ip_plus_composition_sd15.safetensors',
+    family: 'Community IPAdapter composition',
+    sourceUrl: 'https://huggingface.co/ostris/ip-composition-adapter/resolve/main/ip_plus_composition_sd15.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip_plus_composition_sd15.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space.',
+  },
+  {
+    id: 'ipadapter-composition-sdxl',
+    filename: 'ip_plus_composition_sdxl.safetensors',
+    family: 'Community IPAdapter composition',
+    sourceUrl: 'https://huggingface.co/ostris/ip-composition-adapter/resolve/main/ip_plus_composition_sdxl.safetensors',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\ip_plus_composition_sdxl.safetensors',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space.',
+  },
+  {
+    id: 'ipadapter-kolors-plus',
+    filename: 'Kolors-IP-Adapter-Plus.bin',
+    family: 'Community IPAdapter Kolors',
+    sourceUrl:
+      'https://huggingface.co/Kwai-Kolors/Kolors-IP-Adapter-Plus/resolve/main/ip_adapter_plus_general.bin?download=true',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\Kolors-IP-Adapter-Plus.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space; requires the Kolors CLIP vision encoder.',
+  },
+  {
+    id: 'ipadapter-kolors-faceid-plus',
+    filename: 'Kolors-IP-Adapter-FaceID-Plus.bin',
+    family: 'Community IPAdapter Kolors FaceID',
+    sourceUrl:
+      'https://huggingface.co/Kwai-Kolors/Kolors-IP-Adapter-FaceID-Plus/resolve/main/ipa-faceid-plus.bin?download=true',
+    destination: 'C:\\ComfyUI\\ComfyUI_Shared_Folders\\models\\ipadapter\\Kolors-IP-Adapter-FaceID-Plus.bin',
+    sha256: 'Pending',
+    status: 'Missing',
+    note: 'Download blocked by disk space; also requires Kolors CLIP vision and InsightFace antelopev2.',
   },
 ]
 
@@ -634,6 +1245,7 @@ const referenceRows: ReferenceRow[] = [
 ]
 
 function shortHash(value: string): string {
+  if (!/^[A-Fa-f0-9]{24,}( or [A-Fa-f0-9]{24,})?$/.test(value)) return value
   if (value.includes(' or ')) {
     return value
       .split(' or ')
@@ -655,7 +1267,10 @@ function referenceLink(row: ReferenceRow) {
 export function DownloadsPage() {
   const installedCount = downloadRows.filter((row) => row.status === 'Installed').length
   const missingCount = downloadRows.filter((row) => row.status === 'Missing').length
+  const downloadingCount = downloadRows.filter((row) => row.status === 'Downloading').length
   const movedCount = downloadRows.filter((row) => row.movedFromDownloads).length
+  const ipAdapterInstalledCount = ipAdapterRows.filter((row) => row.status === 'Installed').length
+  const ipAdapterMissingCount = ipAdapterRows.filter((row) => row.status === 'Missing').length
 
   return (
     <div className="page">
@@ -686,6 +1301,10 @@ export function DownloadsPage() {
         <div>
           <span>Missing</span>
           <b>{missingCount}</b>
+        </div>
+        <div>
+          <span>Downloading</span>
+          <b>{downloadingCount}</b>
         </div>
         <p>
           <i /> Exact filenames and SHA-256 values came from the selected Civitai model-version records.
@@ -742,6 +1361,63 @@ export function DownloadsPage() {
                   <td>{row.trainedWords}</td>
                   <td>
                     <code className="mono">{row.localPath}</code>
+                  </td>
+                  <td>
+                    <code className="mono" title={row.sha256}>
+                      {shortHash(row.sha256)}
+                    </code>
+                  </td>
+                  <td>
+                    <span className="status-pill" data-status={row.status.toLowerCase()}>
+                      {row.status}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="panel" style={{ marginTop: 12 }}>
+        <header className="panel-head">
+          <div>
+            <h2>IPAdapter runtime models</h2>
+            <p>
+              Exact filenames required by ComfyUI IPAdapter Plus unified loaders. Installed {ipAdapterInstalledCount} of{' '}
+              {ipAdapterRows.length}; {ipAdapterMissingCount} remain pending because C: ran out of free space during the
+              transfer.
+            </p>
+          </div>
+        </header>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>File</th>
+                <th>Family</th>
+                <th>Source</th>
+                <th>Local placement</th>
+                <th>SHA-256</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ipAdapterRows.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <span className="mono">{row.filename}</span>
+                    <br />
+                    <small>{row.note}</small>
+                  </td>
+                  <td>{row.family}</td>
+                  <td>
+                    <a href={row.sourceUrl} target="_blank" rel="noreferrer">
+                      Hugging Face
+                    </a>
+                  </td>
+                  <td>
+                    <code className="mono">{row.destination}</code>
                   </td>
                   <td>
                     <code className="mono" title={row.sha256}>

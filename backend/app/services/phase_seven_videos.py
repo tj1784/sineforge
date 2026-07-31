@@ -25,16 +25,45 @@ from backend.app.db.base import (
     AuditLog,
     Chapter,
     PlanningMediaAsset,
+    Project,
     Scene,
     Shot,
     ShotPromptPackage,
     Story,
+)
+from backend.app.schemas.project_workflows import (
+    is_cineforge_studio_workflow_lane,
 )
 from backend.app.services import reference_assets
 
 
 class PhaseSevenVideoError(ValueError):
     pass
+
+
+def _agentless_dry_run_path(project_id: UUID) -> str:
+    return f"/projects/{project_id}/agentless-workflow/dry-run"
+
+
+def _require_legacy_video_lane(
+    db: Session,
+    story: Story,
+) -> None:
+    project = db.get(Project, story.project_id)
+    if project is not None and is_cineforge_studio_workflow_lane(
+        project.workflow_lane
+    ):
+        return
+    actual_lane = (
+        project.workflow_lane if project is not None else "missing_project"
+    )
+    project_id = project.id if project is not None else story.project_id
+    raise PhaseSevenVideoError(
+        "workflow_lane_mismatch: The legacy Phase 7 video queue requires "
+        "workflow_lane='cineforge_studio'; received "
+        f"{actual_lane!r}. Use {_agentless_dry_run_path(project_id)} for the "
+        "deterministic scene-reset contract."
+    )
 
 
 DEFAULT_PHASE7_WORKFLOW_LABEL = "CineForge Phase 7 WAN 2.1 LightX2V I2V 480p"
@@ -44,7 +73,6 @@ DEFAULT_PHASE7_VIDEO_WORKFLOW_PATHS = (
     / "storage"
     / "handoff_workflows"
     / "cineforge-phase7-wan21-lightx2v-i2v480p.api.json",
-    Path(r"C:\ComfyUI\BlokeyUI\ComfyAPI-Runner\static_workflows\cineforge-phase7-wan21-lightx2v-i2v480p.api.json"),
 )
 DEFAULT_COMFY_INPUT_DIR = Path(r"C:\ComfyUI\LTX\ComfyUI\ComfyUI\input")
 DEFAULT_VIDEO_FPS = 16.0
@@ -284,6 +312,7 @@ def queue_story_videos(
     workflow_api_json: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     story = _story(db, story_id)
+    _require_legacy_video_lane(db, story)
     rows = _shot_rows(db, story_id)
     if not rows:
         raise PhaseSevenVideoError("Phase 7 has no shots to queue.")

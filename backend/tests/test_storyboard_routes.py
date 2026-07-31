@@ -33,7 +33,13 @@ def client(tmp_path) -> Generator[TestClient, None, None]:
 
 
 def make_story(client: TestClient) -> dict:
-    project = client.post("/projects", json={"name": "Storyboard test"}).json()
+    project = client.post(
+        "/projects",
+        json={
+            "name": "Storyboard test",
+            "workflow_lane": "cineforge_studio",
+        },
+    ).json()
     response = client.post("/storyboard/stories", json={"project_id": project["id"], "title": "A test story", "base_story": "A small planning story.", "target_duration_sec": 8})
     assert response.status_code == 201
     return response.json()

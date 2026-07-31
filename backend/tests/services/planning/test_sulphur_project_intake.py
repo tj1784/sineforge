@@ -18,6 +18,7 @@ def configured_settings(tmp_path) -> Settings:
     model = tmp_path / "sulphur_prompt_enhancer_model-q8_0.gguf"
     model.write_bytes(b"test-model-evidence")
     return Settings(
+        storage_root=tmp_path / "storage",
         sulphur_planning_enabled=True,
         sulphur_phase_one_enabled=True,
         sulphur_model_path=model,
@@ -64,6 +65,8 @@ def test_sulphur_intake_preserves_full_prompt_and_plans_required_scenes(tmp_path
     intake = build_sulphur_project_intake(
         SulphurProjectPromptCreate(
             idempotency_key="sulphur-intake-test-1",
+            workflow_lane="cineforge_studio",
+            planning_agent="sulphur",
             prompt=source_prompt,
         ),
         settings=configured_settings(tmp_path),
@@ -77,6 +80,7 @@ def test_sulphur_intake_preserves_full_prompt_and_plans_required_scenes(tmp_path
     assert intake.workspace_payload.run_phase_one is True
     assert intake.workspace_payload.bootstrap_phase_plan is True
     assert intake.workspace_payload.auto_approve_phases_through == 5
+    assert intake.workspace_payload.require_production_plan_approval is False
     assert intake.workspace_payload.requested_chapter_count == 2
     assert intake.workspace_payload.prefer_local_providers is True
     assert intake.clip_plan.planned_scene_count == 16
@@ -84,6 +88,8 @@ def test_sulphur_intake_preserves_full_prompt_and_plans_required_scenes(tmp_path
     assert sum(intake.clip_plan.scene_duration_plan_sec) == pytest.approx(125, abs=1e-9)
     assert all(6 <= item <= 10 for item in intake.clip_plan.scene_duration_plan_sec)
     assert "exactly 16 scenes" in (intake.workspace_payload.production_notes or "")
+    assert intake.planning_agent == "sulphur"
+    assert intake.intake_model == "sulphur-2-base"
 
 
 def test_scene_count_uses_ceiling_of_seconds_divided_by_eight():
@@ -93,6 +99,59 @@ def test_scene_count_uses_ceiling_of_seconds_divided_by_eight():
     assert len(plan.scene_duration_plan_sec) == 38
     assert sum(plan.scene_duration_plan_sec) == pytest.approx(300, abs=1e-9)
     assert plan.durations_within_generation_range is True
+
+
+def test_qwen_agent_uses_its_request_scoped_model_without_changing_global_selection(
+    tmp_path,
+):
+    settings = configured_settings(tmp_path)
+    qwen_model = tmp_path / "qwen3-4b-q4_k_m.gguf"
+    qwen_model.write_bytes(b"test-qwen-model-evidence")
+    settings = settings.model_copy(
+        update={
+            "qwen_model_path": qwen_model,
+            "qwen_model_id": "qwen3-4b-test",
+        }
+    )
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.read())
+        assert body["model"] == "qwen3.5-9b-defiant"
+        return httpx.Response(
+            200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "title": "Qwen Project",
+                                    "description": "A request-scoped Qwen intake.",
+                                    "target_duration_sec": 60,
+                                }
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    intake = build_sulphur_project_intake(
+        SulphurProjectPromptCreate(
+            idempotency_key="qwen-intake-test-001",
+            workflow_lane="cineforge_studio",
+            planning_agent="qwen",
+            planning_model_id="qwen3.5-9b-defiant",
+            prompt="Create a complete 60-second story about a night train.",
+        ),
+        settings=settings,
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert intake.planning_agent == "qwen"
+    assert intake.intake_model == "qwen3.5-9b-defiant"
+    assert intake.workspace_payload.planning_model_id == "qwen3.5-9b-defiant"
+    assert intake.workspace_payload.privacy_preference == "Local-only Qwen planning"
 
 
 def test_explicit_runtime_overrides_sulphur_fallback_arithmetic(tmp_path):
@@ -127,6 +186,8 @@ def test_explicit_runtime_overrides_sulphur_fallback_arithmetic(tmp_path):
     intake = build_sulphur_project_intake(
         SulphurProjectPromptCreate(
             idempotency_key="sulphur-runtime-correction",
+            workflow_lane="cineforge_studio",
+            planning_agent="sulphur",
             prompt=source_prompt,
         ),
         settings=configured_settings(tmp_path),
@@ -167,6 +228,8 @@ def test_word_and_compound_runtimes_are_deterministic(tmp_path):
     one_minute = build_sulphur_project_intake(
         SulphurProjectPromptCreate(
             idempotency_key="sulphur-runtime-one-minute",
+            workflow_lane="cineforge_studio",
+            planning_agent="sulphur",
             prompt="Create a one-minute cinematic short about a train station.",
         ),
         settings=configured_settings(tmp_path),
@@ -175,6 +238,8 @@ def test_word_and_compound_runtimes_are_deterministic(tmp_path):
     compound = build_sulphur_project_intake(
         SulphurProjectPromptCreate(
             idempotency_key="sulphur-runtime-compound",
+            workflow_lane="cineforge_studio",
+            planning_agent="sulphur",
             prompt="Create a 2 minute 5 second cinematic short about a courier.",
         ),
         settings=configured_settings(tmp_path),
@@ -197,6 +262,8 @@ def test_invalid_sulphur_brief_fails_before_project_creation(tmp_path):
         build_sulphur_project_intake(
             SulphurProjectPromptCreate(
                 idempotency_key="sulphur-intake-test-2",
+                workflow_lane="cineforge_studio",
+                planning_agent="sulphur",
                 prompt="Create a complete one-minute cinematic story about a winter lighthouse.",
             ),
             settings=configured_settings(tmp_path),

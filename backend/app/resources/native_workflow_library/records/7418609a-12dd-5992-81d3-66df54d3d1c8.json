@@ -1,0 +1,1221 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "7418609a-12dd-5992-81d3-66df54d3d1c8",
+  "name": "3. Boogu Edit - One Image",
+  "version": "1.0",
+  "description": "3. Boogu Edit - One Image is a image utilities workflow designed to inspect, transform, compare, or compose image assets using Boogu. Its 16-node graph exposes 2 prompt/text field(s), 2 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Image Editing & Composition",
+  "subcategory": "Image utilities",
+  "episode": "EP25",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Review the model-file entries in Requirements and place each checkpoint, text encoder, VAE, LoRA, or auxiliary model in the folder documented by the source workflow. Refresh ComfyUI after adding files.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Check image order, masks, crop/resize behavior, denoise strength, and edit prompt. Preview the mask or composite before spending time on the final sample.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "Boogu",
+    "EP25",
+    "Image Editing & Composition",
+    "Image utilities"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma",
+      "pixaroma",
+      "Pixaroma YouTube Channel"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "CLIPLoader",
+      "EmptySD3LatentImage",
+      "KSampler",
+      "ModelSamplingAuraFlow",
+      "PixaromaCompare",
+      "PixaromaLabel",
+      "PixaromaLoadImage",
+      "PixaromaNote",
+      "PixaromaPreview",
+      "PixaromaRunTimer",
+      "PixaromaSeed",
+      "PixaromaText",
+      "TextEncodeBooguEdit",
+      "UNETLoader",
+      "VAEDecode",
+      "VAELoader"
+    ],
+    "model_files": [
+      {
+        "node_id": "194",
+        "node_type": "UNETLoader",
+        "input": "unet_name",
+        "value": "boogu\\boogu_image_edit_turbo_int8_convrot.safetensors"
+      },
+      {
+        "node_id": "195",
+        "node_type": "CLIPLoader",
+        "input": "clip_name",
+        "value": "qwen3vl_8b_fp8_scaled.safetensors"
+      },
+      {
+        "node_id": "196",
+        "node_type": "VAELoader",
+        "input": "vae_name",
+        "value": "ae.safetensors"
+      }
+    ],
+    "media_inputs": [
+      {
+        "node_id": "215",
+        "node_type": "PixaromaLoadImage",
+        "input": "image",
+        "default": "BunnyExplorer.png"
+      },
+      {
+        "node_id": "215",
+        "node_type": "PixaromaLoadImage",
+        "input": "LoadImagePixState",
+        "default": "{\"version\":1,\"mode\":\"max_mp\",\"max_mp\":1,\"longest_side\":1024,\"scale_factor\":1,\"fit_w\":1024,\"fit_h\":1024,\"cover_w\":1024,\"cover_h\":1024,\"ratio_preset\":\"1:1\",\"ratio_w\":1,\"ratio_h\":1,\"ratio_action\":\"crop\",\"pad_color\":\"#808080\",\"pad_top\":0,\"pad_bottom\":0,\"pad_left\":0,\"pad_right\":0,\"crop_anchor\":\"center\",\"crop_scale\":true,\"snap\":0,\"resample\":\"auto\",\"allow_upscale\":true,\"orig_name\":\"BunnyExplorer.png\"}"
+      }
+    ],
+    "prompt_field_count": 2,
+    "output_node_count": 1,
+    "documentation_notes": "{\"version\":1,\"content\":\"<h1>MODELS AND NODES USED IN THIS WORKFLOW</h1><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"model-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load Diffusion Model</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/resolve/main/diffusion_models/boogu_image_edit_turbo_int8_convrot.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download Turbo INT8 boogu_image_edit_turbo_int8_convrot.safetensors<span class=\\\"pix-note-btnsize\\\">10.6 GB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/diffusion_models/boogu</div><p>\\n\\n</p><p>Create the <code>boogu</code> folder if it does not exist.</p><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-rm\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/tree/main/diffusion_models\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">More versions</a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"CLIP\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load CLIP</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/resolve/main/text_encoders/qwen3vl_8b_fp8_scaled.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download qwen3vl_8b_fp8_scaled.safetensors<span class=\\\"pix-note-btnsize\\\">9.9 GB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/text_encoders</div><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"VAE\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load VAE</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/vae/ae.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download ae.safetensors<span class=\\\"pix-note-btnsize\\\">320 MB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/vae</div><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p><span data-ic=\\\"warning-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;After placing the files, restart ComfyUI or refresh model lists using the <b>R</b> shortcut.</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"nodes-installed\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Nodes Installed from Manager</h2><p>\\n\\n</p><ul>\\n  <li>Pixaroma</li>\\n</ul><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"pixaroma\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Resources</h2><p>\\n\\n</p><p>\\n  <a class=\\\"pix-note-discord\\\" href=\\\"https://discord.com/invite/gggpkVgBf3\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Join Discord</a>&nbsp;\\n  <a class=\\\"pix-note-yt\\\" href=\\\"https://www.youtube.com/@pixaroma\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Pixaroma YouTube Channel</a>&nbsp;\\n</p>\",\"buttonColor\":\"#f66744\",\"lineColor\":\"#f66744\",\"width\":547.2501028356285,\"height\":664.1100961777862,\"backgroundColor\":\"#2a2a2a\"}"
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep25 workflows/ep25 workflows/boogu/3. boogu edit - one image.json",
+  "source_filename": "3. Boogu Edit - One Image.json",
+  "source_archive": "Ep25 Workflows.zip",
+  "source_entry": "Ep25 Workflows/Ep25 Workflows/Boogu/3. Boogu Edit - One Image.json",
+  "source_workflow": {
+    "id": "c5beec59-2b88-4f3f-ba35-7640a58a9ba6",
+    "revision": 0,
+    "last_node_id": 221,
+    "last_link_id": 273,
+    "nodes": [
+      {
+        "id": 197,
+        "type": "PixaromaNote",
+        "pos": [
+          -1612.2416742377316,
+          217.83035566381673
+        ],
+        "size": [
+          547.2501028356285,
+          664.1100961777862
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "1227d9898f9d5137533df750611ca97e8c738f3d",
+          "Node name for S&R": "PixaromaNote"
+        },
+        "widgets_values": [
+          "{\"version\":1,\"content\":\"<h1>MODELS AND NODES USED IN THIS WORKFLOW</h1><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"model-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load Diffusion Model</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/resolve/main/diffusion_models/boogu_image_edit_turbo_int8_convrot.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download Turbo INT8 boogu_image_edit_turbo_int8_convrot.safetensors<span class=\\\"pix-note-btnsize\\\">10.6 GB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/diffusion_models/boogu</div><p>\\n\\n</p><p>Create the <code>boogu</code> folder if it does not exist.</p><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-rm\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/tree/main/diffusion_models\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">More versions</a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"CLIP\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load CLIP</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/resolve/main/text_encoders/qwen3vl_8b_fp8_scaled.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download qwen3vl_8b_fp8_scaled.safetensors<span class=\\\"pix-note-btnsize\\\">9.9 GB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/text_encoders</div><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"VAE\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load VAE</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/vae/ae.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download ae.safetensors<span class=\\\"pix-note-btnsize\\\">320 MB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/vae</div><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p><span data-ic=\\\"warning-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;After placing the files, restart ComfyUI or refresh model lists using the <b>R</b> shortcut.</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"nodes-installed\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Nodes Installed from Manager</h2><p>\\n\\n</p><ul>\\n  <li>Pixaroma</li>\\n</ul><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"pixaroma\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Resources</h2><p>\\n\\n</p><p>\\n  <a class=\\\"pix-note-discord\\\" href=\\\"https://discord.com/invite/gggpkVgBf3\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Join Discord</a>&nbsp;\\n  <a class=\\\"pix-note-yt\\\" href=\\\"https://www.youtube.com/@pixaroma\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Pixaroma YouTube Channel</a>&nbsp;\\n</p>\",\"buttonColor\":\"#f66744\",\"lineColor\":\"#f66744\",\"width\":547.2501028356285,\"height\":664.1100961777862,\"backgroundColor\":\"#2a2a2a\"}",
+          ""
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 195,
+        "type": "CLIPLoader",
+        "pos": [
+          -1032.3327979409496,
+          365.6745421737079
+        ],
+        "size": [
+          495.8871826591876,
+          106
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "CLIP",
+            "type": "CLIP",
+            "links": [
+              259
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.76",
+          "Node name for S&R": "CLIPLoader"
+        },
+        "widgets_values": [
+          "qwen3vl_8b_fp8_scaled.safetensors",
+          "boogu",
+          "default"
+        ],
+        "color": "#f66744",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 196,
+        "type": "VAELoader",
+        "pos": [
+          -1032.3327979409496,
+          537.5187286835991
+        ],
+        "size": [
+          495.8871826591876,
+          58
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "VAE",
+            "type": "VAE",
+            "links": [
+              236,
+              260
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.76",
+          "Node name for S&R": "VAELoader"
+        },
+        "widgets_values": [
+          "ae.safetensors"
+        ],
+        "color": "#f66744",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 194,
+        "type": "UNETLoader",
+        "pos": [
+          -1032.3327979409496,
+          217.83035566381673
+        ],
+        "size": [
+          495.8871826591876,
+          82
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "MODEL",
+            "type": "MODEL",
+            "links": [
+              271
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.76",
+          "Node name for S&R": "UNETLoader"
+        },
+        "widgets_values": [
+          "boogu\\boogu_image_edit_turbo_int8_convrot.safetensors",
+          "default"
+        ],
+        "color": "#f66744",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 219,
+        "type": "ModelSamplingAuraFlow",
+        "pos": [
+          -510.6173893074787,
+          217.83035566381673
+        ],
+        "size": [
+          260.0858377843416,
+          58
+        ],
+        "flags": {},
+        "order": 9,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "model",
+            "type": "MODEL",
+            "link": 271
+          }
+        ],
+        "outputs": [
+          {
+            "name": "MODEL",
+            "type": "MODEL",
+            "links": [
+              272
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.27.0",
+          "Node name for S&R": "ModelSamplingAuraFlow"
+        },
+        "widgets_values": [
+          3.16
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 213,
+        "type": "TextEncodeBooguEdit",
+        "pos": [
+          -510.6173893074787,
+          361.49549993049607
+        ],
+        "size": [
+          260.0858377843416,
+          222
+        ],
+        "flags": {},
+        "order": 10,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "clip",
+            "type": "CLIP",
+            "link": 259
+          },
+          {
+            "name": "vae",
+            "type": "VAE",
+            "link": 260
+          },
+          {
+            "label": "image_1",
+            "name": "images.image_1",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": 262
+          },
+          {
+            "label": "image_2",
+            "name": "images.image_2",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": null
+          },
+          {
+            "name": "prompt",
+            "type": "STRING",
+            "widget": {
+              "name": "prompt"
+            },
+            "link": 273
+          }
+        ],
+        "outputs": [
+          {
+            "name": "positive",
+            "type": "CONDITIONING",
+            "links": [
+              265
+            ]
+          },
+          {
+            "name": "negative",
+            "type": "CONDITIONING",
+            "links": [
+              266
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.27.0",
+          "Node name for S&R": "TextEncodeBooguEdit"
+        },
+        "widgets_values": [
+          "",
+          ""
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 164,
+        "type": "VAEDecode",
+        "pos": [
+          109.83845980430958,
+          217.83035566381673
+        ],
+        "size": [
+          140,
+          46
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 13,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "samples",
+            "type": "LATENT",
+            "link": 257
+          },
+          {
+            "name": "vae",
+            "type": "VAE",
+            "link": 236
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              268,
+              270
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.32",
+          "Node name for S&R": "VAEDecode"
+        },
+        "widgets_values": [],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 218,
+        "type": "PixaromaPreview",
+        "pos": [
+          585.8740724544626,
+          319.5187286835991
+        ],
+        "size": [
+          415.61810868087366,
+          495.1100961777862
+        ],
+        "flags": {},
+        "order": 15,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 270
+          }
+        ],
+        "outputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "e9a57031954d7be8235bcb7abdf5fd4c98b6a679",
+          "Node name for S&R": "PixaromaPreview",
+          "pixaromaFrames": [
+            {
+              "filename": "pixaroma_preview_7c5236b1858645129553df6044e937f6.png",
+              "subfolder": "",
+              "type": "temp"
+            }
+          ],
+          "pixaromaSelected": 0,
+          "pixaromaExpanded": false
+        },
+        "widgets_values": [
+          "img",
+          "preview"
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 220,
+        "type": "PixaromaText",
+        "pos": [
+          -652.6173893074787,
+          694.5388658512186
+        ],
+        "size": [
+          412,
+          357.4643974525569
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "links": [
+              273
+            ]
+          }
+        ],
+        "title": "Edit Prompt",
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "e9a57031954d7be8235bcb7abdf5fd4c98b6a679",
+          "Node name for S&R": "PixaromaText"
+        },
+        "widgets_values": [
+          "replace the background with a exotic beach",
+          ""
+        ],
+        "color": "#1e3323",
+        "bgcolor": "#36543d"
+      },
+      {
+        "id": 198,
+        "type": "PixaromaLabel",
+        "pos": [
+          -1612.2416742377316,
+          109.16172418906586
+        ],
+        "size": [
+          353,
+          51
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 5,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "80b307e8d1882fd933959cb0ea94a26d143557b5",
+          "Node name for S&R": "PixaromaLabel",
+          "aux_id": "pixaroma/ComfyUI-Pixaroma"
+        },
+        "widgets_values": [
+          "{\"text\":\"Boogu Edit - One Image\",\"fontSize\":31,\"fontFamily\":\"Arial\",\"fontColor\":\"#ffffff\",\"textAlign\":\"left\",\"backgroundColor\":\"#f66744\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1}"
+        ],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)"
+      },
+      {
+        "id": 204,
+        "type": "PixaromaSeed",
+        "pos": [
+          -217.31175257820564,
+          537.5187286835991
+        ],
+        "size": [
+          300,
+          86
+        ],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "seed",
+            "type": "INT",
+            "links": [
+              241
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "ffcf2f56aa448f2df763b09b70857632792b7805",
+          "Node name for S&R": "PixaromaSeed",
+          "seedState": "{\"seed\":1976875927024209,\"mode\":\"random\",\"compact\":true,\"digits\":16}"
+        },
+        "widgets_values": [
+          {
+            "seed": 1976875927024209,
+            "mode": "random",
+            "compact": true,
+            "digits": 16
+          }
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 163,
+        "type": "KSampler",
+        "pos": [
+          -215.42165205067136,
+          215.49549993049607
+        ],
+        "size": [
+          298.1098994724657,
+          262
+        ],
+        "flags": {},
+        "order": 12,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "model",
+            "type": "MODEL",
+            "link": 272
+          },
+          {
+            "name": "positive",
+            "type": "CONDITIONING",
+            "link": 265
+          },
+          {
+            "name": "negative",
+            "type": "CONDITIONING",
+            "link": 266
+          },
+          {
+            "name": "latent_image",
+            "type": "LATENT",
+            "link": 186
+          },
+          {
+            "name": "seed",
+            "type": "INT",
+            "widget": {
+              "name": "seed"
+            },
+            "link": 241
+          }
+        ],
+        "outputs": [
+          {
+            "name": "LATENT",
+            "type": "LATENT",
+            "slot_index": 0,
+            "links": [
+              257
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.27",
+          "Node name for S&R": "KSampler"
+        },
+        "widgets_values": [
+          35,
+          "fixed",
+          4,
+          1,
+          "dpmpp_2m",
+          "simple",
+          1
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 162,
+        "type": "EmptySD3LatentImage",
+        "pos": [
+          -215.42165205067136,
+          694.5388658512186
+        ],
+        "size": [
+          226,
+          107.66122679194416
+        ],
+        "flags": {},
+        "order": 11,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "width",
+            "type": "INT",
+            "widget": {
+              "name": "width"
+            },
+            "link": 263
+          },
+          {
+            "name": "height",
+            "type": "INT",
+            "widget": {
+              "name": "height"
+            },
+            "link": 264
+          }
+        ],
+        "outputs": [
+          {
+            "name": "LATENT",
+            "type": "LATENT",
+            "slot_index": 0,
+            "links": [
+              186
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.32",
+          "Node name for S&R": "EmptySD3LatentImage"
+        },
+        "widgets_values": [
+          1024,
+          1024,
+          1
+        ],
+        "color": "#342339",
+        "bgcolor": "#593359"
+      },
+      {
+        "id": 215,
+        "type": "PixaromaLoadImage",
+        "pos": [
+          -1032.3327979409496,
+          694.5388658512186
+        ],
+        "size": [
+          360,
+          763.5362342986559
+        ],
+        "flags": {},
+        "order": 7,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "links": [
+              262,
+              267
+            ]
+          },
+          {
+            "name": "mask",
+            "type": "MASK",
+            "links": null
+          },
+          {
+            "name": "width",
+            "type": "INT",
+            "links": [
+              263
+            ]
+          },
+          {
+            "name": "height",
+            "type": "INT",
+            "links": [
+              264
+            ]
+          },
+          {
+            "name": "filename",
+            "type": "STRING",
+            "links": null
+          },
+          {
+            "name": "original_width",
+            "type": "INT",
+            "links": null
+          },
+          {
+            "name": "original_height",
+            "type": "INT",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "e9a57031954d7be8235bcb7abdf5fd4c98b6a679",
+          "Node name for S&R": "PixaromaLoadImage",
+          "loadImagePixState": "{\"version\":1,\"mode\":\"max_mp\",\"max_mp\":1,\"longest_side\":1024,\"scale_factor\":1,\"fit_w\":1024,\"fit_h\":1024,\"cover_w\":1024,\"cover_h\":1024,\"ratio_preset\":\"1:1\",\"ratio_w\":1,\"ratio_h\":1,\"ratio_action\":\"crop\",\"pad_color\":\"#808080\",\"pad_top\":0,\"pad_bottom\":0,\"pad_left\":0,\"pad_right\":0,\"crop_anchor\":\"center\",\"crop_scale\":true,\"snap\":0,\"resample\":\"auto\",\"allow_upscale\":true}"
+        },
+        "widgets_values": [
+          "BunnyExplorer.png",
+          "image",
+          ""
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 216,
+        "type": "PixaromaCompare",
+        "pos": [
+          109.83845980430958,
+          319.5187286835991
+        ],
+        "size": [
+          440,
+          494
+        ],
+        "flags": {},
+        "order": 14,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image1",
+            "type": "IMAGE",
+            "link": 267
+          },
+          {
+            "name": "image2",
+            "type": "IMAGE",
+            "link": 268
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "e9a57031954d7be8235bcb7abdf5fd4c98b6a679",
+          "Node name for S&R": "PixaromaCompare",
+          "compareState": {
+            "mode": 0,
+            "showWhich": 0,
+            "opacity": 0.5,
+            "images": [
+              {
+                "filename": "pixaroma_compare_pixcmp_diwjv_00003_.png",
+                "subfolder": "",
+                "type": "temp"
+              },
+              {
+                "filename": "pixaroma_compare_pixcmp_diwjv_00004_.png",
+                "subfolder": "",
+                "type": "temp"
+              }
+            ]
+          }
+        },
+        "widgets_values": [],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 221,
+        "type": "PixaromaRunTimer",
+        "pos": [
+          862.4921811353363,
+          833.2710645774971
+        ],
+        "size": [
+          139,
+          50
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 8,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "08d9e2254442889287e8834adab0c37404970d23",
+          "Node name for S&R": "PixaromaRunTimer",
+          "runTimerLastMs": 4086.39999999851
+        },
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      }
+    ],
+    "links": [
+      [
+        186,
+        162,
+        0,
+        163,
+        3,
+        "LATENT"
+      ],
+      [
+        236,
+        196,
+        0,
+        164,
+        1,
+        "VAE"
+      ],
+      [
+        241,
+        204,
+        0,
+        163,
+        4,
+        "INT"
+      ],
+      [
+        257,
+        163,
+        0,
+        164,
+        0,
+        "LATENT"
+      ],
+      [
+        259,
+        195,
+        0,
+        213,
+        0,
+        "CLIP"
+      ],
+      [
+        260,
+        196,
+        0,
+        213,
+        1,
+        "VAE"
+      ],
+      [
+        262,
+        215,
+        0,
+        213,
+        2,
+        "IMAGE"
+      ],
+      [
+        263,
+        215,
+        2,
+        162,
+        0,
+        "INT"
+      ],
+      [
+        264,
+        215,
+        3,
+        162,
+        1,
+        "INT"
+      ],
+      [
+        265,
+        213,
+        0,
+        163,
+        1,
+        "CONDITIONING"
+      ],
+      [
+        266,
+        213,
+        1,
+        163,
+        2,
+        "CONDITIONING"
+      ],
+      [
+        267,
+        215,
+        0,
+        216,
+        0,
+        "IMAGE"
+      ],
+      [
+        268,
+        164,
+        0,
+        216,
+        1,
+        "IMAGE"
+      ],
+      [
+        270,
+        164,
+        0,
+        218,
+        0,
+        "IMAGE"
+      ],
+      [
+        271,
+        194,
+        0,
+        219,
+        0,
+        "MODEL"
+      ],
+      [
+        272,
+        219,
+        0,
+        163,
+        0,
+        "MODEL"
+      ],
+      [
+        273,
+        220,
+        0,
+        213,
+        4,
+        "STRING"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 0.6934334949441692,
+        "offset": [
+          1872.0862239740507,
+          63.750697431778086
+        ]
+      },
+      "frontendVersion": "1.45.20",
+      "node_versions": {
+        "ComfyUI-GGUF": "8098c7149fa4ff14991eb3347a5585051ceeafbe",
+        "comfy-core": "v0.3.10-37-gd055325",
+        "rgthree-comfy": "5d771b8b56a343c24a26e8cea1f0c87c3d58102f"
+      },
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true,
+      "workflowRendererVersion": "LG"
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "1b528c4d5f43dfc618b0b7e3d6b21979b2266f3f94433b517f0270de2fccbf98",
+  "workflow": {
+    "162": {
+      "inputs": {
+        "width": [
+          "215",
+          2
+        ],
+        "height": [
+          "215",
+          3
+        ],
+        "batch_size": 1
+      },
+      "class_type": "EmptySD3LatentImage",
+      "_meta": {
+        "title": "EmptySD3LatentImage"
+      }
+    },
+    "163": {
+      "inputs": {
+        "seed": [
+          "204",
+          0
+        ],
+        "steps": 4,
+        "cfg": 1,
+        "sampler_name": "dpmpp_2m",
+        "scheduler": "simple",
+        "denoise": 1,
+        "model": [
+          "219",
+          0
+        ],
+        "positive": [
+          "213",
+          0
+        ],
+        "negative": [
+          "213",
+          1
+        ],
+        "latent_image": [
+          "162",
+          0
+        ]
+      },
+      "class_type": "KSampler",
+      "_meta": {
+        "title": "KSampler"
+      }
+    },
+    "164": {
+      "inputs": {
+        "samples": [
+          "163",
+          0
+        ],
+        "vae": [
+          "196",
+          0
+        ]
+      },
+      "class_type": "VAEDecode",
+      "_meta": {
+        "title": "VAE Decode"
+      }
+    },
+    "194": {
+      "inputs": {
+        "unet_name": "boogu\\boogu_image_edit_turbo_int8_convrot.safetensors",
+        "weight_dtype": "default"
+      },
+      "class_type": "UNETLoader",
+      "_meta": {
+        "title": "Load Diffusion Model"
+      }
+    },
+    "195": {
+      "inputs": {
+        "clip_name": "qwen3vl_8b_fp8_scaled.safetensors",
+        "type": "boogu",
+        "device": "default"
+      },
+      "class_type": "CLIPLoader",
+      "_meta": {
+        "title": "Load CLIP"
+      }
+    },
+    "196": {
+      "inputs": {
+        "vae_name": "ae.safetensors"
+      },
+      "class_type": "VAELoader",
+      "_meta": {
+        "title": "Load VAE"
+      }
+    },
+    "197": {
+      "inputs": {
+        "note_json": "{\"version\":1,\"content\":\"<h1>MODELS AND NODES USED IN THIS WORKFLOW</h1><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"model-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load Diffusion Model</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/resolve/main/diffusion_models/boogu_image_edit_turbo_int8_convrot.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download Turbo INT8 boogu_image_edit_turbo_int8_convrot.safetensors<span class=\\\"pix-note-btnsize\\\">10.6 GB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/diffusion_models/boogu</div><p>\\n\\n</p><p>Create the <code>boogu</code> folder if it does not exist.</p><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-rm\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/tree/main/diffusion_models\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">More versions</a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"CLIP\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load CLIP</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/Boogu-Image/resolve/main/text_encoders/qwen3vl_8b_fp8_scaled.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download qwen3vl_8b_fp8_scaled.safetensors<span class=\\\"pix-note-btnsize\\\">9.9 GB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/text_encoders</div><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"VAE\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load VAE</h2><p>\\n\\n</p><p>\\n<span class=\\\"pix-note-btnblock\\\">\\n  <a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/Comfy-Org/HiDream-I1_ComfyUI/resolve/main/split_files/vae/ae.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download ae.safetensors<span class=\\\"pix-note-btnsize\\\">320 MB</span></a>\\n</span>&nbsp;\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/vae</div><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p><span data-ic=\\\"warning-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;After placing the files, restart ComfyUI or refresh model lists using the <b>R</b> shortcut.</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"nodes-installed\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Nodes Installed from Manager</h2><p>\\n\\n</p><ul>\\n  <li>Pixaroma</li>\\n</ul><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><h2><span data-ic=\\\"pixaroma\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Resources</h2><p>\\n\\n</p><p>\\n  <a class=\\\"pix-note-discord\\\" href=\\\"https://discord.com/invite/gggpkVgBf3\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Join Discord</a>&nbsp;\\n  <a class=\\\"pix-note-yt\\\" href=\\\"https://www.youtube.com/@pixaroma\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Pixaroma YouTube Channel</a>&nbsp;\\n</p>\",\"buttonColor\":\"#f66744\",\"lineColor\":\"#f66744\",\"width\":547.2501028356285,\"height\":664.1100961777862,\"backgroundColor\":\"#2a2a2a\"}"
+      },
+      "class_type": "PixaromaNote",
+      "_meta": {
+        "title": "Note Pixaroma"
+      }
+    },
+    "198": {
+      "inputs": {
+        "label_json": "{\"text\":\"Boogu Edit - One Image\",\"fontSize\":31,\"fontFamily\":\"Arial\",\"fontColor\":\"#ffffff\",\"textAlign\":\"left\",\"backgroundColor\":\"#f66744\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "204": {
+      "inputs": {
+        "SeedState": "{\"runSeed\":2152166968730060}"
+      },
+      "class_type": "PixaromaSeed",
+      "_meta": {
+        "title": "Seed Pixaroma"
+      }
+    },
+    "213": {
+      "inputs": {
+        "prompt": [
+          "220",
+          0
+        ],
+        "negative_prompt": "",
+        "clip": [
+          "195",
+          0
+        ],
+        "vae": [
+          "196",
+          0
+        ],
+        "images.image_1": [
+          "215",
+          0
+        ]
+      },
+      "class_type": "TextEncodeBooguEdit",
+      "_meta": {
+        "title": "TextEncodeBooguEdit"
+      }
+    },
+    "215": {
+      "inputs": {
+        "image": "BunnyExplorer.png",
+        "LoadImagePixState": "{\"version\":1,\"mode\":\"max_mp\",\"max_mp\":1,\"longest_side\":1024,\"scale_factor\":1,\"fit_w\":1024,\"fit_h\":1024,\"cover_w\":1024,\"cover_h\":1024,\"ratio_preset\":\"1:1\",\"ratio_w\":1,\"ratio_h\":1,\"ratio_action\":\"crop\",\"pad_color\":\"#808080\",\"pad_top\":0,\"pad_bottom\":0,\"pad_left\":0,\"pad_right\":0,\"crop_anchor\":\"center\",\"crop_scale\":true,\"snap\":0,\"resample\":\"auto\",\"allow_upscale\":true,\"orig_name\":\"BunnyExplorer.png\"}"
+      },
+      "class_type": "PixaromaLoadImage",
+      "_meta": {
+        "title": "Load Image Pixaroma"
+      }
+    },
+    "216": {
+      "inputs": {
+        "image1": [
+          "215",
+          0
+        ],
+        "image2": [
+          "164",
+          0
+        ]
+      },
+      "class_type": "PixaromaCompare",
+      "_meta": {
+        "title": "Image Compare Pixaroma"
+      }
+    },
+    "218": {
+      "inputs": {
+        "filename_prefix": "img",
+        "save_mode": "preview",
+        "pixaroma_buttons": null,
+        "pixaroma_strip": null,
+        "image": [
+          "164",
+          0
+        ],
+        "CivitaiMeta": "0"
+      },
+      "class_type": "PixaromaPreview",
+      "_meta": {
+        "title": "Preview Image Pixaroma"
+      }
+    },
+    "219": {
+      "inputs": {
+        "shift": 3.16,
+        "model": [
+          "194",
+          0
+        ]
+      },
+      "class_type": "ModelSamplingAuraFlow",
+      "_meta": {
+        "title": "ModelSamplingAuraFlow"
+      }
+    },
+    "220": {
+      "inputs": {
+        "text": "replace the background with a exotic beach"
+      },
+      "class_type": "PixaromaText",
+      "_meta": {
+        "title": "Edit Prompt"
+      }
+    },
+    "221": {
+      "inputs": {},
+      "class_type": "PixaromaRunTimer",
+      "_meta": {
+        "title": "Run Timer Pixaroma"
+      }
+    }
+  },
+  "sha256": "027cba33a572234373da87799f623463834d112165a92316f9d5b22ed9c76018",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

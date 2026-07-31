@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "sineforge.ltx23-podcast-prompt-contract/v1",
+  "planner_model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+  "system_prompt": {
+    "role": "local_ltx23_podcast_variation_planner",
+    "objective": "Create one fresh, image-aware, short two-person podcast variation for LTX-2.3 image-to-video with native audio.",
+    "output_contract": "Return only one JSON object that conforms exactly to the supplied JSON Schema. Do not use Markdown, code fences, XML, commentary, or keys that are not in the schema.",
+    "visual_rules": [
+      "Treat the supplied image as the immutable first-frame identity, wardrobe, seating, set, prop, lighting, and composition reference.",
+      "MAN_A is the person at the position declared by speaker_assignment.MAN_A; MAN_B is the person at speaker_assignment.MAN_B.",
+      "Use one continuous podcast shot with no cut, no angle change, no teleportation, and no identity swap.",
+      "Only the named speaker moves their mouth during each turn. The listener keeps their mouth closed and reacts subtly.",
+      "Use restrained gestures, stable microphones and furniture, realistic skin, realistic eye movement, and broadcast-quality camera behavior."
+    ],
+    "dialogue_rules": [
+      "Create two clearly different topics: a primary topic and an unrelated pivot topic.",
+      "MAN_A opens on the primary topic, MAN_B replies to the primary topic, and MAN_A ends with a brief pivot to the unrelated topic.",
+      "Keep every line within the word limits in the request. Use natural spoken English and no stage directions inside dialogue.",
+      "Do not claim invented details as verified news. When approved source notes are absent, real-world politics, conflict, elections, medicine, finance, and other changing facts must be framed as fictional opinion or general discussion.",
+      "Do not produce hateful, harassing, sexual, graphic, or instructional wrongdoing content."
+    ],
+    "audio_rules": [
+      "Describe two distinct but natural male broadcast voices without imitating a real person.",
+      "Request clean close-microphone speech, quiet treated-room ambience, no music, and no overlapping dialogue.",
+      "Do not request subtitles, captions, logos, visible text, or a narrator."
+    ]
+  },
+  "default_request": {
+    "schema_version": "sineforge.ltx23-podcast-variation-request/v1",
+    "language": "English",
+    "duration_seconds": 8,
+    "speaker_assignment": {
+      "MAN_A": "camera-left",
+      "MAN_B": "camera-right"
+    },
+    "primary_topic_brief": "Choose a fresh, specific subject from the supplied primary category hint. It may be current affairs, science, technology, culture, work, design, history, food, travel, or everyday life.",
+    "pivot_topic_brief": "Choose a clearly unrelated, specific subject from the supplied pivot category hint.",
+    "tone": "thoughtful, concise, natural broadcast conversation with a lightly curious tone",
+    "dialogue_limits": {
+      "max_words_per_line": 6,
+      "max_total_words": 18
+    },
+    "factuality_policy": "Without approved source_notes, frame changing real-world matters as fictional opinion or broad discussion and avoid precise unsupported claims.",
+    "source_notes": [],
+    "avoid_topics": []
+  },
+  "category_hints": [
+    "geopolitics and diplomacy",
+    "space and astronomy",
+    "climate and energy",
+    "consumer technology",
+    "artificial intelligence",
+    "architecture and cities",
+    "film and television",
+    "music and live performance",
+    "food and cooking",
+    "travel and local culture",
+    "work and team habits",
+    "education and learning",
+    "psychology and decision-making",
+    "sports strategy",
+    "history and archaeology",
+    "design and craftsmanship",
+    "transportation and mobility",
+    "nature and wildlife",
+    "books and storytelling",
+    "everyday etiquette"
+  ],
+  "response_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "variation_title",
+      "primary_topic",
+      "pivot_topic",
+      "factuality_mode",
+      "visual_style",
+      "setting_description",
+      "camera_motion",
+      "man_a_dialogue",
+      "man_a_action",
+      "man_b_dialogue",
+      "man_b_action",
+      "pivot_dialogue",
+      "pivot_action",
+      "ambient_audio",
+      "negative_prompt"
+    ],
+    "properties": {
+      "variation_title": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 100
+      },
+      "primary_topic": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 160
+      },
+      "pivot_topic": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 160
+      },
+      "factuality_mode": {
+        "type": "string",
+        "enum": [
+          "fictional_opinion_dialogue",
+          "source_bound"
+        ]
+      },
+      "visual_style": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 240
+      },
+      "setting_description": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 420
+      },
+      "camera_motion": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 220
+      },
+      "man_a_dialogue": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 180
+      },
+      "man_a_action": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 220
+      },
+      "man_b_dialogue": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 180
+      },
+      "man_b_action": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 220
+      },
+      "pivot_dialogue": {
+        "type": "string",
+        "minLength": 2,
+        "maxLength": 180
+      },
+      "pivot_action": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 220
+      },
+      "ambient_audio": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 220
+      },
+      "negative_prompt": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 600
+      }
+    }
+  },
+  "fixed_negative_prompt": "identity swap, blended faces, merged bodies, duplicate people, extra person, wrong speaker moving lips, listener speaking, simultaneous speech, overlapping dialogue, malformed mouth, deformed teeth, lip distortion, face drift, wardrobe change, set change, moving microphone, warped hands, extra fingers, frozen frames, sudden camera cut, angle change, jump cut, subtitles, captions, logo, watermark, visible text, cartoon, game render, oversaturated skin, plastic skin"
+}

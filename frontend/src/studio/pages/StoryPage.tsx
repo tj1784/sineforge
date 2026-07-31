@@ -21,6 +21,8 @@ import { formatDuration } from '../utils'
 import { EmptyState, LoadingState } from '../components/StateBlocks'
 import { ChapterIntakeForm } from '../../components/ChapterIntakeForm'
 import { makeChapterIntakeDraft, type ChapterIntakeDraft } from '../../components/chapterIntake'
+import type { PlanningAgent } from '../../planningAgents'
+import { formatPlanningRoute } from '../planningRouteDisplay'
 
 type ProviderPreference = 'local' | 'hosted' | 'mixed'
 type LogicalModel = NonNullable<ManualTaskRoute['logical_model']>
@@ -32,13 +34,9 @@ const PLANNING_TASKS: Array<{
 }> = [
   { task: 'story_structure', label: 'Story adaptation', logicalModel: 'sol' },
   { task: 'character_bible', label: 'Character profile', logicalModel: 'terra' },
-  { task: 'chapter_outline', label: 'Chapter outline', logicalModel: 'terra' },
   { task: 'scene_breakdown', label: 'Scene breakdown', logicalModel: 'terra' },
   { task: 'shot_list', label: 'Shot list', logicalModel: 'luna' },
-  { task: 'narration_plan', label: 'Narration plan', logicalModel: 'terra' },
   { task: 'prompt_package', label: 'Prompt packages', logicalModel: 'luna' },
-  { task: 'continuity_plan', label: 'Continuity review', logicalModel: 'terra' },
-  { task: 'model_recommendation', label: 'Model recommendations', logicalModel: 'terra' },
   { task: 'production_proposal', label: 'Final proposal', logicalModel: 'sol' },
 ]
 
@@ -64,9 +62,87 @@ function diffValue(value: unknown): string {
   return serialized.length > 180 ? `${serialized.slice(0, 177)}…` : serialized
 }
 
+function objectValue(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
+
+function arrayValue(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : []
+}
+
+function stringValue(value: unknown, fallback = 'Not recorded'): string {
+  return typeof value === 'string' && value.trim() ? value.trim() : fallback
+}
+
+function proposalPayloadSummary(payload: Record<string, unknown>): {
+  title: string
+  targetDuration: string
+  chapters: number
+  scenes: number
+  shots: number
+  characters: number
+  payloadSize: string
+} {
+  const story = objectValue(payload.story)
+  const chapters = arrayValue(story.chapters)
+  const scenes = chapters.flatMap((chapter) => arrayValue(objectValue(chapter).scenes))
+  const shots = scenes.flatMap((scene) => arrayValue(objectValue(scene).shots))
+  const characters = arrayValue(story.characters)
+  const bytes = new Blob([JSON.stringify(payload)]).size
+
+  return {
+    title: stringValue(story.title),
+    targetDuration:
+      typeof story.target_duration_sec === 'number'
+        ? formatDuration(story.target_duration_sec)
+        : stringValue(story.target_duration_sec, 'Not recorded'),
+    chapters: chapters.length,
+    scenes: scenes.length,
+    shots: shots.length,
+    characters: characters.length,
+    payloadSize: `${Math.max(1, Math.round(bytes / 1024)).toLocaleString()} KB`,
+  }
+}
+
+function parseRuntimeInput(value: string | number, fallbackSec: number): number {
+  const raw = String(value).trim()
+  if (!raw) return fallbackSec
+
+  if (raw.includes(':')) {
+    const parts = raw.split(':').map((part) => Number(part.trim()))
+    if (parts.some((part) => !Number.isFinite(part) || part < 0)) return fallbackSec
+    if (parts.length === 2) {
+      const [minutes, seconds] = parts
+      if (seconds >= 60) return fallbackSec
+      return Math.max(1, Math.round(minutes * 60 + seconds))
+    }
+    if (parts.length === 3) {
+      const [hours, minutes, seconds] = parts
+      if (minutes >= 60 || seconds >= 60) return fallbackSec
+      return Math.max(1, Math.round(hours * 3600 + minutes * 60 + seconds))
+    }
+    return fallbackSec
+  }
+
+  const numeric = Number(raw)
+  return Number.isFinite(numeric) && numeric > 0 ? Math.round(numeric) : fallbackSec
+}
+
 export function StoryPage() {
-  const { data, addHierarchy, updateStoryFields, reload, setMessage, busy } = useStudio()
+  const {
+    data,
+    addHierarchy,
+    updateStoryFields,
+    reload,
+    setMessage,
+    busy,
+    workflowLane,
+  } = useStudio()
   const storyId = data?.story.id ?? ''
+  const projectId = data?.story.project_id ?? ''
+  const isAgentless = workflowLane === 'agentless'
   const [title, setTitle] = useState(data?.story.title ?? '')
   const [logline, setLogline] = useState(data?.story.logline ?? '')
   const [synopsis, setSynopsis] = useState(data?.story.synopsis ?? '')
@@ -77,7 +153,7 @@ export function StoryPage() {
   const [visualStyle, setVisualStyle] = useState(data?.story.visual_style ?? '')
   const [pointOfView, setPointOfView] = useState(data?.story.point_of_view ?? '')
   const [productionNotes, setProductionNotes] = useState(data?.story.production_notes ?? '')
-  const [targetRuntime, setTargetRuntime] = useState(data?.story.target_duration_sec ?? 300)
+  const [targetRuntime, setTargetRuntime] = useState(formatDuration(data?.story.target_duration_sec ?? 300))
   const [chapterCreatorOpen, setChapterCreatorOpen] = useState(false)
   const [chapterDraft, setChapterDraft] = useState<ChapterIntakeDraft>(() => makeChapterIntakeDraft(0))
   const [chapterOrderSlot, setChapterOrderSlot] = useState(1)
@@ -87,13 +163,14 @@ export function StoryPage() {
   const [actorName, setActorName] = useState('')
   const [routingMode, setRoutingMode] = useState<OrchestrationRoutingMode>('automatic')
   const [providerPreference, setProviderPreference] = useState<ProviderPreference>('local')
+  const [planningAgent, setPlanningAgent] = useState<PlanningAgent>('qwen')
   const [providerProfiles, setProviderProfiles] = useState<ProviderProfile[]>([])
   const [providerCatalog, setProviderCatalog] = useState<ProviderCatalogEntry[]>([])
   const [routingPreflight, setRoutingPreflight] = useState<RoutingPreflightResponse | null>(null)
   const [manualRouteSelections, setManualRouteSelections] = useState<
     Partial<Record<PlanningTaskType, string>>
   >({})
-  const [maxSteps, setMaxSteps] = useState(10)
+  const [maxSteps, setMaxSteps] = useState(PLANNING_TASKS.length)
   const [repairBudget, setRepairBudget] = useState(3)
   const [timeBudgetSec, setTimeBudgetSec] = useState(300)
   const [transportRetryLimit, setTransportRetryLimit] = useState(2)
@@ -106,6 +183,7 @@ export function StoryPage() {
   const [proposalDiff, setProposalDiff] = useState<ProposalDiff | null>(null)
   const [reviewNotes, setReviewNotes] = useState('')
   const [rejectionReason, setRejectionReason] = useState('')
+  const [bypassPlanningGates, setBypassPlanningGates] = useState(true)
   const [planningLoading, setPlanningLoading] = useState(true)
   const [planningBusy, setPlanningBusy] = useState(false)
   const [planningError, setPlanningError] = useState<string | null>(null)
@@ -132,7 +210,7 @@ export function StoryPage() {
       setVisualStyle(data?.story.visual_style ?? '')
       setPointOfView(data?.story.point_of_view ?? '')
       setProductionNotes(data?.story.production_notes ?? '')
-      setTargetRuntime(data?.story.target_duration_sec ?? 300)
+      setTargetRuntime(formatDuration(data?.story.target_duration_sec ?? 300))
       const ids = (data?.chapters ?? []).map((c) => c.id)
       setExpanded((prev) => (prev.length ? prev.filter((id) => ids.includes(id)) : ids))
     }, 0)
@@ -162,16 +240,22 @@ export function StoryPage() {
         setPlanningError(null)
       }
       try {
-        const [runList, proposalList, profileList, catalog] = await Promise.all([
+        const [runList, proposalList, profileList, catalog, projectSettings] = await Promise.all([
           api.listOrchestrationRuns(storyId),
           api.listStoryProposals(storyId),
           api.listProviderProfiles().catch(() => []),
           api.listPlanningProviders().catch(() => null),
+          projectId ? api.getSettings(projectId).catch(() => null) : null,
         ])
         setRuns(runList)
         setProposals(proposalList)
         setProviderProfiles(profileList)
         setProviderCatalog(catalog?.providers ?? [])
+        setPlanningAgent(
+          projectSettings?.prompting_policy_json.planning_agent === 'sulphur'
+            ? 'sulphur'
+            : 'qwen',
+        )
 
         const runId =
           (preferredRunId && runList.some((run) => run.id === preferredRunId) && preferredRunId) ||
@@ -208,7 +292,7 @@ export function StoryPage() {
         if (!silent) setPlanningLoading(false)
       }
     },
-    [storyId],
+    [projectId, storyId],
   )
 
   useEffect(() => {
@@ -237,15 +321,15 @@ export function StoryPage() {
   const story = data.story
   const chapters = data.chapters
   const providerFactById = new Map(providerCatalog.map((provider) => [provider.provider_identifier, provider]))
-  const routeOptions = [
-    {
-      value: BUILTIN_MOCK_ROUTE,
-      label: 'Built-in mock · local · available',
-      providerIdentifier: 'mock',
-      availabilityStatus: providerFactById.get('mock')?.availability_status ?? 'available',
-      privacy: providerFactById.get('mock')?.privacy_classification ?? 'local',
-    },
-    ...providerProfiles.map((profile) => {
+  const studioRouteOptions = [
+      {
+        value: BUILTIN_MOCK_ROUTE,
+        label: 'Built-in mock · local · available',
+        providerIdentifier: 'mock',
+        availabilityStatus: providerFactById.get('mock')?.availability_status ?? 'available',
+        privacy: providerFactById.get('mock')?.privacy_classification ?? 'local',
+      },
+      ...providerProfiles.map((profile) => {
       const fact = providerFactById.get(profile.provider_identifier)
       return {
         value: profile.id,
@@ -256,24 +340,40 @@ export function StoryPage() {
       }
     }),
   ]
+  const routeOptions = isAgentless
+    ? studioRouteOptions.filter(
+        (option) => option.providerIdentifier === planningAgent,
+      )
+    : studioRouteOptions
+  const visibleProviderFacts = isAgentless
+    ? providerCatalog.filter(
+        (provider) => provider.provider_identifier === planningAgent,
+      )
+    : providerCatalog
 
   const disabled = busy || planningBusy || planningLoading
   const structureDisabled = busy || structureBusy
-  const actor = actorName.trim()
+  const actor = actorName.trim() || 'Robert'
   const runCanStart = selectedRun?.status === 'pending'
   const runCanCancel = selectedRun?.status === 'pending' || selectedRun?.status === 'running'
-  const runCanRetry = selectedRun?.status === 'failed' || selectedRun?.status === 'canceled'
+  const runCanIterate = Boolean(
+    selectedRun && !['pending', 'running'].includes(selectedRun.status),
+  )
   const proposalIsTerminal = ['applied', 'rejected', 'superseded'].includes(selectedProposal?.status ?? '')
+  const proposalHasValidationErrors =
+    selectedProposal?.validation_status === 'invalid' ||
+    Boolean(selectedProposal?.validation_errors.length)
   const proposalCanReview =
     Boolean(selectedProposal) &&
     !proposalIsTerminal &&
-    selectedProposal?.validation_status !== 'invalid' &&
-    !selectedProposal?.validation_errors.length
+    !proposalHasValidationErrors
   const proposalCanApply =
-    selectedProposal?.status === 'validated' &&
-    selectedProposal.validation_status !== 'invalid' &&
-    !selectedProposal.validation_errors.length &&
-    proposalDiff?.proposal_id === selectedProposal.id
+    Boolean(selectedProposal) &&
+    !proposalIsTerminal &&
+    !proposalHasValidationErrors &&
+    (bypassPlanningGates ||
+      (selectedProposal?.status === 'validated' &&
+        proposalDiff?.proposal_id === selectedProposal?.id))
 
   async function chooseRun(runId: string) {
     setSelectedRunId(runId)
@@ -317,6 +417,7 @@ export function StoryPage() {
   }
 
   function buildManualRoutes(): ManualTaskRoute[] {
+    if (isAgentless) return []
     return PLANNING_TASKS.flatMap<ManualTaskRoute>(({ task, logicalModel }) => {
         const selection = manualRouteSelections[task]
         if (!selection) return []
@@ -341,6 +442,10 @@ export function StoryPage() {
   }
 
   function changeRoutingMode(nextMode: OrchestrationRoutingMode) {
+    if (isAgentless) {
+      setRoutingMode('automatic')
+      return
+    }
     setRoutingMode(nextMode)
     if (nextMode === 'manual') {
       setManualRouteSelections((current) => {
@@ -356,15 +461,18 @@ export function StoryPage() {
     setPlanningError(null)
     setPlanningNotice(null)
     try {
+      const effectiveRoutingMode: OrchestrationRoutingMode = isAgentless
+        ? 'automatic'
+        : routingMode
       const manualRoutes = buildManualRoutes()
-      if (routingMode === 'manual' && manualRoutes.length !== PLANNING_TASKS.length) {
+      if (effectiveRoutingMode === 'manual' && manualRoutes.length !== PLANNING_TASKS.length) {
         throw new Error('Manual routing requires an explicit provider route for every planning task.')
       }
       const preflight = await api.validateStoryRouting(story.id, {
-        routing_mode: routingMode,
+        routing_mode: effectiveRoutingMode,
         manual_routes: manualRoutes,
-        prefer_local_providers: providerPreference !== 'hosted',
-        prefer_hosted_providers: providerPreference !== 'local',
+        prefer_local_providers: isAgentless || providerPreference !== 'hosted',
+        prefer_hosted_providers: !isAgentless && providerPreference !== 'local',
         max_steps: maxSteps,
         time_budget_sec: timeBudgetSec,
         transport_retry_limit: transportRetryLimit,
@@ -380,16 +488,27 @@ export function StoryPage() {
         base_storyboard_version_id:
           story.approval_state === 'approved' ? story.active_storyboard_version_id ?? null : null,
         requested_by: actor || null,
-        routing_mode: routingMode,
+        routing_mode: effectiveRoutingMode,
         manual_routes: manualRoutes,
-        prefer_local_providers: providerPreference !== 'hosted',
-        prefer_hosted_providers: providerPreference !== 'local',
+        prefer_local_providers: isAgentless || providerPreference !== 'hosted',
+        prefer_hosted_providers: !isAgentless && providerPreference !== 'local',
         max_steps: maxSteps,
         repair_budget: repairBudget,
         time_budget_sec: timeBudgetSec,
         transport_retry_limit: transportRetryLimit,
+        task_types: PLANNING_TASKS.map((item) => item.task),
         idempotency_key: `studio-${crypto.randomUUID()}`,
       })
+      if (bypassPlanningGates) {
+        const started = await api.startOrchestrationRun(result.run.id)
+        setPlanningNotice(
+          result.idempotent_replay
+            ? started.message
+            : 'Planning draft generation started. Phases 1–5 will populate for inspection when the run completes.',
+        )
+        await loadPlanning(started.run.id, selectedProposalId || undefined, true)
+        return
+      }
       setPlanningNotice(
         result.idempotent_replay
           ? 'The existing idempotent pending run was loaded. It has not been started.'
@@ -424,11 +543,21 @@ export function StoryPage() {
   }
 
   async function retryRun() {
-    if (!selectedRun || !runCanRetry) return
+    if (!selectedRun || !runCanIterate) return
     setPlanningBusy(true)
     setPlanningError(null)
     try {
       const result = await api.retryOrchestrationRun(selectedRun.id, actor || undefined)
+      if (bypassPlanningGates) {
+        const started = await api.startOrchestrationRun(result.run.id)
+        setPlanningNotice(
+          result.idempotent_replay
+            ? started.message
+            : 'New planning iteration started. It will not overwrite the previous draft.',
+        )
+        await loadPlanning(started.run.id, selectedProposalId || undefined, true)
+        return
+      }
       setPlanningNotice(
         result.idempotent_replay
           ? 'The existing pending retry was loaded. Start it explicitly when ready.'
@@ -462,12 +591,12 @@ export function StoryPage() {
   }
 
   async function reviewProposal() {
-    if (!selectedProposal || !actor || !proposalCanReview) return
+    if (!selectedProposal || !proposalCanReview) return
     setPlanningBusy(true)
     setPlanningError(null)
     try {
       const proposal = await api.reviewProposal(selectedProposal.id, actor, reviewNotes)
-      setPlanningNotice('Proposal marked reviewed. It remains unapplied until you choose Apply proposal.')
+      setPlanningNotice('Review note saved. You can apply, edit manually, reject, or generate another iteration.')
       await loadPlanning(selectedRunId || undefined, proposal.id)
     } catch (error) {
       setPlanningError(errorMessage(error, 'Could not review the proposal.'))
@@ -477,7 +606,7 @@ export function StoryPage() {
   }
 
   async function rejectProposal() {
-    if (!selectedProposal || !actor || !rejectionReason.trim() || proposalIsTerminal) return
+    if (!selectedProposal || !rejectionReason.trim() || proposalIsTerminal) return
     setPlanningBusy(true)
     setPlanningError(null)
     try {
@@ -492,15 +621,15 @@ export function StoryPage() {
   }
 
   async function applyProposal() {
-    if (!selectedProposal || !proposalDiff || !actor || !proposalCanApply) return
+    if (!selectedProposal || !proposalCanApply) return
     setPlanningBusy(true)
     setPlanningError(null)
     try {
       const result = await api.applyProposal(
         selectedProposal.id,
         actor,
-        proposalDiff.base_storyboard_version_id,
-        proposalDiff.base_content_hash,
+        proposalDiff?.base_storyboard_version_id ?? selectedProposal.base_storyboard_version_id,
+        proposalDiff?.base_content_hash ?? null,
       )
       await reload(story.id)
       await loadPlanning(selectedRunId || undefined, selectedProposal.id)
@@ -512,6 +641,30 @@ export function StoryPage() {
     } finally {
       setPlanningBusy(false)
     }
+  }
+
+  async function copyProposalPayload() {
+    if (!selectedProposal) return
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(selectedProposal.payload, null, 2))
+      setPlanningNotice('Proposal JSON copied to clipboard.')
+    } catch (error) {
+      setPlanningError(errorMessage(error, 'Could not copy proposal JSON.'))
+    }
+  }
+
+  function downloadProposalPayload() {
+    if (!selectedProposal) return
+    const json = JSON.stringify(selectedProposal.payload, null, 2)
+    const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `sineforge-proposal-${shortId(selectedProposal.id)}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    setPlanningNotice('Proposal JSON download started.')
   }
 
   async function persistStructure(action: () => Promise<unknown>, successMessage: string): Promise<boolean> {
@@ -533,7 +686,7 @@ export function StoryPage() {
   }
 
   function newChapterDuration() {
-    const runtime = Number(targetRuntime) || story.target_duration_sec || 60
+    const runtime = parseRuntimeInput(targetRuntime, story.target_duration_sec || 60)
     return Math.max(6, Math.round(runtime / Math.max(1, chapters.length + 1)))
   }
 
@@ -677,6 +830,9 @@ export function StoryPage() {
       ),
     0,
   )
+  const selectedProposalSummary = selectedProposal
+    ? proposalPayloadSummary(selectedProposal.payload)
+    : null
 
   function chapterCode(index: number) {
     return `CH${String(index + 1).padStart(2, '0')}`
@@ -697,7 +853,7 @@ export function StoryPage() {
       visual_style: visualStyle || null,
       point_of_view: pointOfView || null,
       production_notes: productionNotes || null,
-      target_duration_sec: Number(targetRuntime) || story.target_duration_sec,
+      target_duration_sec: parseRuntimeInput(targetRuntime, story.target_duration_sec),
     })
   }
 
@@ -768,11 +924,16 @@ export function StoryPage() {
               <label>
                 Target runtime
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="numeric"
                   value={targetRuntime}
                   disabled={busy}
-                  onChange={(e) => setTargetRuntime(Number(e.target.value))}
+                  onChange={(e) => setTargetRuntime(e.target.value)}
+                  placeholder="540 or 9:00"
                 />
+                <small className="form-hint">
+                  Plain numbers are seconds. You can also type minutes:seconds, e.g. 9:00.
+                </small>
               </label>
             </div>
             <div className="form-stack">
@@ -844,7 +1005,7 @@ export function StoryPage() {
                 <h2>Narrative hierarchy</h2>
                 <p>
                   {chapters.length} chapters · {sceneCount} scenes · {shotCount} shots ·{' '}
-                  {formatDuration(Number(targetRuntime) || story.target_duration_sec)} target
+                  {formatDuration(parseRuntimeInput(targetRuntime, story.target_duration_sec))} target
                 </p>
               </div>
               <button
@@ -1143,7 +1304,7 @@ export function StoryPage() {
               {chapters.length} chapters · {sceneCount} scenes · {shotCount} shots
             </b>
             <small>
-              {plannedSec} of {Number(targetRuntime) || story.target_duration_sec} planned seconds.
+              {plannedSec} of {parseRuntimeInput(targetRuntime, story.target_duration_sec)} planned seconds.
             </small>
           </div>
         </aside>
@@ -1164,10 +1325,10 @@ export function StoryPage() {
       <section className="panel" aria-labelledby="planning-orchestration-title" style={{ marginTop: 14 }}>
         <div className="panel-title">
           <div>
-            <h2 id="planning-orchestration-title">Planning orchestration and proposal review</h2>
+            <h2 id="planning-orchestration-title">Planning generation and iterations</h2>
             <p>
-              Create and start a real backend planning run, inspect its immutable proposal, then review,
-              reject, or apply it explicitly. Starting a run never applies its proposal.
+              Fast bypass is the default: generate phases 1–5, inspect the draft, then apply,
+              edit, reject, or generate a new iteration.
             </p>
           </div>
           <div className="inline-actions">
@@ -1199,6 +1360,21 @@ export function StoryPage() {
         <div className="split-2">
           <div className="stack-form" style={{ maxWidth: '100%' }}>
             <h3>1. Configure and run</h3>
+            <label className="check-card">
+              <input
+                type="checkbox"
+                checked={bypassPlanningGates}
+                onChange={(event) => setBypassPlanningGates(event.target.checked)}
+                disabled={disabled}
+              />
+              <span>
+                <b>Fast planning bypass</b>
+                <small>
+                  Default. Auto-start planning runs, allow direct application of usable drafts,
+                  and make new iterations from completed runs.
+                </small>
+              </span>
+            </label>
             <label>
               Audit name
               <input
@@ -1213,33 +1389,34 @@ export function StoryPage() {
               <label>
                 Routing mode
                 <select
-                  value={routingMode}
+                  value={isAgentless ? 'automatic' : routingMode}
                   onChange={(event) =>
                     changeRoutingMode(event.target.value as OrchestrationRoutingMode)
                   }
-                  disabled={disabled}
+                  disabled={disabled || isAgentless}
                 >
                   <option value="automatic">Automatic</option>
-                  <option value="hybrid">Hybrid</option>
-                  <option value="manual">Manual</option>
+                  {!isAgentless ? <option value="hybrid">Hybrid</option> : null}
+                  {!isAgentless ? <option value="manual">Manual</option> : null}
                 </select>
               </label>
               <label>
                 Provider preference
                 <select
-                  value={providerPreference}
+                  value={isAgentless ? 'local' : providerPreference}
                   onChange={(event) => setProviderPreference(event.target.value as ProviderPreference)}
-                  disabled={disabled}
+                  disabled={disabled || isAgentless}
                 >
                   <option value="local">Prefer local only</option>
-                  <option value="mixed">Prefer local and allow hosted</option>
-                  <option value="hosted">Prefer hosted only</option>
+                  {!isAgentless ? <option value="mixed">Prefer local and allow hosted</option> : null}
+                  {!isAgentless ? <option value="hosted">Prefer hosted only</option> : null}
                 </select>
               </label>
             </div>
             <p className="form-hint">
-              Provider preferences are recorded with the run. This page does not install models, submit
-              render jobs, or generate media.
+              {isAgentless
+                ? `This project is locked to the selected local ${planningAgent === 'qwen' ? 'Qwen3 4B Hivemind' : 'Sulphur 2 Base'} agent. Prompts are structured JSON; hosted/API and mock fallbacks are blocked.`
+                : 'Provider preferences are recorded with the run. This page does not install models, submit render jobs, or generate media.'}
             </p>
             <div className="split-2">
               <label>
@@ -1327,11 +1504,11 @@ export function StoryPage() {
                 </table>
               </div>
             ) : null}
-            {providerCatalog.length ? (
+            {visibleProviderFacts.length ? (
               <details className="debug-panel">
                 <summary>Provider facts used by preflight</summary>
                 <ul>
-                  {providerCatalog.map((provider) => (
+                  {visibleProviderFacts.map((provider) => (
                     <li key={provider.provider_identifier}>
                       {provider.display_name}: {provider.availability_status} · {provider.privacy_classification} · {provider.capabilities.join(', ') || 'no verified capabilities'}
                     </li>
@@ -1346,16 +1523,18 @@ export function StoryPage() {
             ) : null}
             <div className="inline-actions">
               <button type="button" className="secondary-button" disabled={disabled} onClick={() => void createRun()}>
-                Create pending run
+                {bypassPlanningGates ? 'Generate planning draft' : 'Create pending run'}
               </button>
-              <button
-                type="button"
-                className="primary-button"
-                disabled={disabled || !runCanStart}
-                onClick={() => void startRun()}
-              >
-                Start selected run
-              </button>
+              {!bypassPlanningGates ? (
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={disabled || !runCanStart}
+                  onClick={() => void startRun()}
+                >
+                  Start selected run
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="ghost-button"
@@ -1367,10 +1546,10 @@ export function StoryPage() {
               <button
                 type="button"
                 className="secondary-button"
-                disabled={disabled || !runCanRetry}
+                disabled={disabled || !runCanIterate}
                 onClick={() => void retryRun()}
               >
-                Create retry run
+                {bypassPlanningGates ? 'Generate new iteration' : 'Create retry run'}
               </button>
             </div>
 
@@ -1422,7 +1601,7 @@ export function StoryPage() {
                           <tr key={step.id}>
                             <td>{step.sequence_index + 1}. {step.task_type}</td>
                             <td><span className={`truth-pill ${statusClass(step.status)}`}>{step.status}</span></td>
-                            <td>{step.provider_identifier || 'Not selected'}{step.resolved_model ? ` · ${step.resolved_model}` : ''}</td>
+                            <td>{formatPlanningRoute(step, providerCatalog)}</td>
                             <td>{step.attempt_number}</td>
                           </tr>
                         ))}
@@ -1505,13 +1684,51 @@ export function StoryPage() {
                     <p className="notice info">The proposal diff contains no changes.</p>
                   )
                 ) : (
-                  <p className="notice warning">A verified proposal diff is required before Apply is enabled.</p>
+                  <p className="notice warning">
+                    Proposal diff is unavailable. Fast bypass can still apply if backend revalidation passes.
+                  </p>
                 )}
 
-                <details className="debug-panel">
-                  <summary>Inspect immutable proposal payload</summary>
-                  <pre>{JSON.stringify(selectedProposal.payload, null, 2)}</pre>
-                </details>
+                {selectedProposalSummary ? (
+                  <div className="debug-panel">
+                    <div className="panel-title">
+                      <div>
+                        <h3>Proposal payload summary</h3>
+                        <p>
+                          Full immutable JSON is hidden during normal editing. Copy or download it only
+                          when you need the raw artifact.
+                        </p>
+                      </div>
+                      <div className="inline-actions">
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          disabled={disabled}
+                          onClick={() => void copyProposalPayload()}
+                        >
+                          Copy JSON
+                        </button>
+                        <button
+                          type="button"
+                          className="ghost-button"
+                          disabled={disabled}
+                          onClick={() => downloadProposalPayload()}
+                        >
+                          Download JSON
+                        </button>
+                      </div>
+                    </div>
+                    <ul className="kv-list">
+                      <li><span>Title</span><strong>{selectedProposalSummary.title}</strong></li>
+                      <li><span>Target runtime</span><strong>{selectedProposalSummary.targetDuration}</strong></li>
+                      <li><span>Chapters</span><strong>{selectedProposalSummary.chapters}</strong></li>
+                      <li><span>Scenes</span><strong>{selectedProposalSummary.scenes}</strong></li>
+                      <li><span>Shots</span><strong>{selectedProposalSummary.shots}</strong></li>
+                      <li><span>Characters</span><strong>{selectedProposalSummary.characters}</strong></li>
+                      <li><span>Payload size</span><strong>{selectedProposalSummary.payloadSize}</strong></li>
+                    </ul>
+                  </div>
+                ) : null}
 
                 <label>
                   Review notes (optional)
@@ -1538,15 +1755,15 @@ export function StoryPage() {
                   <button
                     type="button"
                     className="secondary-button"
-                    disabled={disabled || !actor || !proposalCanReview}
+                    disabled={disabled || !proposalCanReview}
                     onClick={() => void reviewProposal()}
                   >
-                    Mark reviewed
+                    Save review note
                   </button>
                   <button
                     type="button"
                     className="ghost-button"
-                    disabled={disabled || !actor || !rejectionReason.trim() || proposalIsTerminal}
+                    disabled={disabled || !rejectionReason.trim() || proposalIsTerminal}
                     onClick={() => void rejectProposal()}
                   >
                     Reject proposal
@@ -1554,21 +1771,21 @@ export function StoryPage() {
                   <button
                     type="button"
                     className="primary-button"
-                    disabled={disabled || !actor || !proposalCanApply}
+                    disabled={disabled || !proposalCanApply}
                     onClick={() => void applyProposal()}
                   >
-                    Apply reviewed proposal
+                    Apply generated draft
                   </button>
                 </div>
                 <p className="form-hint">
-                  Apply checks the proposal's recorded base version and content hash, then refreshes the
-                  live Studio snapshot. It does not create render jobs.
+                  Apply still checks validation, ownership, and stale-base safety, then refreshes the
+                  live Studio snapshot. It does not create video render jobs.
                 </p>
               </>
             ) : (
               <EmptyState
-                title="No proposal to review"
-                detail="Create and explicitly start a planning run. A completed run can publish an immutable proposal here."
+                title="No planning draft yet"
+                detail="Generate a planning draft. Fast bypass auto-starts it and publishes the usable proposal here."
               />
             )}
           </div>

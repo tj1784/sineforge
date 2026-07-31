@@ -77,7 +77,7 @@ Starting CineForge must also start the explicitly configured external ComfyUI ru
 
 The startup orchestrator must:
 
-1. Read an administrator-configured ComfyUI working directory and launcher path. On the primary Windows workstation, the current runtime is `C:\ComfyUI\BlokeyUI`, its launcher is `run_blokeyui.bat`, and its loopback URL is `http://127.0.0.1:8888`.
+1. Read an administrator-configured ComfyUI working directory and launcher path. On the primary Windows workstation, the only approved runtime is `C:\ComfyUI\LTX\ComfyUI`, its launcher is `run_cineforge_ltx.bat`, and its loopback URL is `http://127.0.0.1:8888`.
 2. Probe `CINEFORGE_COMFYUI_BASE_URL` before launching. If ComfyUI is already healthy, reuse it and do not start a duplicate process.
 3. Start the configured launcher as a hidden background child process with the configured runtime directory as its working directory. AI-authored text must never become a shell command or executable path.
 4. Wait for both the ComfyUI root endpoint and `/object_info` to respond within a bounded timeout. Only then may CineForge report ComfyUI as ready.

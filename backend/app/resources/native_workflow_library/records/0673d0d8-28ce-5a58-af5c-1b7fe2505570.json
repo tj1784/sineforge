@@ -1,0 +1,582 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "0673d0d8-28ce-5a58-af5c-1b7fe2505570",
+  "name": "5 SeedVR2 Upscale",
+  "version": "1.0",
+  "description": "5 SeedVR2 Upscale is a local upscaling workflow designed to increase image or video resolution with a locally loaded model using SeedVR2. Its 6-node graph exposes 0 prompt/text field(s), 1 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The imported graph contains unresolved custom-node classes, so install or map the listed nodes and reconvert from the included editor graph before production use.",
+  "category": "Upscaling & Restoration",
+  "subcategory": "Local upscaling",
+  "episode": "EP05",
+  "instructions": "1. Install or map the unresolved node classes listed in Requirements, open the included editor-format source in the main LTX ComfyUI install, and export API format again before attempting a run.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Select the intended scale/model and verify output dimensions before running. Use one representative asset first to estimate VRAM and processing time.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP05",
+    "Local upscaling",
+    "SeedVR2",
+    "Upscaling & Restoration"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "ComfyUI-SeedVR2_VideoUpscaler",
+      "pixaroma",
+      "Pixaroma YouTube Channel",
+      "rgthree-comfy"
+    ],
+    "unresolved_node_classes": [
+      "SeedVR2LoadDiTModel",
+      "SeedVR2LoadVAEModel",
+      "SeedVR2VideoUpscaler"
+    ],
+    "node_classes": [
+      "Image Comparer (rgthree)",
+      "LoadImage",
+      "SaveImage",
+      "SeedVR2LoadDiTModel",
+      "SeedVR2LoadVAEModel",
+      "SeedVR2VideoUpscaler"
+    ],
+    "model_files": [],
+    "media_inputs": [
+      {
+        "node_id": "5",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "Woman1.jpg"
+      }
+    ],
+    "prompt_field_count": 0,
+    "output_node_count": 1,
+    "documentation_notes": "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🟣 SeedVR2 (Down)Load DiT Model\n\n### Models are downloaded automatically the first time you use them.\n### Check the SeedVR2 Note. \n### The files are saved in: ComfyUI\\models\\SEEDVR2\n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- **ComfyUI-SeedVR2_VideoUpscaler**\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n\n## SeedVR2 model files\n\n### Repo 1: numz/SeedVR2_comfyUI\nMore info [HERE](https://huggingface.co/numz/SeedVR2_comfyUI/tree/main)\n\n| Model file | Size |\n|---|---:|\n| `ema_vae_fp16.safetensors` | 501 MB |\n| `seedvr2_ema_3b_fp16.safetensors` | 6.78 GB |\n| `seedvr2_ema_3b_fp8_e4m3fn.safetensors` | 3.39 GB |\n| `seedvr2_ema_7b_fp16.safetensors` | 16.5 GB |\n| `seedvr2_ema_7b_fp8_e4m3fn.safetensors` | 8.24 GB |\n| `seedvr2_ema_7b_sharp_fp16.safetensors` | 16.5 GB |\n| `seedvr2_ema_7b_sharp_fp8_e4m3fn.safetensors` | 8.24 GB |\n\n### Repo 2: AInVFX/SeedVR2_comfyUI\nMore info [HERE](https://huggingface.co/AInVFX/SeedVR2_comfyUI/tree/main)\n\n| Model file | Size |\n|---|---:|\n| `seedvr2_ema_3b-Q4_K_M.gguf` | 2 GB |\n| `seedvr2_ema_3b-Q8_0.gguf` | 3.66 GB |\n| `seedvr2_ema_7b-Q4_K_M.gguf` | 4.76 GB |\n| `seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors` | 8.47 GB |\n| `seedvr2_ema_7b_sharp-Q4_K_M.gguf` | 4.76 GB |\n| `seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors` | 8.47 GB |\n\n### Notes\n- **fp16**: best quality, uses more VRAM\n- **fp8 (e4m3fn)**: lower VRAM, usually faster, slightly less accurate\n- **sharp**: sharper output variant\n- **GGUF**: quantized format, often smaller and lighter to run"
+  },
+  "workflow_status": "requires_custom_nodes",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep05 workflows/ep05 workflows/5 seedvr2 upscale.json",
+  "source_filename": "5 SeedVR2 Upscale.json",
+  "source_archive": "EP05 Workflows.zip",
+  "source_entry": "EP05 Workflows/EP05 Workflows/5 SeedVR2 Upscale.json",
+  "source_workflow": {
+    "id": "67848af9-129f-4e35-ae41-01aa86827953",
+    "revision": 0,
+    "last_node_id": 10,
+    "last_link_id": 6,
+    "nodes": [
+      {
+        "id": 2,
+        "type": "SeedVR2LoadVAEModel",
+        "pos": [
+          -721.2697654848671,
+          717.7438631554602
+        ],
+        "size": [
+          321.808203125,
+          298
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "torch_compile_args",
+            "shape": 7,
+            "type": "TORCH_COMPILE_ARGS",
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "SEEDVR2_VAE",
+            "type": "SEEDVR2_VAE",
+            "links": [
+              2
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "seedvr2_videoupscaler",
+          "ver": "2.5.24",
+          "Node name for S&R": "SeedVR2LoadVAEModel"
+        },
+        "widgets_values": [
+          "ema_vae_fp16.safetensors",
+          "cuda:0",
+          true,
+          1024,
+          128,
+          true,
+          1024,
+          128,
+          "false",
+          "cpu",
+          false
+        ]
+      },
+      {
+        "id": 7,
+        "type": "Image Comparer (rgthree)",
+        "pos": [
+          28.373041908545993,
+          534.6907447188462
+        ],
+        "size": [
+          408.5529864636676,
+          482.09761703102083
+        ],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          {
+            "dir": 3,
+            "name": "image_a",
+            "type": "IMAGE",
+            "link": 4
+          },
+          {
+            "dir": 3,
+            "name": "image_b",
+            "type": "IMAGE",
+            "link": 5
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "rgthree-comfy",
+          "ver": "8ff50e4521881eca1fe26aec9615fc9362474931",
+          "comparer_mode": "Slide"
+        },
+        "widgets_values": [
+          [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_unxyy_00019_.png&type=temp&subfolder=&rand=0.17966169331510695"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_unxyy_00020_.png&type=temp&subfolder=&rand=0.6611205723033143"
+            }
+          ]
+        ]
+      },
+      {
+        "id": 6,
+        "type": "SaveImage",
+        "pos": [
+          460.31669226355706,
+          534.6907447188462
+        ],
+        "size": [
+          408.5529864636676,
+          482.09761703102083
+        ],
+        "flags": {},
+        "order": 7,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 6
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "ComfyUI"
+        ]
+      },
+      {
+        "id": 1,
+        "type": "SeedVR2LoadDiTModel",
+        "pos": [
+          -907.4726159211064,
+          453.41416476219837
+        ],
+        "size": [
+          508.50446378091124,
+          202
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "torch_compile_args",
+            "shape": 7,
+            "type": "TORCH_COMPILE_ARGS",
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "SEEDVR2_DIT",
+            "type": "SEEDVR2_DIT",
+            "links": [
+              1
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "seedvr2_videoupscaler",
+          "ver": "2.5.24",
+          "Node name for S&R": "SeedVR2LoadDiTModel"
+        },
+        "widgets_values": [
+          "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+          "cuda:0",
+          0,
+          false,
+          "cpu",
+          false,
+          "sdpa"
+        ]
+      },
+      {
+        "id": 5,
+        "type": "LoadImage",
+        "pos": [
+          -739.2230521282164,
+          5.292298962762769
+        ],
+        "size": [
+          331.91620582155053,
+          378.7289904308775
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              3,
+              4
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "Woman1.jpg",
+          "image"
+        ]
+      },
+      {
+        "id": 10,
+        "type": "MarkdownNote",
+        "pos": [
+          -1448.7512756426615,
+          -30.153550309309253
+        ],
+        "size": [
+          499.89670360192656,
+          344.45491753448766
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 3,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "👑 Pixaroma - Note - START HERE",
+        "properties": {},
+        "widgets_values": [
+          "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n---\n\n## 🟣 SeedVR2 (Down)Load DiT Model\n\n### Models are downloaded automatically the first time you use them.\n### Check the SeedVR2 Note. \n### The files are saved in: ComfyUI\\models\\SEEDVR2\n\n---\n\n## 🧩 Nodes Installed from Manager  \n\n- **ComfyUI-SeedVR2_VideoUpscaler**\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 4,
+        "type": "SeedVR2VideoUpscaler",
+        "pos": [
+          -351.60492411322923,
+          535.9303796770696
+        ],
+        "size": [
+          329.956640625,
+          386
+        ],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 3
+          },
+          {
+            "name": "dit",
+            "type": "SEEDVR2_DIT",
+            "link": 1
+          },
+          {
+            "name": "vae",
+            "type": "SEEDVR2_VAE",
+            "link": 2
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              5,
+              6
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "seedvr2_videoupscaler",
+          "ver": "2.5.24",
+          "Node name for S&R": "SeedVR2VideoUpscaler"
+        },
+        "widgets_values": [
+          2765144094,
+          "randomize",
+          4096,
+          0,
+          5,
+          false,
+          "lab",
+          0,
+          0,
+          0,
+          0,
+          "cpu",
+          false
+        ]
+      },
+      {
+        "id": 9,
+        "type": "MarkdownNote",
+        "pos": [
+          -1448.7512756426615,
+          363.1594266300987
+        ],
+        "size": [
+          499.89670360192656,
+          606.2269555688357
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "SeedVR2 Note",
+        "properties": {},
+        "widgets_values": [
+          "## SeedVR2 model files\n\n### Repo 1: numz/SeedVR2_comfyUI\nMore info [HERE](https://huggingface.co/numz/SeedVR2_comfyUI/tree/main)\n\n| Model file | Size |\n|---|---:|\n| `ema_vae_fp16.safetensors` | 501 MB |\n| `seedvr2_ema_3b_fp16.safetensors` | 6.78 GB |\n| `seedvr2_ema_3b_fp8_e4m3fn.safetensors` | 3.39 GB |\n| `seedvr2_ema_7b_fp16.safetensors` | 16.5 GB |\n| `seedvr2_ema_7b_fp8_e4m3fn.safetensors` | 8.24 GB |\n| `seedvr2_ema_7b_sharp_fp16.safetensors` | 16.5 GB |\n| `seedvr2_ema_7b_sharp_fp8_e4m3fn.safetensors` | 8.24 GB |\n\n### Repo 2: AInVFX/SeedVR2_comfyUI\nMore info [HERE](https://huggingface.co/AInVFX/SeedVR2_comfyUI/tree/main)\n\n| Model file | Size |\n|---|---:|\n| `seedvr2_ema_3b-Q4_K_M.gguf` | 2 GB |\n| `seedvr2_ema_3b-Q8_0.gguf` | 3.66 GB |\n| `seedvr2_ema_7b-Q4_K_M.gguf` | 4.76 GB |\n| `seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors` | 8.47 GB |\n| `seedvr2_ema_7b_sharp-Q4_K_M.gguf` | 4.76 GB |\n| `seedvr2_ema_7b_sharp_fp8_e4m3fn_mixed_block35_fp16.safetensors` | 8.47 GB |\n\n### Notes\n- **fp16**: best quality, uses more VRAM\n- **fp8 (e4m3fn)**: lower VRAM, usually faster, slightly less accurate\n- **sharp**: sharper output variant\n- **GGUF**: quantized format, often smaller and lighter to run\n"
+        ],
+        "color": "#233",
+        "bgcolor": "#355"
+      }
+    ],
+    "links": [
+      [
+        1,
+        1,
+        0,
+        4,
+        1,
+        "SEEDVR2_DIT"
+      ],
+      [
+        2,
+        2,
+        0,
+        4,
+        2,
+        "SEEDVR2_VAE"
+      ],
+      [
+        3,
+        5,
+        0,
+        4,
+        0,
+        "IMAGE"
+      ],
+      [
+        4,
+        5,
+        0,
+        7,
+        0,
+        "IMAGE"
+      ],
+      [
+        5,
+        4,
+        0,
+        7,
+        1,
+        "IMAGE"
+      ],
+      [
+        6,
+        4,
+        0,
+        6,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 0.9229599817708042,
+        "offset": [
+          1718.9489084447694,
+          170.66415803653473
+        ]
+      },
+      "frontendVersion": "1.38.13",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "e58ec64cbde3e39cff74ff4942d9f419df477895af42501608f90d40b023ab4d",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "UNKNOWN": "seedvr2_ema_7b_fp8_e4m3fn_mixed_block35_fp16.safetensors",
+        "UNKNOWN_1": "cuda:0",
+        "UNKNOWN_2": 0,
+        "UNKNOWN_3": false,
+        "UNKNOWN_4": "cpu",
+        "UNKNOWN_5": false,
+        "UNKNOWN_6": "sdpa"
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::SeedVR2LoadDiTModel"
+    },
+    "2": {
+      "inputs": {
+        "UNKNOWN": "ema_vae_fp16.safetensors",
+        "UNKNOWN_1": "cuda:0",
+        "UNKNOWN_2": true,
+        "UNKNOWN_3": 1024,
+        "UNKNOWN_4": 128,
+        "UNKNOWN_5": true,
+        "UNKNOWN_6": 1024,
+        "UNKNOWN_7": 128,
+        "UNKNOWN_8": "false",
+        "UNKNOWN_9": "cpu",
+        "UNKNOWN_10": false
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::SeedVR2LoadVAEModel"
+    },
+    "4": {
+      "inputs": {
+        "UNKNOWN": 2765144094,
+        "UNKNOWN_1": "randomize",
+        "UNKNOWN_2": 4096,
+        "UNKNOWN_3": 0,
+        "UNKNOWN_4": 5,
+        "UNKNOWN_5": false,
+        "UNKNOWN_6": "lab",
+        "UNKNOWN_7": 0,
+        "UNKNOWN_8": 0,
+        "UNKNOWN_9": 0,
+        "UNKNOWN_10": 0,
+        "UNKNOWN_11": "cpu",
+        "UNKNOWN_12": false,
+        "image": [
+          "5",
+          0
+        ],
+        "dit": [
+          "1",
+          0
+        ],
+        "vae": [
+          "2",
+          0
+        ]
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::SeedVR2VideoUpscaler"
+    },
+    "5": {
+      "inputs": {
+        "image": "Woman1.jpg"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    },
+    "6": {
+      "inputs": {
+        "filename_prefix": "ComfyUI",
+        "images": [
+          "4",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image"
+      }
+    },
+    "7": {
+      "inputs": {
+        "rgthree_comparer": {
+          "images": [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_unxyy_00019_.png&type=temp&subfolder=&rand=0.17966169331510695"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_unxyy_00020_.png&type=temp&subfolder=&rand=0.6611205723033143"
+            }
+          ]
+        },
+        "image_a": [
+          "5",
+          0
+        ],
+        "image_b": [
+          "4",
+          0
+        ]
+      },
+      "class_type": "Image Comparer (rgthree)",
+      "_meta": {
+        "title": "Image Comparer (rgthree)"
+      }
+    }
+  },
+  "sha256": "3af91418db022ffe06b60ea8aeb9f034f35deae050b44eb0915bf0e3e242ca9f",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

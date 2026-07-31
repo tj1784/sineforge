@@ -105,13 +105,14 @@ def enhance_phase_one_package(
     target_duration_sec: float,
     creative_direction: dict[str, Any],
     baseline_package: dict[str, Any],
+    model_id: str | None = None,
     settings: Settings | None = None,
 ) -> dict[str, Any]:
     """Return validated enhancement fields; callers retain deterministic fallback."""
 
     cfg = settings or get_settings()
-    if not (cfg.sulphur_configured and cfg.sulphur_phase_one_enabled):
-        raise RuntimeError("Sulphur Phase 1 enhancement is disabled")
+    if not (cfg.sulphur_planning_enabled and cfg.sulphur_phase_one_enabled):
+        raise RuntimeError("Local Phase 1 enhancement is disabled")
 
     baseline = {
         field: baseline_package.get(field)
@@ -142,11 +143,23 @@ def enhance_phase_one_package(
         ],
     }
     body = {
-        "model": get_active_lm_studio_model_id(cfg),
+        "model": model_id or get_active_lm_studio_model_id(cfg),
         "temperature": 0.35,
         "max_tokens": 4096,
         "messages": [
-            {"role": "system", "content": _SYSTEM_PROMPT},
+            {
+                "role": "system",
+                "content": json.dumps(
+                    {
+                        "schema_version": "sineforge.local-agent-system/v1",
+                        "agent_role": "phase_one_planner",
+                        "instructions": [_SYSTEM_PROMPT],
+                        "response_artifact_format": "json",
+                    },
+                    ensure_ascii=False,
+                    separators=(",", ":"),
+                ),
+            },
             {
                 "role": "user",
                 "content": json.dumps(user_payload, ensure_ascii=False, separators=(",", ":")),

@@ -79,12 +79,8 @@ def apply_proposal(db: Session, proposal_id: UUID, request: ProposalApplyRequest
         raise ProposalStateError(f"Cannot apply proposal in status '{record.status}'.")
     if record.validation_status == "invalid" or record.validation_errors:
         raise ProposalStateError("Cannot apply proposal with validation errors.")
-    if record.status not in {"validated", "needs_review", "pending_review"}:
+    if record.status in {"generating", "validating", "applying"}:
         raise ProposalStateError(f"Cannot apply proposal in status '{record.status}'.")
-
-    # needs_review / pending_review may still apply only after explicit human review marker.
-    if record.status != "validated" and not record.reviewed_at:
-        raise ProposalStateError("Proposal must be reviewed before apply.")
 
     try:
         proposal_type = ProposalType(record.proposal_type)

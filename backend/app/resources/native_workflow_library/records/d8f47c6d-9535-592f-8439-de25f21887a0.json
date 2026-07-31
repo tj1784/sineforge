@@ -1,0 +1,526 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "d8f47c6d-9535-592f-8439-de25f21887a0",
+  "name": "Prompt from Image",
+  "version": "1.0",
+  "description": "Prompt from Image is a captioning & transcription workflow designed to extract structured text or prompts from media using the models configured in the graph. Its 7-node graph exposes 2 prompt/text field(s), 2 media input target(s), and 0 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Prompting & Language",
+  "subcategory": "Captioning & transcription",
+  "episode": "EP28",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Review the model-file entries in Requirements and place each checkpoint, text encoder, VAE, LoRA, or auxiliary model in the folder documented by the source workflow. Refresh ComfyUI after adding files.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Edit the source text or media, review the system/instruction fields, and inspect the generated text before passing it into another generation workflow.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "Captioning & transcription",
+    "EP28",
+    "Prompting & Language"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma",
+      "pixaroma",
+      "Pixaroma YouTube Channel"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "CLIPLoader",
+      "PixaromaLabel",
+      "PixaromaLoadImageMini",
+      "PixaromaNote",
+      "PixaromaSeed",
+      "PixaromaShowText",
+      "TextGenerate"
+    ],
+    "model_files": [
+      {
+        "node_id": "195",
+        "node_type": "CLIPLoader",
+        "input": "clip_name",
+        "value": "qwen3-vl-4b-heretic_int8.safetensors"
+      }
+    ],
+    "media_inputs": [
+      {
+        "node_id": "224",
+        "node_type": "PixaromaLoadImageMini",
+        "input": "image",
+        "default": "BunnyExplorer.png"
+      },
+      {
+        "node_id": "224",
+        "node_type": "PixaromaLoadImageMini",
+        "input": "LoadImageMiniState",
+        "default": "{\"version\":1,\"mode\":\"off\",\"max_mp\":1,\"longest_side\":1024,\"scale_factor\":1,\"fit_w\":1024,\"fit_h\":1024,\"cover_w\":1024,\"cover_h\":1024,\"ratio_preset\":\"1:1\",\"ratio_w\":1,\"ratio_h\":1,\"ratio_action\":\"crop\",\"pad_color\":\"#808080\",\"pad_top\":0,\"pad_bottom\":0,\"pad_left\":0,\"pad_right\":0,\"crop_anchor\":\"center\",\"crop_scale\":true,\"snap\":0,\"resample\":\"auto\",\"allow_upscale\":true,\"orig_name\":\"BunnyExplorer.png\"}"
+      }
+    ],
+    "prompt_field_count": 2,
+    "output_node_count": 0,
+    "documentation_notes": "Write one polished visual description paragraph.\n\nUse the connected picture as the source.\n\nWrite 200 to 250 words.\n\nStart with the medium and style, such as realistic photograph, 3D render, cartoon illustration, anime illustration, digital painting, watercolor, oil painting, comic art, pixel art, or line art.\n\nDescribe visible details only.\n\nDescribe the main subject, visible pose, face, expression, hair, skin or fur, clothing, accessories, shoes, props, visible text, symbols, setting, background, framing, lighting, colors, materials, textures, shadows, and overall visual style.\n\nFor people or characters, describe only visible body parts and visible posture.\n\nKeep visible text exactly as written.\n\nSkip unseen parts naturally.\n\nUse direct visual description.\n\nBegin immediately:\n\nThis is a 3D render, crafted with smooth, polished textures and soft lighting that highlights the character’s plush, cartoonish charm. The central figure is a white rabbit, standing upright in a full-body explorer outfit. Its large, expressive brown eyes gaze forward with gentle curiosity, framed by oversized, fluffy white ears tipped with pink inner linings and edged with fine white fur. A small, simple smile curves its pink nose, giving it an endearing, cheerful demeanor. The rabbit wears a green safari-style hat adorned with a circular gold emblem on the front. Its uniform consists of olive-green field gear — a short-sleeved shirt with buttoned pockets, matching shorts, and a brown belt with a metallic buckle — all rendered with subtle fabric texture. Over its shoulders rests a green backpack with tan straps and a small front pocket, secured with a buckle; brown hiking boots complete the ensemble. The background is a clean, minimalist white gradient, emphasizing the character’s vibrant colors: greens, browns, and soft whites. Lighting casts gentle shadows beneath the feet and along the contours of the outfit, enhancing depth without harshness. The overall style is whimsical yet detailed, with rounded edges and soft highlights suggesting a digital sculpted character designed for visual appeal and playfulness.\n\n{\"version\":1,\"content\":\"<h1>MODELS AND NODES USED IN THIS WORKFLOW</h1><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"CLIP\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load CLIP</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n<span class=\\\"pix-note-btnblock\\\"><a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/DreamFast/Qwen3-VL-4b-Heretic-ComfyUI/resolve/main/qwen3-vl-4b-heretic_int8.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download qwen3-vl-4b-heretic_int8<span class=\\\"pix-note-btnsize\\\">4.5 GB</span></a></span>&nbsp;\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/text_encoders<br><br><span class=\\\"pix-note-btnblock\\\"><a class=\\\"pix-note-vp\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/DreamFast/Qwen3-VL-4b-Heretic-ComfyUI/tree/main\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">More Versions</a></span>&nbsp;<br></div><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p><span data-ic=\\\"warning-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;After placing the files, restart ComfyUI or refresh model lists using the <b>R</b> shortcut.</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"nodes-installed\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Nodes Installed from Manager</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><ul>\\n  <li>Pixaroma</li></ul><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"pixaroma\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Resources</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n  <a class=\\\"pix-note-discord\\\" href=\\\"https://discord.com/invite/gggpkVgBf3\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Join Discord</a>&nbsp;\\n\\n  <a class=\\\"pix-note-yt\\\" href=\\\"https://www.youtube.com/@pixaroma\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Pixaroma YouTube Channel</a>&nbsp;\\n</p>\",\"buttonColor\":\"#f66744\",\"lineColor\":\"#f66744\",\"width\":510.9698562411088,\"height\":790.0640443733356,\"backgroundColor\":\"#2a2a2a\"}"
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep28 workflows/ep28 workflows/prompt from image.json",
+  "source_filename": "Prompt from Image.json",
+  "source_archive": "Ep28 Workflows.zip",
+  "source_entry": "Ep28 Workflows/Ep28 Workflows/Prompt from Image.json",
+  "source_workflow": {
+    "id": "c5beec59-2b88-4f3f-ba35-7640a58a9ba6",
+    "revision": 0,
+    "last_node_id": 226,
+    "last_link_id": 275,
+    "nodes": [
+      {
+        "id": 195,
+        "type": "CLIPLoader",
+        "pos": [
+          -1055.6195189744317,
+          223.3824473224962
+        ],
+        "size": [
+          374.4070761865687,
+          106
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "CLIP",
+            "type": "CLIP",
+            "links": [
+              261
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.3.76",
+          "Node name for S&R": "CLIPLoader"
+        },
+        "widgets_values": [
+          "qwen3-vl-4b-heretic_int8.safetensors",
+          "krea2",
+          "default"
+        ],
+        "color": "#f66744",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 224,
+        "type": "PixaromaLoadImageMini",
+        "pos": [
+          -1055.6195189744317,
+          386.305144154565
+        ],
+        "size": [
+          374.4070761865687,
+          495.0518487105703
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "links": [
+              270
+            ]
+          },
+          {
+            "name": "image_info",
+            "type": "PIX_IMAGE_INFO",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "50368144a64aca44577cf47a1173d708a7a2f2c9",
+          "Node name for S&R": "PixaromaLoadImageMini"
+        },
+        "widgets_values": [
+          "BunnyExplorer.png",
+          "image",
+          ""
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 213,
+        "type": "TextGenerate",
+        "pos": [
+          -636.750808493925,
+          223.3824473224962
+        ],
+        "size": [
+          406.7298087541376,
+          412
+        ],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "showAdvanced": true,
+        "inputs": [
+          {
+            "name": "clip",
+            "type": "CLIP",
+            "link": 261
+          },
+          {
+            "name": "image",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": 270
+          },
+          {
+            "name": "video",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": null
+          },
+          {
+            "name": "audio",
+            "shape": 7,
+            "type": "AUDIO",
+            "link": null
+          },
+          {
+            "name": "sampling_mode.seed",
+            "type": "INT",
+            "widget": {
+              "name": "sampling_mode.seed"
+            },
+            "link": 275
+          }
+        ],
+        "outputs": [
+          {
+            "name": "generated_text",
+            "type": "STRING",
+            "links": [
+              274
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.21.0",
+          "Node name for S&R": "TextGenerate"
+        },
+        "widgets_values": [
+          "Write one polished visual description paragraph.\n\nUse the connected picture as the source.\n\nWrite 200 to 250 words.\n\nStart with the medium and style, such as realistic photograph, 3D render, cartoon illustration, anime illustration, digital painting, watercolor, oil painting, comic art, pixel art, or line art.\n\nDescribe visible details only.\n\nDescribe the main subject, visible pose, face, expression, hair, skin or fur, clothing, accessories, shoes, props, visible text, symbols, setting, background, framing, lighting, colors, materials, textures, shadows, and overall visual style.\n\nFor people or characters, describe only visible body parts and visible posture.\n\nKeep visible text exactly as written.\n\nSkip unseen parts naturally.\n\nUse direct visual description.\n\nBegin immediately:",
+          1024,
+          "on",
+          0.7,
+          64,
+          0.95,
+          0.05,
+          1.05,
+          4024454347,
+          0,
+          false,
+          true
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 225,
+        "type": "PixaromaShowText",
+        "pos": [
+          -190.93345249662363,
+          223.3824473224962
+        ],
+        "size": [
+          429.97746328968924,
+          657.9745455426391
+        ],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "source",
+            "type": "*",
+            "link": 274
+          }
+        ],
+        "outputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "50368144a64aca44577cf47a1173d708a7a2f2c9",
+          "Node name for S&R": "PixaromaShowText"
+        },
+        "widgets_values": [
+          "This is a 3D render, crafted with smooth, polished textures and soft lighting that highlights the character’s plush, cartoonish charm. The central figure is a white rabbit, standing upright in a full-body explorer outfit. Its large, expressive brown eyes gaze forward with gentle curiosity, framed by oversized, fluffy white ears tipped with pink inner linings and edged with fine white fur. A small, simple smile curves its pink nose, giving it an endearing, cheerful demeanor. The rabbit wears a green safari-style hat adorned with a circular gold emblem on the front. Its uniform consists of olive-green field gear — a short-sleeved shirt with buttoned pockets, matching shorts, and a brown belt with a metallic buckle — all rendered with subtle fabric texture. Over its shoulders rests a green backpack with tan straps and a small front pocket, secured with a buckle; brown hiking boots complete the ensemble. The background is a clean, minimalist white gradient, emphasizing the character’s vibrant colors: greens, browns, and soft whites. Lighting casts gentle shadows beneath the feet and along the contours of the outfit, enhancing depth without harshness. The overall style is whimsical yet detailed, with rounded edges and soft highlights suggesting a digital sculpted character designed for visual appeal and playfulness."
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 219,
+        "type": "PixaromaNote",
+        "pos": [
+          -1610.9679534822276,
+          223.38244732249618
+        ],
+        "size": [
+          514.2530684034459,
+          466.9928065950603
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "1227d9898f9d5137533df750611ca97e8c738f3d",
+          "Node name for S&R": "PixaromaNote"
+        },
+        "widgets_values": [
+          "{\"version\":1,\"content\":\"<h1>MODELS AND NODES USED IN THIS WORKFLOW</h1><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"CLIP\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load CLIP</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n<span class=\\\"pix-note-btnblock\\\"><a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/DreamFast/Qwen3-VL-4b-Heretic-ComfyUI/resolve/main/qwen3-vl-4b-heretic_int8.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download qwen3-vl-4b-heretic_int8<span class=\\\"pix-note-btnsize\\\">4.5 GB</span></a></span>&nbsp;\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/text_encoders<br><br><span class=\\\"pix-note-btnblock\\\"><a class=\\\"pix-note-vp\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/DreamFast/Qwen3-VL-4b-Heretic-ComfyUI/tree/main\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">More Versions</a></span>&nbsp;<br></div><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p><span data-ic=\\\"warning-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;After placing the files, restart ComfyUI or refresh model lists using the <b>R</b> shortcut.</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"nodes-installed\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Nodes Installed from Manager</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><ul>\\n  <li>Pixaroma</li></ul><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"pixaroma\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Resources</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n  <a class=\\\"pix-note-discord\\\" href=\\\"https://discord.com/invite/gggpkVgBf3\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Join Discord</a>&nbsp;\\n\\n  <a class=\\\"pix-note-yt\\\" href=\\\"https://www.youtube.com/@pixaroma\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Pixaroma YouTube Channel</a>&nbsp;\\n</p>\",\"buttonColor\":\"#f66744\",\"lineColor\":\"#f66744\",\"width\":510.9698562411088,\"height\":790.0640443733356,\"backgroundColor\":\"#2a2a2a\"}",
+          ""
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      },
+      {
+        "id": 198,
+        "type": "PixaromaLabel",
+        "pos": [
+          -1610.9679534822276,
+          112.0261522446219
+        ],
+        "size": [
+          296,
+          51
+        ],
+        "flags": {
+          "no_title": true
+        },
+        "order": 3,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "80b307e8d1882fd933959cb0ea94a26d143557b5",
+          "Node name for S&R": "PixaromaLabel",
+          "aux_id": "pixaroma/ComfyUI-Pixaroma"
+        },
+        "widgets_values": [
+          "{\"text\":\"Prompt From Image\",\"fontSize\":31,\"fontFamily\":\"Arial\",\"fontColor\":\"#ffffff\",\"textAlign\":\"left\",\"backgroundColor\":\"#f66744\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1}"
+        ],
+        "color": "rgba(0,0,0,0)",
+        "bgcolor": "rgba(0,0,0,0)"
+      },
+      {
+        "id": 226,
+        "type": "PixaromaSeed",
+        "pos": [
+          -636.750808493925,
+          700.6102179923114
+        ],
+        "size": [
+          406.7298087541376,
+          86
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "seed",
+            "type": "INT",
+            "links": [
+              275
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "ComfyUI-Pixaroma",
+          "ver": "50368144a64aca44577cf47a1173d708a7a2f2c9",
+          "Node name for S&R": "PixaromaSeed",
+          "seedState": "{\"seed\":3527925546697955,\"mode\":\"random\",\"compact\":true,\"digits\":16}"
+        },
+        "widgets_values": [
+          {
+            "seed": 3527925546697955,
+            "mode": "random",
+            "compact": true,
+            "digits": 16
+          }
+        ],
+        "color": "#1d1d1d",
+        "bgcolor": "#2a2a2a"
+      }
+    ],
+    "links": [
+      [
+        261,
+        195,
+        0,
+        213,
+        0,
+        "CLIP"
+      ],
+      [
+        270,
+        224,
+        0,
+        213,
+        1,
+        "IMAGE"
+      ],
+      [
+        274,
+        213,
+        0,
+        225,
+        0,
+        "STRING"
+      ],
+      [
+        275,
+        226,
+        0,
+        213,
+        4,
+        "INT"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 0.9229599817706823,
+        "offset": [
+          1826.7095627775461,
+          94.1569675227857
+        ]
+      },
+      "frontendVersion": "1.45.21",
+      "node_versions": {
+        "ComfyUI-GGUF": "8098c7149fa4ff14991eb3347a5585051ceeafbe",
+        "comfy-core": "v0.3.10-37-gd055325",
+        "rgthree-comfy": "5d771b8b56a343c24a26e8cea1f0c87c3d58102f"
+      },
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true,
+      "workflowRendererVersion": "LG"
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "9c887c5dd2fd7915090689be9c74af602ee071b823f2eedb80e4307df7bbcfe6",
+  "workflow": {
+    "195": {
+      "inputs": {
+        "clip_name": "qwen3-vl-4b-heretic_int8.safetensors",
+        "type": "krea2",
+        "device": "default"
+      },
+      "class_type": "CLIPLoader",
+      "_meta": {
+        "title": "Load CLIP"
+      }
+    },
+    "198": {
+      "inputs": {
+        "label_json": "{\"text\":\"Prompt From Image\",\"fontSize\":31,\"fontFamily\":\"Arial\",\"fontColor\":\"#ffffff\",\"textAlign\":\"left\",\"backgroundColor\":\"#f66744\",\"padding\":10,\"borderRadius\":0,\"opacity\":1,\"fontWeight\":\"normal\",\"lineHeight\":1}"
+      },
+      "class_type": "PixaromaLabel",
+      "_meta": {
+        "title": "Label Pixaroma"
+      }
+    },
+    "213": {
+      "inputs": {
+        "prompt": "Write one polished visual description paragraph.\n\nUse the connected picture as the source.\n\nWrite 200 to 250 words.\n\nStart with the medium and style, such as realistic photograph, 3D render, cartoon illustration, anime illustration, digital painting, watercolor, oil painting, comic art, pixel art, or line art.\n\nDescribe visible details only.\n\nDescribe the main subject, visible pose, face, expression, hair, skin or fur, clothing, accessories, shoes, props, visible text, symbols, setting, background, framing, lighting, colors, materials, textures, shadows, and overall visual style.\n\nFor people or characters, describe only visible body parts and visible posture.\n\nKeep visible text exactly as written.\n\nSkip unseen parts naturally.\n\nUse direct visual description.\n\nBegin immediately:",
+        "max_length": 1024,
+        "sampling_mode": "on",
+        "sampling_mode.temperature": 0.7,
+        "sampling_mode.top_k": 64,
+        "sampling_mode.top_p": 0.95,
+        "sampling_mode.min_p": 0.05,
+        "sampling_mode.repetition_penalty": 1.05,
+        "sampling_mode.seed": [
+          "226",
+          0
+        ],
+        "sampling_mode.presence_penalty": 0,
+        "thinking": false,
+        "use_default_template": true,
+        "clip": [
+          "195",
+          0
+        ],
+        "image": [
+          "224",
+          0
+        ]
+      },
+      "class_type": "TextGenerate",
+      "_meta": {
+        "title": "Generate Text"
+      }
+    },
+    "219": {
+      "inputs": {
+        "note_json": "{\"version\":1,\"content\":\"<h1>MODELS AND NODES USED IN THIS WORKFLOW</h1><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"CLIP\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Load CLIP</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n<span class=\\\"pix-note-btnblock\\\"><a class=\\\"pix-note-dl\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/DreamFast/Qwen3-VL-4b-Heretic-ComfyUI/resolve/main/qwen3-vl-4b-heretic_int8.safetensors\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Download qwen3-vl-4b-heretic_int8<span class=\\\"pix-note-btnsize\\\">4.5 GB</span></a></span>&nbsp;\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><div class=\\\"pix-note-folderhint\\\" style=\\\"color: #f66744\\\">Place in: ComfyUI/models/text_encoders<br><br><span class=\\\"pix-note-btnblock\\\"><a class=\\\"pix-note-vp\\\" style=\\\"background-color: #f66744\\\" href=\\\"https://huggingface.co/DreamFast/Qwen3-VL-4b-Heretic-ComfyUI/tree/main\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">More Versions</a></span>&nbsp;<br></div><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2></h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p><span data-ic=\\\"warning-v1\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;After placing the files, restart ComfyUI or refresh model lists using the <b>R</b> shortcut.</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"nodes-installed\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Nodes Installed from Manager</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><ul>\\n  <li>Pixaroma</li></ul><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><hr class=\\\"pix-note-hr-solid\\\" style=\\\"color: #b8b8b8\\\"><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><h2><span data-ic=\\\"pixaroma\\\" class=\\\"pix-note-ic\\\" contenteditable=\\\"false\\\" style=\\\"color: #f66744\\\"></span>&nbsp;Resources</h2><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n\\n</p><p>\\n  <a class=\\\"pix-note-discord\\\" href=\\\"https://discord.com/invite/gggpkVgBf3\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Join Discord</a>&nbsp;\\n\\n  <a class=\\\"pix-note-yt\\\" href=\\\"https://www.youtube.com/@pixaroma\\\" target=\\\"_blank\\\" rel=\\\"noopener noreferrer\\\">Pixaroma YouTube Channel</a>&nbsp;\\n</p>\",\"buttonColor\":\"#f66744\",\"lineColor\":\"#f66744\",\"width\":510.9698562411088,\"height\":790.0640443733356,\"backgroundColor\":\"#2a2a2a\"}"
+      },
+      "class_type": "PixaromaNote",
+      "_meta": {
+        "title": "Note Pixaroma"
+      }
+    },
+    "224": {
+      "inputs": {
+        "image": "BunnyExplorer.png",
+        "LoadImageMiniState": "{\"version\":1,\"mode\":\"off\",\"max_mp\":1,\"longest_side\":1024,\"scale_factor\":1,\"fit_w\":1024,\"fit_h\":1024,\"cover_w\":1024,\"cover_h\":1024,\"ratio_preset\":\"1:1\",\"ratio_w\":1,\"ratio_h\":1,\"ratio_action\":\"crop\",\"pad_color\":\"#808080\",\"pad_top\":0,\"pad_bottom\":0,\"pad_left\":0,\"pad_right\":0,\"crop_anchor\":\"center\",\"crop_scale\":true,\"snap\":0,\"resample\":\"auto\",\"allow_upscale\":true,\"orig_name\":\"BunnyExplorer.png\"}"
+      },
+      "class_type": "PixaromaLoadImageMini",
+      "_meta": {
+        "title": "Load Image Mini Pixaroma"
+      }
+    },
+    "225": {
+      "inputs": {
+        "text": "This is a 3D render, crafted with smooth, polished textures and soft lighting that highlights the character’s plush, cartoonish charm. The central figure is a white rabbit, standing upright in a full-body explorer outfit. Its large, expressive brown eyes gaze forward with gentle curiosity, framed by oversized, fluffy white ears tipped with pink inner linings and edged with fine white fur. A small, simple smile curves its pink nose, giving it an endearing, cheerful demeanor. The rabbit wears a green safari-style hat adorned with a circular gold emblem on the front. Its uniform consists of olive-green field gear — a short-sleeved shirt with buttoned pockets, matching shorts, and a brown belt with a metallic buckle — all rendered with subtle fabric texture. Over its shoulders rests a green backpack with tan straps and a small front pocket, secured with a buckle; brown hiking boots complete the ensemble. The background is a clean, minimalist white gradient, emphasizing the character’s vibrant colors: greens, browns, and soft whites. Lighting casts gentle shadows beneath the feet and along the contours of the outfit, enhancing depth without harshness. The overall style is whimsical yet detailed, with rounded edges and soft highlights suggesting a digital sculpted character designed for visual appeal and playfulness.",
+        "source": [
+          "213",
+          0
+        ]
+      },
+      "class_type": "PixaromaShowText",
+      "_meta": {
+        "title": "Show Text Pixaroma"
+      }
+    },
+    "226": {
+      "inputs": {
+        "SeedState": "{\"runSeed\":4422999155927150}"
+      },
+      "class_type": "PixaromaSeed",
+      "_meta": {
+        "title": "Seed Pixaroma"
+      }
+    }
+  },
+  "sha256": "34a004c374894f2bdbbe1a3af8f80033f70c88fe0e3dff216e12b723c0f6e98c",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

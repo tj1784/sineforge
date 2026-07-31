@@ -32,10 +32,12 @@ from sqlalchemy.orm import Session
 from backend.app.db.base import (
     OrchestrationRun,
     OrchestrationStep,
+    Project,
     ProviderProfile,
     StoryboardVersion,
     TaskProviderAssignment,
 )
+from backend.app.schemas.project_workflows import is_agentless_workflow_lane
 from backend.app.schemas.orchestration import (
     ActorType,
     CheckpointState,
@@ -103,13 +105,9 @@ from backend.app.services import (
 DEFAULT_PIPELINE: tuple[PlanningTaskType, ...] = (
     PlanningTaskType.story_structure,
     PlanningTaskType.character_bible,
-    PlanningTaskType.chapter_outline,
     PlanningTaskType.scene_breakdown,
     PlanningTaskType.shot_list,
-    PlanningTaskType.narration_plan,
     PlanningTaskType.prompt_package,
-    PlanningTaskType.continuity_plan,
-    PlanningTaskType.model_recommendation,
     PlanningTaskType.production_proposal,
 )
 
@@ -199,9 +197,32 @@ class PlanningEngine:
     def create_run(self, request: CreateOrchestrationRunRequest) -> tuple[OrchestrationRun, bool]:
         """Create a pending run. Returns (run, created). Idempotent on client key."""
         story = self.repo.lock_story_for_run_creation(request.story_id)
+        project = self.repo.db.get(Project, story.project_id)
+        local_only_lane = bool(
+            project is not None
+            and is_agentless_workflow_lane(project.workflow_lane)
+        )
         project_settings = storyboard_settings_service.get_settings(
             self.repo.db, story.project_id
         )
+        if local_only_lane and request.prefer_hosted_providers:
+            raise PlanningError(
+                PlanningErrorCode.ROUTING_FAILED,
+                (
+                    "Agentless workflow projects prohibit hosted/API planning "
+                    "agents; select the local LM Studio provider."
+                ),
+                details={"workflow_lane": project.workflow_lane},
+            )
+        if local_only_lane and not request.prefer_local_providers:
+            raise PlanningError(
+                PlanningErrorCode.ROUTING_FAILED,
+                (
+                    "Agentless workflow projects require the selected local "
+                    "LM Studio planning agent."
+                ),
+                details={"workflow_lane": project.workflow_lane},
+            )
         if request.prefer_hosted_providers and not project_settings.prefer_hosted_providers:
             raise PlanningError(
                 PlanningErrorCode.ROUTING_FAILED,
@@ -282,6 +303,56 @@ class PlanningEngine:
         descriptor_by_id = {
             item.provider_identifier: item for item in descriptors
         }
+        selected_agent: str | None = None
+        if local_only_lane:
+            prompting_policy = dict(
+                project_settings.prompting_policy_json or {}
+            )
+            selected_agent = str(
+                prompting_policy.get("planning_agent") or "qwen"
+            )
+            selected_descriptor = descriptor_by_id.get(selected_agent)
+            if (
+                selected_agent not in {"qwen", "sulphur"}
+                or selected_descriptor is None
+                or selected_descriptor.privacy_classification != "local"
+                or (
+                    self._provider_registry_is_explicit
+                    and selected_agent not in self.providers
+                )
+                or (
+                    not self._provider_registry_is_explicit
+                    and selected_descriptor.availability_status.value
+                    != "available"
+                )
+            ):
+                raise PlanningError(
+                    PlanningErrorCode.ROUTING_FAILED,
+                    (
+                        f"Selected local planning agent '{selected_agent}' is "
+                        "not available; Agentless policy forbids fallback to "
+                        "mock or hosted providers."
+                    ),
+                    details={
+                        "workflow_lane": project.workflow_lane,
+                        "planning_agent": selected_agent,
+                    },
+                )
+            if any(
+                route.provider_identifier != selected_agent
+                for route in effective_routes
+            ):
+                raise PlanningError(
+                    PlanningErrorCode.ROUTING_FAILED,
+                    (
+                        "Agentless planning routes must use the project-selected "
+                        f"local agent '{selected_agent}'."
+                    ),
+                    details={
+                        "workflow_lane": project.workflow_lane,
+                        "planning_agent": selected_agent,
+                    },
+                )
         for manual_route in effective_routes:
             descriptor = descriptor_by_id.get(manual_route.provider_identifier)
             if descriptor is None:
@@ -355,6 +426,11 @@ class PlanningEngine:
         provider_catalog: list[dict[str, Any]] = []
         for descriptor in descriptors:
             if (
+                local_only_lane
+                and descriptor.provider_identifier != selected_agent
+            ):
+                continue
+            if (
                 self._provider_registry_is_explicit
                 and descriptor.provider_identifier not in self.providers
             ):
@@ -369,6 +445,8 @@ class PlanningEngine:
                 entry["execution_mode"] = "injected"
             provider_catalog.append(entry)
         routing_snapshot["provider_catalog"] = provider_catalog
+        if selected_agent is not None:
+            routing_snapshot["selected_planning_agent"] = selected_agent
         routing_snapshot["input_context_hash"] = input_context_hash
         routing_snapshot["base_content_hash"] = base_content_hash
         routing_snapshot["persisted_task_assignments"] = stored_route_evidence

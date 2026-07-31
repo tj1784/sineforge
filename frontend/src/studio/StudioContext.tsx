@@ -7,6 +7,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { PageId } from '../components/AppShell'
+import type { ProjectWorkflowLane } from '../workflowLanes'
 import {
   ApiError,
   api,
@@ -29,11 +30,13 @@ function errorMessage(error: unknown, fallback: string): string {
 
 export function StudioProvider({
   projectId: selectedProjectId,
+  workflowLane,
   backendStatus,
   onNavigate,
   children,
 }: {
   projectId: string
+  workflowLane: ProjectWorkflowLane | null
   backendStatus: string
   onNavigate: (page: PageId) => void
   children: ReactNode
@@ -409,6 +412,7 @@ export function StudioProvider({
     () => ({
       backendStatus,
       navigate: onNavigate,
+      workflowLane,
       projectId,
       setProjectId,
       storyId,
@@ -439,6 +443,7 @@ export function StudioProvider({
     [
       backendStatus,
       onNavigate,
+      workflowLane,
       projectId,
       storyId,
       data,

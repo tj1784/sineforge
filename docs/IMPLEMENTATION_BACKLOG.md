@@ -1,15 +1,18 @@
 # SineForge Implementation Backlog
 
-Last audited: 2026-07-28  
-Scope of this audit: WAN Base, Phase 7 video/picture lock, Phase 8 Foley,
-audio mix/master, and final mux runtime admission  
+Last audited: 2026-07-29
+Scope of this audit: LTX Sequence Sheet with native synchronized audio, WAN
+Base hold, and WAN Phase 8 Foley/audio runtime admission
 Authoritative design: [WAN Base and Phase 8 Audio Implementation Plan](SINEFORGE_WAN_BASE_AND_PHASE8_AUDIO_IMPLEMENTATION_PLAN_2026-07-28.md)
 
-## Phase 8 runtime status
+LTX Sequence Sheet design:
+[LTX Sequence Sheet and Long-Video Implementation Plan](SINEFORGE_LTX_SEQUENCE_SHEET_IMPLEMENTATION_PLAN_2026-07-29.md)
+
+## WAN Phase 8 runtime status
 
 **Runtime admission is closed.**
 
-The repository currently proves only non-rendering Phase 8 capabilities:
+The repository currently proves only non-rendering WAN Phase 8 capabilities:
 
 - immutable picture-lock hash validation;
 - exact frame, rational PTS, and 48 kHz sample-range planning;
@@ -33,7 +36,7 @@ numeric-QA response as evidence that audio exists.
 
 ## Admission rule
 
-Phase 8 media execution remains disabled until every P8-G01 through P8-G09 gate
+WAN Phase 8 media execution remains disabled until every P8-G01 through P8-G09 gate
 below has:
 
 1. an implemented owner and fail-closed service boundary;
@@ -48,12 +51,11 @@ Planning endpoints may remain enabled while runtime admission is closed.
 
 ## WAN Base and Phase 7 runtime admission
 
-`wan_base@1` is intentionally visible as `qualification_required`. The
-repository currently proves the immutable profile contract, 15–90-second
-editorial-subscene policy, provider-valid segment planning, exact EDL
-validation, picture-lock construction, and bounded managed video ingest. It
-does not prove that a WAN workflow can execute in the active ComfyUI runtime or
-that FFmpeg has materialized a validated picture lock.
+`wan_base@1` is intentionally visible as **`on_hold`** and is not selectable
+for execution. The local WAN dry run did not complete successfully. Existing
+research, project snapshots, and evidence remain readable, but no route or UI
+may queue WAN or silently substitute LTX. Leaving hold requires a separately
+approved qualification change backed by a successful dry run.
 
 The following gates remain fail-closed:
 
@@ -144,6 +146,127 @@ State: blocked; only EDL validation and contract construction exist.
 Exit evidence: typed-template tests, stream-copy and normalized cases, full
 decode/probe/hash reports, equivalent-timeline tests for both stitch stages,
 and an immutable picture-lock approval.
+
+---
+
+## LTX Sequence Sheet runtime admission
+
+The LTX Sequence Sheet authoring and dry-run layer is implemented around
+`ltx_base@2`, with one visible row per 8–15-second LTX request, strict named
+fields, deterministic seeds, dependency validation, `8n+1` frame compilation,
+durable database records, and a project-scoped Studio editor.
+
+`ltx_base@2` intentionally remains `qualification_required`. Authoring,
+validation, and dry-run compilation are available; runtime submission remains
+fail-closed.
+
+The additive durable-record migration was applied to the local CineForge
+database on 2026-07-29 at revision `d0e1f2a3b4c5`. The pre-migration database
+was preserved at:
+
+```text
+storage/backups/cineforge_local.pre-sequence-sheet.20260729-062221.db
+```
+
+The backup and migrated database both passed SQLite integrity checks. A live
+dry-run against the restarted project API compiled an eight-second row to 193
+frames and created zero sequence records, while correctly reporting the
+profile and workflow qualification blockers.
+
+### LTX-G01 — Static API workflow and semantic manifest
+
+Priority: P0
+State: blocked on an exact API-format export.
+
+- Export the chosen LTX graph from the active ComfyUI installation using
+  **Save (API Format)**.
+- Do not pass the current visual graph through the generic converter: local
+  validation showed that converter can corrupt reroutes, math-expression
+  inputs, batch sizes, and output bit depth.
+- Store the API JSON immutably with its SHA-256.
+- Add manifest bindings for positive and negative prompts, seed, frame count,
+  FPS, starting image, output prefix, video output, and required synchronized
+  native-audio output.
+- Record exact model paths/hashes, custom-node revisions, ComfyUI commit, and
+  `/object_info` hash.
+
+Exit evidence: admitted `workflow_api.json`, manifest, immutable hashes,
+patched-prompt preview, and live preflight with no unresolved selector.
+
+### LTX-G02 — Workstation qualification
+
+Priority: P0
+State: blocked on completed Sulphur artifact and local render evidence.
+
+- Let the Sulphur 2 Base Quants browser download finalize; never move or hash a
+  `.crdownload` as though it were complete.
+- Verify the final file size and SHA-256 before installation/admission.
+- Unload Qwen 3.6 40B from LM Studio before LTX rendering. The last validation
+  found only about 452 MiB of VRAM free while `llama-server.exe` held nearly
+  the full 24 GiB GPU.
+- Complete and fully decode:
+  - one eight-second row;
+  - one fifteen-second row; and
+  - a two-row last-usable-frame continuation.
+- Record wall time, peak VRAM/RAM, frame count, FPS, duration, output hash,
+  decode/QA evidence, and model/runtime provenance.
+
+Exit evidence: three successful qualification records and an explicit
+promotion of `ltx_base@2` to `qualified`.
+
+### LTX-G03 — Dependency worker and continuity materialization
+
+Priority: P1
+State: persistence and pure continuity-QA contracts implemented; controlled
+renderer, frame extraction, and scheduler ownership remain pending workflow
+admission.
+
+- Claim only rows whose dependencies are satisfied.
+- Keep the local LTX queue at one video job in flight until benchmark evidence
+  permits otherwise.
+- Persist the exact patched API prompt before submission.
+- Collect the selected managed clip and its synchronized native-audio asset.
+- Fully decode and QA a bounded tail window, select the latest usable frame,
+  extract it losslessly, and persist a continuity packet.
+- Unblock a successor only after its exact managed handoff exists.
+- Recover expired leases without regenerating successful ancestors.
+
+Exit evidence: restart and fault-injection tests plus a reproducible two-row
+continuation ledger.
+
+### LTX-G04 — Spreadsheet workbook import
+
+Priority: P2
+State: CSV and JSON implemented; XLSX and ODS deferred.
+
+The repository currently declares no workbook parser. Add a reviewed,
+version-pinned XLSX/ODS parser or a bounded standard-library reader before
+enabling those extensions in the Studio file picker. Workbook import must use
+the same named-column, type, row-limit, and cell-diagnostic contract as CSV;
+formulas, external links, macros, and embedded content must not execute.
+
+Exit evidence: XLSX/ODS fixtures, repeated-cell and shared-string cases, file
+size/row bounds, malicious workbook tests, and canonical parity with CSV.
+
+### LTX-G05 — Synchronized native-audio assembly and final mux
+
+Priority: P1
+State: deterministic EDL, stream-signature, native-audio sample-edit, and final
+mux contracts implemented; media probing/encoding and the materializing worker
+remain pending admitted clips.
+
+- Assemble managed selected clips file-by-file.
+- Remove a duplicated boundary frame only through an explicit EDL decision.
+- Prefer concat-demuxer stream copy when signatures match; use one controlled
+  mezzanine encode only when required.
+- Require synchronized native audio from every LTX row.
+- Apply the same boundary trims, retimes, and transition overlaps to exact
+  native-audio sample ranges.
+- Mux assembled native audio with the assembled LTX video.
+- Never invoke WAN Phase 8 from an LTX sequence.
+
+Exit evidence: full A/V decode, exact frame/PTS/sample manifest, stream-copy and
+normalization cases, immutable mux identity, and exact final duration parity.
 
 ---
 
@@ -544,7 +667,8 @@ State: not implemented for Phase 8 runtime.
 
 - P8-G01 through P8-G08
 - Operations runbook
-- Feature flags for Phase 8 execution independent of WAN and LTX
+- Feature flags for WAN Phase 8 execution, independent from all LTX runtime
+  flags
 
 ### Required implementation
 
@@ -558,7 +682,7 @@ State: not implemented for Phase 8 runtime.
   - a 15-second subscene;
   - a 90-second subscene with multiple windows;
   - 10 or more consecutive windows;
-  - WAN-to-Foley and LTX-to-Foley GPU handoffs;
+  - WAN-to-Foley GPU handoffs;
   - an uploaded silent-video direct-Phase-8 case;
   - a repeated retry/load/unload soak.
 - Exercise disable, rollback, and re-enable with existing audio records.
@@ -570,8 +694,8 @@ State: not implemented for Phase 8 runtime.
 - No orphaned active lease or indefinitely running ledger state remains after
   recovery.
 - A changed dependency hash automatically closes runtime admission.
-- `ltx_base@1` behavior remains unchanged.
-- Phase 8 can be disabled while preserving silent picture locks, attempts,
+- `ltx_base@1` and `ltx_base@2` never invoke Phase 8.
+- WAN Phase 8 can be disabled while preserving silent picture locks, attempts,
   stems, and audit history.
 - Operations can distinguish planning-ready, runtime-blocked,
   runtime-qualified, running, failed, and delivery-approved states.
@@ -595,7 +719,7 @@ generation must not begin until its durable evidence model exists.
 
 ## Minimum evidence bundle for one admitted delivery
 
-An admitted Phase 8 delivery must be able to export a manifest containing:
+An admitted WAN Phase 8 delivery must be able to export a manifest containing:
 
 - picture-lock and EDL hashes;
 - exact video frame rate, time base, frame count, and duration;

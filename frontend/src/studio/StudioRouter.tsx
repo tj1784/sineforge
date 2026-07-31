@@ -10,10 +10,13 @@ import { VoicesPage } from './pages/VoicesPage'
 import { ImagesPage } from './pages/ImagesPage'
 import { RoutingPage } from './pages/RoutingPage'
 import { WorkflowsPage } from './pages/WorkflowsPage'
+import { SequenceSheetPage } from './pages/SequenceSheetPage'
 import { ApiCallerPage } from './pages/ApiCallerPage'
+import { ApiRunnerPage } from './pages/ApiRunnerPage'
 import { DownloadsPage } from './pages/DownloadsPage'
 import { ExportsPage } from './pages/ExportsPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { AgentlessWorkflowPage } from './pages/AgentlessWorkflowPage'
 
 const PAGE_META: Record<PageId, { title: string; description: string }> = {
   overview: {
@@ -48,9 +51,17 @@ const PAGE_META: Record<PageId, { title: string; description: string }> = {
     title: 'Workflows',
     description: 'Factual workflow-template catalog, admission evidence, and production routing.',
   },
+  'sequence-sheet': {
+    title: 'Sequence Sheet',
+    description: 'Project-scoped LTX I2V rows, continuity sources, dry-run validation, and explicit execution.',
+  },
   'api-caller': {
     title: 'API Caller',
     description: 'Mutable local API workflow library, right-panel input editor, validation, and explicit queue submission.',
+  },
+  'api-runner': {
+    title: 'API Runner',
+    description: 'First-party workflow library, live ComfyUI validation, right-panel editing, and direct local execution.',
   },
   downloads: {
     title: 'Downloads',
@@ -67,7 +78,51 @@ const PAGE_META: Record<PageId, { title: string; description: string }> = {
 }
 
 export function StudioRouter({ page }: { page: PageId }) {
-  const { data, loadState } = useStudio()
+  const { data, loadState, workflowLane } = useStudio()
+
+  if (workflowLane === null) {
+    return (
+      <StudioChrome
+        title="Loading project workflow"
+        description="Confirming the persisted project lane before enabling Studio surfaces."
+      >
+        <div className="page">
+          <p className="notice" role="status">Loading the project workflow boundary…</p>
+        </div>
+      </StudioChrome>
+    )
+  }
+
+  if (workflowLane === 'agentless') {
+    const blockedFeatures: Partial<Record<PageId, string>> = {
+      images: 'The generic Phase 6 starting-image generator',
+      routing: 'Provider model routing',
+      'api-caller': 'The unrestricted API Caller',
+      'api-runner': 'The unrestricted native API Runner',
+    }
+    const blockedFeature = blockedFeatures[page]
+    if (page === 'overview' || page === 'sequence-sheet' || blockedFeature) {
+      return (
+        <StudioChrome
+          title={page === 'sequence-sheet' ? 'Agentless Scene Reset' : 'Agentless Workflow'}
+          description="Deterministic scene manifests, exact workflow admission, and non-cumulative generation policy."
+        >
+          <div className="page">
+            <AgentlessWorkflowPage blockedFeature={blockedFeature} />
+          </div>
+        </StudioChrome>
+      )
+    }
+  }
+
+  if (page === 'api-runner') {
+    const meta = PAGE_META[page]
+    return (
+      <StudioChrome title={meta.title} description={meta.description}>
+        <ApiRunnerPage />
+      </StudioChrome>
+    )
+  }
 
   if (!data || loadState === 'empty') {
     return <StoryBootstrap />
@@ -83,7 +138,9 @@ export function StudioRouter({ page }: { page: PageId }) {
     images: <ImagesPage />,
     routing: <RoutingPage />,
     workflows: <WorkflowsPage />,
+    'sequence-sheet': <SequenceSheetPage />,
     'api-caller': <ApiCallerPage />,
+    'api-runner': <ApiRunnerPage />,
     downloads: <DownloadsPage />,
     exports: <ExportsPage />,
     settings: <SettingsPage />,

@@ -58,7 +58,13 @@ def api(tmp_path) -> Generator[tuple[TestClient, sessionmaker], None, None]:
 
 
 def _story(client: TestClient) -> dict:
-    project_response = client.post("/projects", json={"name": "Provider contract"})
+    project_response = client.post(
+        "/projects",
+        json={
+            "name": "Provider contract",
+            "workflow_lane": "cineforge_studio",
+        },
+    )
     assert project_response.status_code == 201
     response = client.post(
         "/storyboard/stories",
@@ -73,10 +79,15 @@ def _story(client: TestClient) -> dict:
     return response.json()
 
 
-def test_catalog_is_factual_and_does_not_promote_unconfigured_or_stub_providers():
+def test_catalog_is_factual_and_does_not_promote_unconfigured_or_stub_providers(
+    tmp_path,
+):
     settings = Settings(
         openai_planning_enabled=False,
         openai_api_key=None,
+        sulphur_planning_enabled=False,
+        sulphur_model_path=tmp_path / "missing-sulphur.gguf",
+        qwen_model_path=tmp_path / "missing-qwen.gguf",
     )
     catalog = provider_catalog(settings)
     by_id = {item.provider_identifier: item for item in catalog.providers}
@@ -85,6 +96,8 @@ def test_catalog_is_factual_and_does_not_promote_unconfigured_or_stub_providers(
     assert by_id["mock"].capabilities == ["planning"]
     assert by_id["mock"].capability_source == "runtime_registry"
     assert by_id["openai"].availability_status == "not_configured"
+    assert by_id["qwen"].availability_status == "not_configured"
+    assert by_id["qwen"].connection_test_supported is True
     assert by_id["openai"].capabilities == []
     assert by_id["xai"].availability_status == "not_implemented"
     assert by_id["local_cli"].connection_test_supported is False
@@ -176,6 +189,54 @@ def test_stub_connection_test_is_factual_and_never_constructs_transport():
     assert result.success is False
     assert result.availability_status == "not_implemented"
     assert calls == 0
+
+
+def test_qwen_connection_test_verifies_the_requested_local_model(tmp_path):
+    qwen_path = tmp_path / "qwen3-4b-q4_k_m.gguf"
+    qwen_path.write_bytes(b"qwen-test-model")
+    settings = Settings(
+        sulphur_planning_enabled=True,
+        qwen_model_id="qwen3-4b",
+        qwen_model_path=qwen_path,
+        sulphur_model_path=tmp_path / "missing-sulphur.gguf",
+        sulphur_base_url="http://127.0.0.1:1234/v1",
+    )
+
+    def tester_for(models: list[dict]) -> ProviderConnectionTester:
+        transport = httpx.MockTransport(
+            lambda _request: httpx.Response(200, json={"models": models})
+        )
+        return ProviderConnectionTester(
+            settings,
+            http_client_factory=lambda timeout: httpx.Client(
+                transport=transport,
+                timeout=timeout,
+            ),
+        )
+
+    loaded = tester_for(
+        [
+            {
+                "key": "qwen3-4b",
+                "loaded_instances": [{"id": "qwen3-4b"}],
+            }
+        ]
+    ).test("qwen", timeout_sec=1)
+    wrong_model = tester_for(
+        [
+            {
+                "key": "sulphur-2-base",
+                "loaded_instances": [{"id": "sulphur-2-base"}],
+            }
+        ]
+    ).test("qwen", timeout_sec=1)
+
+    assert loaded.attempted is True
+    assert loaded.success is True
+    assert loaded.availability_status == "available"
+    assert wrong_model.attempted is True
+    assert wrong_model.success is False
+    assert wrong_model.error_code == "model_not_loaded"
 
 
 def test_connection_test_response_is_byte_bounded_and_sanitized():

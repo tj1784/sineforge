@@ -1,0 +1,9 @@
+{
+  "schema_version": "sineforge.orchestration-prompt-history/v1",
+  "artifact_format": "json",
+  "artifact_filename": "rapid_assets_runtime.json",
+  "status": "historical_reference",
+  "source": {
+    "user_text": "You are Grok 4.5 High completing CineForge Storyboard Phase 1 safe reference assets, factual runtime catalog reads, and remaining planning CRUD. No tools; use controller context; return strict complete-file patches. Own only new `backend/app/schemas/assets.py`, `runtime_catalog.py`, `storyboard_crud.py`; new `backend/app/services/reference_assets.py`, `runtime_catalog.py`, `storyboard_crud.py`; new `backend/app/api/routes/assets.py`, `runtime_catalog.py`, `storyboard_crud.py`; and new matching tests. Do not edit ORM/migrations/router/main/config/dependencies.\r\n\r\nImplement managed uploads for character references, starting-image candidates, consented voice sources, and permitted story documents: generated names, fixed managed root abstraction, MIME+extension allowlist, bounded size, SHA-256, duplicate detection, image dimensions/audio metadata when safely available from existing dependencies, no arbitrary path, archive/delete policy, audit, asset-ID/controlled-stream responses, never cloning. Implement CRUD for narrations, prompt packages/versions, model/workflow recommendations, provider profiles, task-provider assignments, proposals, and storyboard-version list/get using existing models and transactional service conventions. Implement factual read-only model/workflow catalog status from registered database/runtime evidence: unknown stays unknown; never claim installed/validated/benchmarked without evidence. Never call ComfyUI, providers, GPU, FFmpeg, installers, downloads, or arbitrary CLI.\r\n"
+  }
+}

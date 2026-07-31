@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
 import { api, type LMStudioModelCatalog } from '../api/client'
+import type { ProjectWorkflowLane } from '../workflowLanes'
 import {
   getShellTopbarActions,
   subscribeShellTopbarActions,
@@ -15,7 +16,9 @@ export type PageId =
   | 'images'
   | 'routing'
   | 'workflows'
+  | 'sequence-sheet'
   | 'api-caller'
+  | 'api-runner'
   | 'downloads'
   | 'exports'
   | 'settings'
@@ -52,7 +55,9 @@ const navItems: { id: PageId; label: string; icon: ShellIconName }[] = [
   { id: 'images', label: 'Starting images', icon: 'image' },
   { id: 'routing', label: 'Model routing', icon: 'cpu' },
   { id: 'workflows', label: 'Workflows', icon: 'layers' },
+  { id: 'sequence-sheet', label: 'Sequence Sheet', icon: 'film' },
   { id: 'api-caller', label: 'API Caller', icon: 'play' },
+  { id: 'api-runner', label: 'API Runner', icon: 'play' },
   { id: 'downloads', label: 'Downloads', icon: 'download' },
   { id: 'exports', label: 'Exports', icon: 'download' },
 ]
@@ -68,7 +73,9 @@ const labels: Record<PageId | 'projects' | 'new-project', string> = {
   images: 'Starting Images',
   routing: 'Model Routing',
   workflows: 'Workflows',
+  'sequence-sheet': 'Sequence Sheet',
   'api-caller': 'API Caller',
+  'api-runner': 'API Runner',
   downloads: 'Downloads',
   exports: 'Exports',
   settings: 'Project Settings',
@@ -79,6 +86,7 @@ type AppShellProps = {
   backendStatus: string
   projectId: string
   projectName: string
+  workflowLane: ProjectWorkflowLane | null
   projectCount: number
   view: ShellView
   onNavigate: (page: PageId) => void
@@ -202,6 +210,7 @@ export function AppShell({
   backendStatus,
   projectId,
   projectName,
+  workflowLane,
   projectCount,
   view,
   onNavigate,
@@ -221,6 +230,12 @@ export function AppShell({
   const [shellActions, setShellActions] = useState<ShellTopbarActions>(() => getShellTopbarActions())
   const navId = useId()
   const isStudio = view === 'studio'
+  const isAgentless = isStudio && workflowLane === 'agentless'
+  const visibleNavItems = isAgentless
+    ? navItems.filter(
+        (item) => !['images', 'routing', 'api-caller', 'api-runner'].includes(item.id),
+      )
+    : navItems
   const projectInitials = initials(projectName)
   const activeLabel =
     view === 'projects'
@@ -390,7 +405,9 @@ export function AppShell({
               <strong>{projectName}</strong>
               <small>
                 {projectId || projectName !== 'Select a project'
-                  ? 'Seven-phase production plan'
+                  ? isAgentless
+                    ? 'Local agents · deterministic production'
+                    : 'Seven-phase production plan'
                   : 'Select a project'}
               </small>
             </span>
@@ -429,7 +446,7 @@ export function AppShell({
         <section className="sidebar-project-section" aria-label="Current project navigation">
           <p className="nav-label project-nav-label">PRODUCTION</p>
           <nav id={navId} className="project-nav">
-            {navItems.map((item) => {
+            {visibleNavItems.map((item) => {
               const active = isStudio && item.id === activePage
               return (
                 <button
@@ -440,7 +457,11 @@ export function AppShell({
                   onClick={() => goPage(item.id)}
                 >
                   <Icon name={item.icon} size={18} />
-                  <span>{item.label}</span>
+                  <span>
+                    {isAgentless && item.id === 'sequence-sheet'
+                      ? 'Agentless scene reset'
+                      : item.label}
+                  </span>
                 </button>
               )
             })}
@@ -472,7 +493,7 @@ export function AppShell({
             <i aria-hidden="true" />
             <span>
               <strong>{runtimeLabel}</strong>
-              <small>ComfyUI · Runner · Sulphur</small>
+              <small>{isAgentless ? 'LM Studio · ComfyUI · JSON manifests' : 'ComfyUI · Runner · local agents'}</small>
             </span>
           </button>
           {runtime ? (
@@ -537,6 +558,13 @@ export function AppShell({
                   </p>
                 ) : null}
               </div>
+              {isAgentless ? (
+                <p className="notice">
+                  Local LM Studio planning is allowed and hosted/API agents are blocked.
+                  Rendering stays deterministic and disabled until both exact JSON
+                  scene-reset workflows pass admission.
+                </p>
+              ) : null}
               <a
                 href="http://127.0.0.1:8022"
                 target="_blank"
@@ -659,8 +687,11 @@ export function AppShell({
                   <strong title={projectId}>{projectName}</strong>
                   <Icon name="chevron" size={13} />
                   <b>{activeLabel}</b>
-                  <span className="phase" aria-label="Seven production phases">
-                    7 PHASES
+                  <span
+                    className="phase"
+                    aria-label={isAgentless ? 'Local-agent deterministic workflow' : 'Seven production phases'}
+                  >
+                    {isAgentless ? 'AGENTLESS' : '7 PHASES'}
                   </span>
                 </>
               ) : null}

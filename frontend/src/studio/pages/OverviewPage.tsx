@@ -7,6 +7,7 @@ import {
 import { useStudio } from '../StudioState'
 import { countScenes, countShots, formatDuration } from '../utils'
 import { ProductionPhases } from '../components/ProductionPhases'
+import { formatPlanningRoute } from '../planningRouteDisplay'
 
 export function OverviewPage() {
   const { data, readiness, approvePlan, busy, backendStatus, navigate } = useStudio()
@@ -72,7 +73,7 @@ export function OverviewPage() {
 
       <details className="backend-diagnostics">
         <summary>
-          <div><span className="eyebrow">LIVE BACKEND</span><b>Planning diagnostics and approval controls</b><small>Expand to inspect readiness, orchestration, and immutable storyboard approval.</small></div>
+          <div><span className="eyebrow">LIVE BACKEND</span><b>Planning diagnostics</b><small>Expand to inspect runs, drafts, routes, and readiness.</small></div>
           <span className={`truth-pill ${backendStatus === 'ok' ? 'verified' : 'unknown'}`}>{backendStatus}</span>
         </summary>
         <div className="backend-diagnostics-content">
@@ -148,7 +149,7 @@ export function OverviewPage() {
             className="primary-button touch-target"
             onClick={() => navigate('story')}
           >
-            {currentProposal ? 'Review proposal' : currentRun ? 'Open run details' : 'Start planning run'}
+            {currentProposal ? 'Open planning draft' : currentRun ? 'Open run details' : 'Generate planning draft'}
           </button>
         </div>
         {planningError ? <p className="notice warning">{planningError}</p> : null}
@@ -157,7 +158,7 @@ export function OverviewPage() {
             <li><span>Current run</span><strong>{currentRun?.status ?? 'No run'}</strong></li>
             <li><span>Current step</span><strong>{currentStep?.task_type ?? '—'}</strong></li>
             <li><span>Logical model</span><strong>{currentStep?.logical_model ?? '—'}</strong></li>
-            <li><span>Resolved route</span><strong>{currentStep?.resolved_model ?? currentStep?.provider_identifier ?? '—'}</strong></li>
+            <li><span>Resolved route</span><strong>{currentStep ? formatPlanningRoute(currentStep) : '—'}</strong></li>
             <li><span>Progress</span><strong>{currentRun ? `${completedSteps}/${currentRun.steps.length} steps` : '—'}</strong></li>
           </ul>
           <ul className="kv-list">
@@ -174,7 +175,7 @@ export function OverviewPage() {
       <div className="panel">
         <div className="panel-title">
           <div>
-            <h2>Backend readiness gates</h2>
+            <h2>Backend readiness checks</h2>
             <p>
               Gate truth is returned by <span className="mono">/storyboard/stories/:id/readiness</span>.
               The UI never hard-codes ready/not-ready.

@@ -23,7 +23,7 @@ from backend.app.services.planning.profiles import (
 # catalog can add configured local/hosted adapters; mock is always available.
 MOCK_PROVIDER = "mock"
 LOCAL_CLI_PROVIDER = "local_cli"
-HOSTED_PROVIDERS = ("openai", "anthropic", "xai", "qwen")
+HOSTED_PROVIDERS = ("openai", "anthropic", "xai")
 
 
 def default_provider_catalog(

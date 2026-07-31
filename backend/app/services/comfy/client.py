@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, BinaryIO
 
 import httpx
 
@@ -96,6 +96,25 @@ class ComfyUIClient:
         response.raise_for_status()
         return response.json()
 
+    async def stage_editor_workflow(
+        self,
+        *,
+        name: str,
+        workflow: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Stage an editor graph for one-time loading by the ComfyUI frontend."""
+
+        self._require_mutation_context()
+        response = await self._client.post(
+            "/sineforge/workflow-transfer",
+            json={"name": name, "workflow": workflow, "source": "sineforge"},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        if not isinstance(payload, dict):
+            raise ValueError("ComfyUI returned an invalid workflow-transfer response.")
+        return payload
+
     async def upload_image(
         self,
         image: bytes,
@@ -105,6 +124,26 @@ class ComfyUIClient:
         overwrite: bool = False,
         content_type: str = "application/octet-stream",
     ) -> dict[str, Any]:
+        self._require_mutation_context()
+        response = await self._client.post(
+            "/upload/image",
+            data={"subfolder": subfolder, "overwrite": str(overwrite).lower()},
+            files={"image": (filename, image, content_type)},
+        )
+        response.raise_for_status()
+        return response.json()
+
+    async def upload_image_file(
+        self,
+        image: BinaryIO,
+        filename: str,
+        *,
+        subfolder: str = "",
+        overwrite: bool = False,
+        content_type: str = "application/octet-stream",
+    ) -> dict[str, Any]:
+        """Stream a seekable file object to ComfyUI's input upload endpoint."""
+
         self._require_mutation_context()
         response = await self._client.post(
             "/upload/image",

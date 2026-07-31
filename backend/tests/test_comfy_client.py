@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 
@@ -51,6 +53,11 @@ async def test_comfy_client_requires_explicit_mutation_context():
             await client.submit_prompt({"1": {"class_type": "KSampler"}}, "client-1")
         with pytest.raises(ComfyMutationBlocked):
             await client.upload_image(b"image", "frame.png")
+        with pytest.raises(ComfyMutationBlocked):
+            await client.stage_editor_workflow(
+                name="Read-only workflow",
+                workflow={"nodes": [{"id": 1}], "links": []},
+            )
 
     assert requests == []
 
@@ -65,6 +72,15 @@ async def test_comfy_client_local_mutation_routes_submit_when_allowed():
             return httpx.Response(200, json={"prompt_id": "prompt-1", "number": 1})
         if request.url.path == "/upload/image":
             return httpx.Response(200, json={"name": "frame.png", "subfolder": "", "type": "input"})
+        if request.url.path == "/sineforge/workflow-transfer":
+            return httpx.Response(
+                200,
+                json={
+                    "ok": True,
+                    "token": "bc8c139e-1330-4ec8-9323-116a91ff3c85",
+                    "expires_in_sec": 300,
+                },
+            )
         if request.url.path in {"/interrupt", "/queue", "/free"}:
             return httpx.Response(200, json={"status": "ok"})
         return httpx.Response(404)
@@ -74,22 +90,34 @@ async def test_comfy_client_local_mutation_routes_submit_when_allowed():
     async with ComfyUIClient("http://comfy.test", allow_mutation=True, transport=transport) as client:
         prompt = await client.submit_prompt({"1": {"class_type": "KSampler"}}, "client-1")
         upload = await client.upload_image(b"image", "frame.png", content_type="image/png")
+        transfer = await client.stage_editor_workflow(
+            name="Read-only workflow",
+            workflow={"nodes": [{"id": 1}], "links": []},
+        )
         interrupt = await client.interrupt()
         queue = await client.delete_queue_items(["prompt-1"])
         free = await client.free_memory()
 
     assert prompt["prompt_id"] == "prompt-1"
     assert upload["name"] == "frame.png"
+    assert transfer["expires_in_sec"] == 300
     assert interrupt == {"status": "ok"}
     assert queue == {"status": "ok"}
     assert free == {"status": "ok"}
     assert [request.url.path for request in requests] == [
         "/prompt",
         "/upload/image",
+        "/sineforge/workflow-transfer",
         "/interrupt",
         "/queue",
         "/free",
     ]
+    transfer_request = requests[2]
+    assert json.loads(transfer_request.content) == {
+        "name": "Read-only workflow",
+        "workflow": {"nodes": [{"id": 1}], "links": []},
+        "source": "sineforge",
+    }
 
 
 @pytest.mark.asyncio

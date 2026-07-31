@@ -1,0 +1,428 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "cba52c5d-fde1-5424-9749-19392bde3429",
+  "name": "8 PAID (8.5Credits) - SeeDream 4.5 Upscale",
+  "version": "1.0",
+  "description": "8 PAID (8.5Credits) - SeeDream 4.5 Upscale is a hosted upscalers workflow designed to send an asset through the workflow's hosted upscale provider using the models configured in the graph. Its 4-node graph exposes 1 prompt/text field(s), 2 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Upscaling & Restoration",
+  "subcategory": "Hosted upscalers",
+  "episode": "EP05",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Review the model-file entries in Requirements and place each checkpoint, text encoder, VAE, LoRA, or auxiliary model in the folder documented by the source workflow. Refresh ComfyUI after adding files.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Select the intended scale/model and verify output dimensions before running. Use one representative asset first to estimate VRAM and processing time.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP05",
+    "Hosted upscalers",
+    "Upscaling & Restoration"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "pixaroma",
+      "Pixaroma YouTube Channel",
+      "rgthree-comfy"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "ByteDanceSeedreamNode",
+      "Image Comparer (rgthree)",
+      "LoadImage",
+      "SaveImage"
+    ],
+    "model_files": [
+      {
+        "node_id": "10",
+        "node_type": "ByteDanceSeedreamNode",
+        "input": "model",
+        "value": "seedream-4-5-251128"
+      }
+    ],
+    "media_inputs": [
+      {
+        "node_id": "4",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "Woman1.jpg"
+      },
+      {
+        "node_id": "10",
+        "node_type": "ByteDanceSeedreamNode",
+        "input": "sequential_image_generation",
+        "default": "disabled"
+      }
+    ],
+    "prompt_field_count": 1,
+    "output_node_count": 1,
+    "documentation_notes": "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n- None (PAID API NODE)\n\n## 🧩 Nodes Installed from Manager  \n\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n\nAdjust the size preset to match your image ratio, or use custom and it will use the width and height you set."
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep05 workflows/ep05 workflows/8 paid (8.5credits) - seedream 4.5 upscale.json",
+  "source_filename": "8 PAID (8.5Credits) - SeeDream 4.5 Upscale.json",
+  "source_archive": "EP05 Workflows.zip",
+  "source_entry": "EP05 Workflows/EP05 Workflows/8 PAID (8.5Credits) - SeeDream 4.5 Upscale.json",
+  "source_workflow": {
+    "id": "e7c921f0-c513-4569-b680-aa66b66eaf12",
+    "revision": 0,
+    "last_node_id": 15,
+    "last_link_id": 27,
+    "nodes": [
+      {
+        "id": 6,
+        "type": "SaveImage",
+        "pos": [
+          2467.8797861406465,
+          2561.163010326582
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 21
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "Up"
+        ]
+      },
+      {
+        "id": 3,
+        "type": "MarkdownNote",
+        "pos": [
+          639.6994653516151,
+          2554.596561954709
+        ],
+        "size": [
+          501.6563240502302,
+          238.16283016331124
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "👑 Pixaroma - Note - START HERE",
+        "properties": {},
+        "widgets_values": [
+          "# MODELS AND NODES USED IN THIS WORKFLOW  \n\n- None (PAID API NODE)\n\n## 🧩 Nodes Installed from Manager  \n\n- **rgthree-comfy**\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 4,
+        "type": "LoadImage",
+        "pos": [
+          1167.7294586984565,
+          2564.4462345125194
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              10,
+              19
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "Woman1.jpg",
+          "image"
+        ]
+      },
+      {
+        "id": 5,
+        "type": "Image Comparer (rgthree)",
+        "pos": [
+          2030.6225656071138,
+          2561.163010326582
+        ],
+        "size": [
+          412.93467192717935,
+          496.0708525637052
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [
+          {
+            "dir": 3,
+            "name": "image_a",
+            "type": "IMAGE",
+            "link": 10
+          },
+          {
+            "dir": 3,
+            "name": "image_b",
+            "type": "IMAGE",
+            "link": 20
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "rgthree-comfy",
+          "ver": "8ff50e4521881eca1fe26aec9615fc9362474931",
+          "comparer_mode": "Slide"
+        },
+        "widgets_values": [
+          [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_tjotl_00021_.png&type=temp&subfolder=&rand=0.10582791422480275"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_tjotl_00022_.png&type=temp&subfolder=&rand=0.5884116124974992"
+            }
+          ]
+        ]
+      },
+      {
+        "id": 10,
+        "type": "ByteDanceSeedreamNode",
+        "pos": [
+          1605.4048016031188,
+          2564.3000935409636
+        ],
+        "size": [
+          400,
+          623.8144844311546
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": 19
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              20,
+              21
+            ]
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.13.0",
+          "Node name for S&R": "ByteDanceSeedreamNode"
+        },
+        "widgets_values": [
+          "seedream-4-5-251128",
+          "Upscale this image to higher resolution while preserving the exact same content, framing, crop, perspective, and composition. Do not zoom in or zoom out, do not shift or re-center anything, and do not add or remove objects. Preserve the original style, colors, lighting direction, and natural shading. Increase clarity by enhancing only real, plausible micro-detail already present: clean edges, fine textures, subtle surface detail, natural grain, and accurate small features. Keep details crisp but natural. Avoid artifacts: no over-sharpening, no halos, no ringing, no crunchy noise, no plastic smoothing, no painterly look, no new patterns, no fake text, no watermarks.\n",
+          "4096x4096 (1:1)",
+          2048,
+          2048,
+          "disabled",
+          1,
+          810191483,
+          "randomize",
+          false,
+          true,
+          "Status: Completed\nTime elapsed: 22s"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 13,
+        "type": "Note",
+        "pos": [
+          1605.4048016031188,
+          3233.3869988446213
+        ],
+        "size": [
+          400,
+          88
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "IMPORTANT",
+        "properties": {},
+        "widgets_values": [
+          "Adjust the size preset to match your image ratio, or use custom and it will use the width and height you set."
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      }
+    ],
+    "links": [
+      [
+        10,
+        4,
+        0,
+        5,
+        0,
+        "IMAGE"
+      ],
+      [
+        19,
+        4,
+        0,
+        10,
+        0,
+        "IMAGE"
+      ],
+      [
+        20,
+        10,
+        0,
+        5,
+        1,
+        "IMAGE"
+      ],
+      [
+        21,
+        10,
+        0,
+        6,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 1.015255979947715,
+        "offset": [
+          -527.5415847140796,
+          -2312.845611665552
+        ]
+      },
+      "frontendVersion": "1.38.13",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "a1cea85d67ac1811eeeac64629c53d441ee27ff90ffac529b0a0d7a052ca9ebf",
+  "workflow": {
+    "4": {
+      "inputs": {
+        "image": "Woman1.jpg"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    },
+    "5": {
+      "inputs": {
+        "rgthree_comparer": {
+          "images": [
+            {
+              "name": "A",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_tjotl_00021_.png&type=temp&subfolder=&rand=0.10582791422480275"
+            },
+            {
+              "name": "B",
+              "selected": true,
+              "url": "/api/view?filename=rgthree.compare._temp_tjotl_00022_.png&type=temp&subfolder=&rand=0.5884116124974992"
+            }
+          ]
+        },
+        "image_a": [
+          "4",
+          0
+        ],
+        "image_b": [
+          "10",
+          0
+        ]
+      },
+      "class_type": "Image Comparer (rgthree)",
+      "_meta": {
+        "title": "Image Comparer (rgthree)"
+      }
+    },
+    "6": {
+      "inputs": {
+        "filename_prefix": "Up",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image"
+      }
+    },
+    "10": {
+      "inputs": {
+        "model": "seedream-4-5-251128",
+        "prompt": "Upscale this image to higher resolution while preserving the exact same content, framing, crop, perspective, and composition. Do not zoom in or zoom out, do not shift or re-center anything, and do not add or remove objects. Preserve the original style, colors, lighting direction, and natural shading. Increase clarity by enhancing only real, plausible micro-detail already present: clean edges, fine textures, subtle surface detail, natural grain, and accurate small features. Keep details crisp but natural. Avoid artifacts: no over-sharpening, no halos, no ringing, no crunchy noise, no plastic smoothing, no painterly look, no new patterns, no fake text, no watermarks.\n",
+        "size_preset": "4096x4096 (1:1)",
+        "width": 2048,
+        "height": 2048,
+        "sequential_image_generation": "disabled",
+        "max_images": 1,
+        "seed": 810191483,
+        "watermark": false,
+        "fail_on_partial": true,
+        "image": [
+          "4",
+          0
+        ]
+      },
+      "class_type": "ByteDanceSeedreamNode",
+      "_meta": {
+        "title": "ByteDance Seedream 4.5 & 5.0"
+      }
+    }
+  },
+  "sha256": "d82ee4a8dbc373c75047e1d476364f029db4a2c4ea48793f47fedd26ed679fc6",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

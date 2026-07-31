@@ -2,7 +2,8 @@
 
 The only network-capable operations in this module are explicit, bounded
 connection tests. Hosted credentials remain at the ``Settings`` secret
-boundary; the Sulphur test targets its configured loopback-only LM Studio API.
+boundary; Qwen and Sulphur tests target their configured loopback-only LM
+Studio API.
 Catalog reads and routing preflight never call any provider.
 """
 
@@ -21,7 +22,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import Settings, get_settings
-from backend.app.db.base import ProviderProfile, Story, TaskProviderAssignment
+from backend.app.db.base import Project, ProviderProfile, Story, TaskProviderAssignment
+from backend.app.schemas.project_workflows import is_agentless_workflow_lane
 from backend.app.schemas.orchestration import ManualTaskRoute, PlanningTaskType, RoutingMode
 from backend.app.schemas.providers import (
     ProviderCapabilitiesResponse,
@@ -35,7 +37,6 @@ from backend.app.schemas.providers import (
     RoutingValidationIssue,
 )
 from backend.app.services import storyboard_settings as storyboard_settings_service
-from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.services.planning.engine import DEFAULT_PIPELINE
 from backend.app.services.planning.errors import PlanningError
 from backend.app.services.planning.provider_registry import (
@@ -46,7 +47,7 @@ from backend.app.services.planning.routing import build_routing_snapshot, select
 
 
 MAX_CONNECTION_TEST_RESPONSE_BYTES = 65_536
-CONNECTION_TEST_CAPABLE = frozenset({"mock", "openai", "sulphur"})
+CONNECTION_TEST_CAPABLE = frozenset({"mock", "openai", "qwen", "sulphur"})
 
 
 class ProviderContractNotFoundError(LookupError):
@@ -188,22 +189,38 @@ class ProviderConnectionTester:
             limits=httpx.Limits(max_connections=1, max_keepalive_connections=0),
         )
 
-    def _test_sulphur(
+    def _test_local_lm_studio(
         self,
         *,
+        provider_identifier: str,
         timeout_sec: float,
         checked_at: datetime,
         capabilities: list[str],
     ) -> ProviderConnectionTestResponse:
-        if not self.settings.sulphur_configured:
+        qwen = provider_identifier == "qwen"
+        configured = (
+            self.settings.qwen_configured
+            if qwen
+            else self.settings.sulphur_configured
+        )
+        model_id = (
+            self.settings.qwen_model_id
+            if qwen
+            else self.settings.sulphur_model_id
+        )
+        display_name = "Qwen3 4B Hivemind" if qwen else "Sulphur 2 Base"
+        if not configured:
             return self._result(
-                provider_identifier="sulphur",
+                provider_identifier=provider_identifier,
                 attempted=False,
                 success=False,
                 availability_status="not_configured",
                 checked_at=checked_at,
                 capabilities=capabilities,
-                detail="Sulphur planning is disabled or its configured GGUF is missing.",
+                detail=(
+                    f"{display_name} planning is disabled or its configured "
+                    "GGUF is missing."
+                ),
                 error_code="not_configured",
             )
 
@@ -221,80 +238,100 @@ class ProviderConnectionTester:
                 content = response.content
                 if len(content) > self.max_response_bytes:
                     return self._result(
-                        provider_identifier="sulphur",
+                        provider_identifier=provider_identifier,
                         attempted=True,
                         success=False,
                         availability_status="unavailable",
                         checked_at=checked_at,
                         capabilities=capabilities,
-                        detail="Sulphur response exceeded the connection-test byte limit.",
+                        detail=(
+                            f"{display_name} response exceeded the "
+                            "connection-test byte limit."
+                        ),
                         started_at=started_at,
                         error_code="response_too_large",
                     )
                 if not 200 <= response.status_code < 300:
                     return self._result(
-                        provider_identifier="sulphur",
+                        provider_identifier=provider_identifier,
                         attempted=True,
                         success=False,
                         availability_status="unavailable",
                         checked_at=checked_at,
                         capabilities=capabilities,
-                        detail="LM Studio returned an unexpected status for Sulphur.",
+                        detail=(
+                            "LM Studio returned an unexpected status for "
+                            f"{display_name}."
+                        ),
                         started_at=started_at,
                         error_code="unexpected_status",
                     )
                 payload = json.loads(content.decode("utf-8"))
                 entries = payload.get("models") if isinstance(payload, dict) else None
-                active_model_id = get_active_lm_studio_model_id(self.settings)
                 loaded = any(
                     isinstance(item, dict)
-                    and any(
-                        isinstance(instance, dict)
-                        and instance.get("id") == active_model_id
-                        for instance in (
-                            item.get("loaded_instances")
-                            if isinstance(item.get("loaded_instances"), list)
-                            else []
+                    and (
+                        any(
+                            isinstance(instance, dict)
+                            and instance.get("id") == model_id
+                            for instance in (
+                                item.get("loaded_instances")
+                                if isinstance(item.get("loaded_instances"), list)
+                                else []
+                            )
+                        )
+                        or (
+                            item.get("key") == model_id
+                            and bool(item.get("loaded_instances"))
                         )
                     )
                     for item in (entries if isinstance(entries, list) else [])
                 )
                 return self._result(
-                    provider_identifier="sulphur",
+                    provider_identifier=provider_identifier,
                     attempted=True,
                     success=loaded,
                     availability_status="available" if loaded else "unavailable",
                     checked_at=checked_at,
                     capabilities=capabilities,
                     detail=(
-                        "The configured Sulphur model is loaded in LM Studio."
+                        f"The configured {display_name} model is loaded in LM Studio."
                         if loaded
-                        else "LM Studio is reachable, but the configured Sulphur model is not loaded."
+                        else (
+                            "LM Studio is reachable, but the configured "
+                            f"{display_name} model is not loaded."
+                        )
                     ),
                     started_at=started_at,
                     error_code=None if loaded else "model_not_loaded",
                 )
         except httpx.TimeoutException:
             return self._result(
-                provider_identifier="sulphur",
+                provider_identifier=provider_identifier,
                 attempted=True,
                 success=False,
                 availability_status="unavailable",
                 checked_at=checked_at,
                 capabilities=capabilities,
-                detail="Sulphur connection check timed out within the requested bound.",
+                detail=(
+                    f"{display_name} connection check timed out within the "
+                    "requested bound."
+                ),
                 started_at=started_at,
                 error_code="timeout",
             )
         except (httpx.TransportError, UnicodeDecodeError, json.JSONDecodeError):
             return self._result(
-                provider_identifier="sulphur",
+                provider_identifier=provider_identifier,
                 attempted=True,
                 success=False,
                 availability_status="unavailable",
                 checked_at=checked_at,
                 capabilities=capabilities,
-                detail="Sulphur could not be verified through the loopback LM Studio API.",
+                detail=(
+                    f"{display_name} could not be verified through the "
+                    "loopback LM Studio API."
+                ),
                 started_at=started_at,
                 error_code="transport_failed",
             )
@@ -350,8 +387,9 @@ class ProviderConnectionTester:
                 started_at=started_at,
             )
 
-        if descriptor.provider_identifier == "sulphur":
-            return self._test_sulphur(
+        if descriptor.provider_identifier in {"qwen", "sulphur"}:
+            return self._test_local_lm_studio(
+                provider_identifier=descriptor.provider_identifier,
                 timeout_sec=timeout_sec,
                 checked_at=checked_at,
                 capabilities=capabilities,
@@ -524,9 +562,22 @@ def validate_story_routing(
         raise ProviderContractNotFoundError("Story not found.")
 
     cfg = settings or get_settings()
+    project = db.get(Project, story.project_id)
+    agentless = bool(
+        project is not None
+        and is_agentless_workflow_lane(project.workflow_lane)
+    )
     project_settings = storyboard_settings_service.get_settings(db, story.project_id)
     facts = provider_catalog(cfg)
     fact_by_id = {item.provider_identifier: item for item in facts.providers}
+    selected_agent: str | None = None
+    if agentless:
+        selected_agent = str(
+            (project_settings.prompting_policy_json or {}).get(
+                "planning_agent",
+                "qwen",
+            )
+        )
     errors: list[RoutingValidationIssue] = []
     warnings: list[RoutingValidationIssue] = []
 
@@ -551,6 +602,20 @@ def validate_story_routing(
             _issue(
                 "local_provider_policy_blocked",
                 "Local planning providers are disabled by project policy.",
+            )
+        )
+    if agentless and payload.prefer_hosted_providers:
+        errors.append(
+            _issue(
+                "agentless_hosted_provider_blocked",
+                "Agentless projects prohibit hosted/API planning agents.",
+            )
+        )
+    if agentless and not payload.prefer_local_providers:
+        errors.append(
+            _issue(
+                "agentless_local_provider_required",
+                "Agentless projects require their selected local planning agent.",
             )
         )
     if (
@@ -648,6 +713,20 @@ def validate_story_routing(
         for task in task_types
         if task in route_by_task
     ]
+    if agentless:
+        for route in effective_routes:
+            if route.provider_identifier != selected_agent:
+                errors.append(
+                    _issue(
+                        "agentless_selected_agent_required",
+                        (
+                            "Agentless planning must use the project-selected "
+                            f"local agent '{selected_agent}'."
+                        ),
+                        task_type=route.task_type,
+                        provider_identifier=route.provider_identifier,
+                    )
+                )
     snapshot = build_routing_snapshot(
         mode=effective_mode,
         manual_routes=effective_routes,
@@ -657,6 +736,11 @@ def validate_story_routing(
         time_budget_sec=payload.time_budget_sec,
         task_types=task_types,
     )
+    routing_facts = [
+        item
+        for item in facts.providers
+        if not agentless or item.provider_identifier == selected_agent
+    ]
     snapshot["provider_catalog"] = [
         {
             "provider_identifier": item.provider_identifier,
@@ -664,8 +748,10 @@ def validate_story_routing(
             "privacy_classification": item.privacy_classification,
             "capabilities": item.capabilities,
         }
-        for item in facts.providers
+        for item in routing_facts
     ]
+    if selected_agent is not None:
+        snapshot["selected_planning_agent"] = selected_agent
 
     routes: list[RoutingPreflightRoute] = []
     for task in task_types:
@@ -763,12 +849,17 @@ def validate_story_routing(
         requested_mode=payload.routing_mode,
         effective_mode=effective_mode,
         routes=routes,
-        provider_facts=facts.providers,
+        provider_facts=routing_facts,
         errors=errors,
         warnings=warnings,
         metadata={
             "task_count": len(task_types),
             "network_calls_performed": False,
             "mutated": False,
+            **(
+                {"selected_planning_agent": selected_agent}
+                if selected_agent is not None
+                else {}
+            ),
         },
     )

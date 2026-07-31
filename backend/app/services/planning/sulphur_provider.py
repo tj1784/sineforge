@@ -24,7 +24,7 @@ class SulphurPlanningProvider(OpenAIPlanningProvider):
     ) -> "SulphurPlanningProvider":
         cfg = settings or get_settings()
         if not cfg.sulphur_configured:
-            raise ValueError("Sulphur planning provider is not configured")
+            raise ValueError("Sulphur local planning provider is not configured")
         active_model_id = get_active_lm_studio_model_id(cfg)
         return cls(
             api_key="lm-studio",
@@ -47,3 +47,40 @@ def build_sulphur_provider_from_settings(
     if not cfg.sulphur_configured:
         return None
     return SulphurPlanningProvider.from_settings(cfg)
+
+
+class QwenPlanningProvider(OpenAIPlanningProvider):
+    """OpenAI-compatible adapter for the local Qwen3 4B Hivemind GGUF model."""
+
+    identifier = "qwen"
+
+    @classmethod
+    def from_settings(
+        cls,
+        settings: Settings | None = None,
+    ) -> "QwenPlanningProvider":
+        cfg = settings or get_settings()
+        if not cfg.qwen_configured:
+            raise ValueError("Qwen local planning provider is not configured")
+        active_model_id = get_active_lm_studio_model_id(cfg)
+        return cls(
+            api_key="lm-studio",
+            base_url=cfg.sulphur_base_url,
+            timeout_sec=cfg.sulphur_timeout_sec,
+            wall_time_sec=cfg.sulphur_wall_time_sec,
+            transport_retries=cfg.sulphur_transport_retries,
+            max_response_bytes=cfg.sulphur_max_response_bytes,
+            repair_instruction_limit=cfg.sulphur_repair_instruction_limit,
+            model_luna=active_model_id,
+            model_terra=active_model_id,
+            model_sol=active_model_id,
+        )
+
+
+def build_qwen_provider_from_settings(
+    settings: Settings | None = None,
+) -> QwenPlanningProvider | None:
+    cfg = settings or get_settings()
+    if not cfg.qwen_configured:
+        return None
+    return QwenPlanningProvider.from_settings(cfg)

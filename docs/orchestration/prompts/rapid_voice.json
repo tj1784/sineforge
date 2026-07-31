@@ -1,0 +1,9 @@
+{
+  "schema_version": "sineforge.orchestration-prompt-history/v1",
+  "artifact_format": "json",
+  "artifact_filename": "rapid_voice.json",
+  "status": "historical_reference",
+  "source": {
+    "user_text": "You are Grok 4.5 High implementing CineForge Storyboard Phase 1 voice configuration, factual provider discovery, preview recipes/jobs, shared GPU leases, and voice routing. No tools; use context; return strict complete-file patches. Own only new `backend/app/schemas/voice.py`; new `backend/app/services/voice_design/**`; new `backend/app/services/runtime/**`; new `backend/app/services/routing/**`; new `backend/app/services/planning_assets.py`; new `backend/app/workers/voice_preview.py`; new `backend/app/api/routes/voices.py`; and new voice/runtime tests. Do not edit ORM/migrations/router/main/config/dependencies.\r\n\r\nSupport exactly placeholder, manual, existing_provider_voice, qwen_voice_design, qwen_custom_voice, elevenlabs_voice_design, parler_local_voice_design, user_provided_consented. Reuse only the configured existing Qwen runtime; discovery reads evidence without loading models; preview is explicit only; CustomVoice is preset speaker, never cloning/reference audio. Parler is optional and when unavailable return exactly “Parler-TTS is not installed or approved.” Never install/download. Manual/placeholder must work and approval must not be blocked by unavailable preview providers when allowed. Qwen routing only for factual native-speech unsupported; unknown no recommendation; native-speech LTX no Qwen; approved assignments never overwritten. Store managed asset IDs, never audio/base64/raw responses. Shared leases serialize explicit voice preview with video GPU work.\r\n"
+  }
+}

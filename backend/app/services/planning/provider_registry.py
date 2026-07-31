@@ -1,11 +1,12 @@
 """Planning provider registry for Storyboard Phase 1.
 
 Responsibilities:
-- Prefer the configured local Sulphur GGUF for automatic planning.
+- Prefer the configured local Qwen3 4B Hivemind GGUF for automatic planning.
+- Keep the configured local Sulphur GGUF available as an alternative.
 - Keep the deterministic mock as the offline/test fallback.
 - Expose OpenAI only when configuration enables it and an API key is present.
-- Represent anthropic / xai / qwen / local_cli / custom as explicitly
-  not_implemented or not_configured — never silently invent adapters.
+- Represent anthropic / xai / local_cli / custom as explicitly not_implemented
+  or not_configured — never silently invent adapters.
 - Refuse shell commands and arbitrary executable paths for any provider
   registration path (especially local_cli / custom).
 
@@ -26,7 +27,9 @@ from backend.app.services.planning.openai_provider import (
 )
 from backend.app.services.planning.provider import MockPlanningProvider, PlanningProvider
 from backend.app.services.planning.sulphur_provider import (
+    QwenPlanningProvider,
     SulphurPlanningProvider,
+    build_qwen_provider_from_settings,
     build_sulphur_provider_from_settings,
 )
 
@@ -40,7 +43,7 @@ class ProviderAvailability(StrEnum):
 
 # Identifiers that must never be constructed from shell/exec paths in Phase 1.
 _SHELL_REFUSED_PROVIDERS = frozenset({"local_cli", "custom"})
-_HOSTED_STUBS = frozenset({"anthropic", "xai", "qwen"})
+_HOSTED_STUBS = frozenset({"anthropic", "xai"})
 _KNOWN_PROVIDERS = frozenset(
     {"mock", "sulphur", "openai", "anthropic", "xai", "qwen", "local_cli", "custom"}
 )
@@ -129,7 +132,10 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
     openai_detail = (
         "OpenAI planning adapter enabled"
         if cfg.openai_configured
-        else "OpenAI disabled or API key not configured; mock remains default"
+        else (
+            "OpenAI disabled or API key not configured; local Qwen, Sulphur, "
+            "or explicit test fallback routing remains available"
+        )
     )
     sulphur_status = (
         ProviderAvailability.available
@@ -141,8 +147,32 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
         if cfg.sulphur_configured
         else "Local Sulphur planning is disabled or its configured GGUF is missing"
     )
+    qwen_status = (
+        ProviderAvailability.available
+        if cfg.qwen_configured
+        else ProviderAvailability.not_configured
+    )
+    qwen_detail = (
+        "Local Qwen3 4B Hivemind GGUF is configured through LM Studio"
+        if cfg.qwen_configured
+        else "Local Qwen planning is disabled or its configured GGUF is missing"
+    )
 
     return [
+        ProviderDescriptor(
+            provider_identifier=QwenPlanningProvider.identifier,
+            display_name="Qwen3 4B Hivemind · local LM Studio",
+            availability_status=qwen_status,
+            execution_mode="local_http" if cfg.qwen_configured else "disabled",
+            privacy_classification="local",
+            capabilities=(
+                ("planning", "script_generation", "prompt_enhancement")
+                if cfg.qwen_configured
+                else tuple()
+            ),
+            detail=qwen_detail,
+            routing_priority=110,
+        ),
         ProviderDescriptor(
             provider_identifier=SulphurPlanningProvider.identifier,
             display_name="Sulphur Prompt Enhancer Q8",
@@ -164,7 +194,7 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
             execution_mode="local",
             privacy_classification="local",
             capabilities=("planning",),
-            detail="Default provider for tests and local use",
+            detail="Deterministic provider reserved for tests and explicit fallback",
             routing_priority=0,
         ),
         ProviderDescriptor(
@@ -188,15 +218,6 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
         ProviderDescriptor(
             provider_identifier="xai",
             display_name="xAI",
-            availability_status=ProviderAvailability.not_implemented,
-            execution_mode="disabled",
-            privacy_classification="hosted",
-            capabilities=tuple(),
-            detail="Not implemented in Storyboard Phase 1",
-        ),
-        ProviderDescriptor(
-            provider_identifier="qwen",
-            display_name="Qwen",
             availability_status=ProviderAvailability.not_implemented,
             execution_mode="disabled",
             privacy_classification="hosted",
@@ -241,7 +262,8 @@ def build_provider_registry(
 ) -> dict[str, PlanningProvider]:
     """Build the live provider map.
 
-    Mock is always present. Sulphur and OpenAI are included only when configured.
+    Mock is always present. Qwen, Sulphur, and OpenAI are included only when
+    configured.
     """
     cfg = settings or get_settings()
     registry: dict[str, PlanningProvider] = {
@@ -254,6 +276,9 @@ def build_provider_registry(
     sulphur = build_sulphur_provider_from_settings(cfg)
     if sulphur is not None:
         registry[SulphurPlanningProvider.identifier] = sulphur
+    qwen = build_qwen_provider_from_settings(cfg)
+    if qwen is not None:
+        registry[QwenPlanningProvider.identifier] = qwen
 
     if extra:
         for key, provider in extra.items():
@@ -297,6 +322,20 @@ def resolve_provider(
                 },
             )
         return SulphurPlanningProvider.from_settings(cfg)
+
+    if provider_identifier == QwenPlanningProvider.identifier:
+        cfg = settings or get_settings()
+        if not cfg.qwen_configured:
+            raise PlanningError(
+                PlanningErrorCode.ROUTING_FAILED,
+                "Provider 'qwen' is not configured for planning",
+                details={
+                    "provider_identifier": "qwen",
+                    "availability_status": ProviderAvailability.not_configured.value,
+                    "sulphur_planning_enabled": cfg.sulphur_planning_enabled,
+                },
+            )
+        return QwenPlanningProvider.from_settings(cfg)
 
     if provider_identifier in _SHELL_REFUSED_PROVIDERS:
         raise PlanningError(

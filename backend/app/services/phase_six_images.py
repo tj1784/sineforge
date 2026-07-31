@@ -35,12 +35,16 @@ from backend.app.db.base import (
     CharacterReferenceAsset,
     Chapter,
     PlanningMediaAsset,
+    Project,
     ProductionPhase,
     Scene,
     Shot,
     ShotCharacter,
     ShotPromptPackage,
     Story,
+)
+from backend.app.schemas.project_workflows import (
+    is_cineforge_studio_workflow_lane,
 )
 from backend.app.services import reference_assets
 
@@ -113,6 +117,31 @@ NEGATIVE_HISTORICAL_GUARDRAIL = (
 
 class PhaseSixImageError(ValueError):
     pass
+
+
+def _agentless_dry_run_path(project_id: UUID) -> str:
+    return f"/projects/{project_id}/agentless-workflow/dry-run"
+
+
+def _require_legacy_image_lane(
+    db: Session,
+    story: Story,
+) -> None:
+    project = db.get(Project, story.project_id)
+    if project is not None and is_cineforge_studio_workflow_lane(
+        project.workflow_lane
+    ):
+        return
+    actual_lane = (
+        project.workflow_lane if project is not None else "missing_project"
+    )
+    project_id = project.id if project is not None else story.project_id
+    raise PhaseSixImageError(
+        "workflow_lane_mismatch: Legacy Phase 5/6 image preparation and "
+        "generation require workflow_lane='cineforge_studio'; received "
+        f"{actual_lane!r}. Use {_agentless_dry_run_path(project_id)} for the "
+        "deterministic scene-reset contract."
+    )
 
 
 @dataclass(frozen=True)
@@ -280,6 +309,7 @@ def status(db: Session, story_id: UUID, *, runtime_reachable: bool | None = None
 
 def prepare(db: Session, story_id: UUID, *, requested_by: str) -> dict[str, Any]:
     story = _story(db, story_id)
+    _require_legacy_image_lane(db, story)
     shots = _shots(db, story_id)
     if not shots:
         raise PhaseSixImageError("Phase 6 has no shots to prepare.")
@@ -1416,6 +1446,7 @@ def generate_shot(
     workflow_api_json: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     story = _story(db, story_id)
+    _require_legacy_image_lane(db, story)
     row = next((candidate for candidate in _shot_rows(db, story_id) if candidate.shot.id == shot_id), None)
     if row is None:
         raise PhaseSixImageError("Shot not found for this story.")
@@ -1576,6 +1607,7 @@ def generate_character_reference(
     workflow_api_json: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     story = _story(db, story_id)
+    _require_legacy_image_lane(db, story)
     character = db.get(Character, character_id)
     if character is None or character.story_id != story_id or character.archived_at is not None:
         raise PhaseSixImageError("Character not found for this story.")
@@ -1762,6 +1794,7 @@ def generate_asset_reference(
     workflow_api_json: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     story = _story(db, story_id)
+    _require_legacy_image_lane(db, story)
     _assert_flux_model(model_name)
     chosen_seed = seed if seed is not None else secrets.randbits(63)
     archetype = _image_archetype("wide establishing")
@@ -1922,6 +1955,7 @@ def generate_phase_five_handoff(
     workflow_api_json: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     story = _story(db, story_id)
+    _require_legacy_image_lane(db, story)
     _assert_flux_model(model_name)
     prepare(db, story_id, requested_by=requested_by)
 

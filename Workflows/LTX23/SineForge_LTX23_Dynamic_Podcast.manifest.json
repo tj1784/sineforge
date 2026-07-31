@@ -1,0 +1,140 @@
+{
+  "schema_version": "sineforge.semantic-workflow-manifest/v1",
+  "template_id": "ltx23-dynamic-podcast-qwen40b-native-audio-v1",
+  "workflow_name": "LTX-2.3 Dynamic Podcast — Local Qwen JSON + Native Audio",
+  "editor_workflow": "SineForge_LTX23_Dynamic_Podcast_Qwen40B.workflow.json",
+  "api_workflow": "SineForge_LTX23_Dynamic_Podcast_Qwen40B.api.json",
+  "prompt_contract": "SineForge_LTX23_Dynamic_Podcast.prompt.json",
+  "execution_policy": {
+    "cloud_agents_allowed": false,
+    "local_planner": "LM Studio",
+    "planner_model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+    "planner_must_unload_before_render": true,
+    "gpu_queue_depth": 1,
+    "batch_size": 1,
+    "native_audio": true,
+    "default_mode": "new variation every run"
+  },
+  "bindings": {
+    "scene_anchor_image": {
+      "node_id": "1",
+      "class_type": "LoadImage",
+      "input": "image"
+    },
+    "planner_model": {
+      "node_id": "2",
+      "class_type": "SineForgeLTXPodcastPlanner",
+      "input": "model"
+    },
+    "variation_mode": {
+      "node_id": "2",
+      "class_type": "SineForgeLTXPodcastPlanner",
+      "input": "variation_mode"
+    },
+    "prompt_seed": {
+      "node_id": "2",
+      "class_type": "SineForgeLTXPodcastPlanner",
+      "input": "seed"
+    },
+    "topic_request_json": {
+      "node_id": "2",
+      "class_type": "SineForgeLTXPodcastPlanner",
+      "input": "topic_request_json",
+      "media_type": "application/json"
+    },
+    "recent_topics_json": {
+      "node_id": "2",
+      "class_type": "SineForgeLTXPodcastPlanner",
+      "input": "recent_topics_json",
+      "media_type": "application/json"
+    },
+    "positive_prompt": {
+      "source": {
+        "node_id": "2",
+        "output_index": 1
+      },
+      "target": {
+        "node_id": "3",
+        "class_type": "LTXVSulphurAllInOne",
+        "input": "positive_prompt"
+      }
+    },
+    "negative_prompt": {
+      "source": {
+        "node_id": "2",
+        "output_index": 2
+      },
+      "target": {
+        "node_id": "3",
+        "class_type": "LTXVSulphurAllInOne",
+        "input": "negative_prompt"
+      }
+    },
+    "video_seed": {
+      "source": {
+        "node_id": "2",
+        "output_index": 4
+      },
+      "target": {
+        "node_id": "3",
+        "class_type": "LTXVSulphurAllInOne",
+        "input": "seed"
+      }
+    },
+    "duration_seconds": {
+      "source": {
+        "node_id": "2",
+        "output_index": 5
+      },
+      "target": {
+        "node_id": "3",
+        "class_type": "LTXVSulphurAllInOne",
+        "input": "seconds"
+      }
+    },
+    "output_prefix": {
+      "source": {
+        "node_id": "2",
+        "output_index": 6
+      },
+      "targets": [
+        {
+          "node_id": "5",
+          "class_type": "SaveVideo",
+          "input": "filename_prefix"
+        },
+        {
+          "node_id": "6",
+          "class_type": "SaveText",
+          "input": "filename_prefix"
+        }
+      ]
+    },
+    "width": {
+      "node_id": "3",
+      "class_type": "LTXVSulphurAllInOne",
+      "input": "custom_width"
+    },
+    "height": {
+      "node_id": "3",
+      "class_type": "LTXVSulphurAllInOne",
+      "input": "custom_height"
+    },
+    "fps": {
+      "node_id": "3",
+      "class_type": "LTXVSulphurAllInOne",
+      "input": "frame_rate"
+    },
+    "quality_schedule": {
+      "node_id": "3",
+      "class_type": "LTXVSulphurAllInOne",
+      "input": "sigma_preset"
+    }
+  },
+  "limitations": [
+    "Native LTX audio does not guarantee verbatim dialogue.",
+    "Two-speaker voice separation and face-to-speaker assignment require QA.",
+    "A continuous two-shot is experimental; production dialogue is stronger as one independently anchored speaker turn per job.",
+    "Semantic novelty is encouraged with a fresh seed and category pair but cannot be mathematically guaranteed without recent-topic comparison."
+  ]
+}

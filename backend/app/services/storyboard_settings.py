@@ -9,6 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from backend.app.db.base import Project, ProjectStoryboardSettings, Story
+from backend.app.schemas.project_workflows import (
+    AGENTLESS_PRODUCTION_PROFILE_REF,
+    DEFAULT_PROJECT_WORKFLOW_LANE,
+    ProjectWorkflowLane,
+    is_agentless_workflow_lane,
+    normalize_project_workflow_lane,
+    workflow_lane_policy_snapshot,
+)
 from backend.app.schemas.storyboard_settings import (
     DEFAULT_APPROVAL_POLICY,
     DEFAULT_ASPECT_RATIO,
@@ -50,6 +58,8 @@ def _profile_snapshot(profile: ProductionProfile) -> dict:
         "model_family": profile.model_family,
         "status": profile.status,
         "execution_qualified": profile.execution_qualified,
+        "selectable_for_execution": profile.selectable_for_execution,
+        "hold_reason": profile.hold_reason,
         "approved_video_model_keys": sorted(profile.approved_video_model_keys),
         "approved_video_models": sorted(profile.approved_video_models),
         "capabilities": {
@@ -94,7 +104,68 @@ def _project_or_error(db: Session, project_id: UUID) -> Project:
     return project
 
 
-def default_settings_values() -> dict:
+def apply_workflow_lane_policy(
+    values: dict,
+    workflow_lane: ProjectWorkflowLane | str | None,
+) -> dict:
+    """Overlay non-negotiable workflow-lane policy on settings values."""
+
+    lane = normalize_project_workflow_lane(workflow_lane)
+    result = dict(values)
+
+    continuity_policy = dict(result.get("continuity_policy_json") or {})
+    prompting_policy = dict(result.get("prompting_policy_json") or {})
+    prompting_policy.update(
+        {
+            "workflow_lane": lane.value,
+            "workflow_lane_policy": workflow_lane_policy_snapshot(lane),
+        }
+    )
+
+    if is_agentless_workflow_lane(lane):
+        continuity_policy.update(
+            {
+                "require_fresh_scene_anchor": True,
+                "allow_cross_scene_continuity": False,
+                "allow_previous_video_frame_handoff": False,
+            }
+        )
+        prompting_policy["orchestration_mode"] = "deterministic_python"
+        prompting_policy.update(
+            {
+                "planning_mode": "local_lm_studio",
+                "hosted_planning_agents_allowed": False,
+                "local_planning_agent_required": True,
+                "default_planning_agent": "qwen",
+                "prompt_artifact_format": "json",
+                "prompt_schema_version": "sineforge.local-planning-prompt/v1",
+            }
+        )
+        result.update(
+            {
+                "shot_duration_min_sec": 3.0,
+                "shot_duration_max_sec": 10.0,
+                "fps": 24.0,
+                "prefer_hosted_providers": False,
+                "prefer_local_providers": True,
+                "allow_model_download": False,
+                "allow_rendering": False,
+            }
+        )
+        result.update(
+            production_profile_settings_values(
+                AGENTLESS_PRODUCTION_PROFILE_REF
+            )
+        )
+
+    result["continuity_policy_json"] = continuity_policy
+    result["prompting_policy_json"] = prompting_policy
+    return result
+
+
+def default_settings_values(
+    workflow_lane: ProjectWorkflowLane | str | None = DEFAULT_PROJECT_WORKFLOW_LANE,
+) -> dict:
     values = {
         "shot_duration_min_sec": DEFAULT_SHOT_DURATION_MIN_SEC,
         "shot_duration_max_sec": DEFAULT_SHOT_DURATION_MAX_SEC,
@@ -117,11 +188,11 @@ def default_settings_values() -> dict:
         "allow_model_download": True,
         "allow_rendering": True,
         "require_voice_consent": True,
-        "require_production_plan_approval": True,
+        "require_production_plan_approval": False,
         "settings_version": 1,
     }
     values.update(production_profile_settings_values(DEFAULT_PRODUCTION_PROFILE_KEY))
-    return values
+    return apply_workflow_lane_policy(values, workflow_lane)
 
 
 def get_settings_row(db: Session, project_id: UUID) -> ProjectStoryboardSettings | None:
@@ -131,11 +202,14 @@ def get_settings_row(db: Session, project_id: UUID) -> ProjectStoryboardSettings
 
 
 def get_or_create_settings(db: Session, project_id: UUID) -> ProjectStoryboardSettings:
-    _project_or_error(db, project_id)
+    project = _project_or_error(db, project_id)
     existing = get_settings_row(db, project_id)
     if existing is not None:
         return existing
-    row = ProjectStoryboardSettings(project_id=project_id, **default_settings_values())
+    row = ProjectStoryboardSettings(
+        project_id=project_id,
+        **default_settings_values(project.workflow_lane),
+    )
     db.add(row)
     db.commit()
     db.refresh(row)
@@ -143,19 +217,22 @@ def get_or_create_settings(db: Session, project_id: UUID) -> ProjectStoryboardSe
 
 
 def get_settings(db: Session, project_id: UUID) -> ProjectStoryboardSettings:
-    _project_or_error(db, project_id)
+    project = _project_or_error(db, project_id)
     existing = get_settings_row(db, project_id)
     if existing is not None:
         return existing
     # Reads use effective defaults without mutating the database.  The first
     # PUT is the explicit creation boundary.
-    return ProjectStoryboardSettings(project_id=project_id, **default_settings_values())
+    return ProjectStoryboardSettings(
+        project_id=project_id,
+        **default_settings_values(project.workflow_lane),
+    )
 
 
 def put_settings(
     db: Session, project_id: UUID, payload: ProjectStoryboardSettingsUpdate
 ) -> ProjectStoryboardSettings:
-    _project_or_error(db, project_id)
+    project = _project_or_error(db, project_id)
     stories = list(
         db.scalars(
             select(Story)
@@ -174,6 +251,7 @@ def put_settings(
         exclude={"expected_settings_version", "production_profile_snapshot_json"}
     )
     data.update(production_profile_settings_values(payload.production_profile_key))
+    data = apply_workflow_lane_policy(data, project.workflow_lane)
 
     if row is None:
         if payload.expected_settings_version is not None:

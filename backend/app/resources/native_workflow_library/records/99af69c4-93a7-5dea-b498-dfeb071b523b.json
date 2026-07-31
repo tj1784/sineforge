@@ -1,0 +1,981 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "99af69c4-93a7-5dea-b498-dfeb071b523b",
+  "name": "LTX-2.3 Dynamic Podcast — Local Qwen JSON + Native Audio",
+  "version": "1.0",
+  "description": "A one-click, image-driven LTX-2.3 podcast experiment that creates a fresh structured conversation locally before every render. The SineForge planner calls the installed Qwen 3.6 40B model through loopback LM Studio with a strict JSON Schema, saves the complete prompt as `.json`, derives a new render seed, and confirms Qwen is unloaded before the two-pass Sulphur LTX-2.3 native-audio I2V node can claim VRAM. The default eight-second shot has MAN_A open a topic, MAN_B reply, and MAN_A pivot to an unrelated topic while the supplied image remains the first-frame identity and set anchor. Fresh mode varies both meaning and pixels; replay mode locks the visible seed. Two-face lip assignment and verbatim native dialogue remain experimental and require review.",
+  "category": "Video & Animation",
+  "subcategory": "LTX-2.3 · Dynamic podcasts",
+  "episode": null,
+  "instructions": "1. Install or update the bundled `SineForge-Workflow-Bridge` with `scripts/Install-SineForgeWorkflowBridge.ps1`, then restart the main LTX ComfyUI once. The workflow requires the `SineForge · Local Qwen Podcast JSON` node.\n2. Keep LM Studio's local server running at `http://127.0.0.1:1234`. The planner explicitly selects the installed Qwen 3.6 40B model; it does not use the currently selected global LM Studio model and never calls a hosted API.\n3. Upload a two-person podcast image and patch `1.image`. The same original image is sent losslessly to LTX as its first-frame guide. A resized JPEG copy is used only for local Qwen visual analysis.\n4. In `2.topic_request_json`, edit valid JSON only. Set `speaker_assignment.MAN_A` and `MAN_B` to match the people in the image. Default is camera-left and camera-right. Keep source notes in `source_notes` when dialogue must remain grounded.\n5. Leave `variation_mode` at `new variation every run` for a fresh cryptographic variation seed, two topic categories, three short dialogue turns, prompt JSON, and LTX seed each run. Change it to `replay visible seed` to reproduce the visible seed as closely as local-model sampling allows.\n6. Use `recent_topics_json` as a JSON array of recent topic names when you want stronger duplicate avoidance. The default `[]` is valid. The planner retries malformed or overlong output once under the same strict response schema.\n7. Validate against the active ComfyUI registry before queueing. Confirm the exact Sulphur distilled checkpoint, Gemma encoder, LTX projection, video/audio VAEs, and spatial upscaler remain selectable.\n8. Queue one job only. Before Qwen runs, the planner releases cached ComfyUI models and unloads other LM Studio models. It then refuses to hand the prompt to LTX unless the selected Qwen instance is confirmed unloaded. This is required on the 24GB GPU.\n9. The default render is one 8-second, 24fps, 768×448 custom-profile, two-pass LTX-2.3 I2V job with native audio and all optional LoRAs disabled. Start here; benchmark before increasing duration or resolution.\n10. Each run saves an H.264 MP4 and its exact `.json` prompt record under the same variation prefix. The JSON includes planner and video seeds, topics, dialogue, positive/negative prompts, hashes, model ID, and unload confirmation.\n11. Treat two-person native dialogue as experimental. Exact words, distinct voices, lip sync, and the correct face speaking are QA conditions rather than guarantees. For production, render one independently anchored five-second speaker turn per job and assemble the accepted turns.\n12. LTX and the local planner are not news sources. Without approved source notes, dialogue about war, politics, elections, medicine, finance, or other changing facts is generated as fictional opinion or broad discussion, not verified reporting.",
+  "tags": [
+    "LTX-2.3",
+    "image to video",
+    "podcast",
+    "talking characters",
+    "native audio",
+    "local Qwen 3.6 40B",
+    "strict JSON",
+    "dynamic prompt",
+    "two pass",
+    "read only"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "SineForge-Workflow-Bridge",
+      "comfyui_starnodes",
+      "ComfyUI-Custom-Scripts"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "CreateVideo",
+      "LTXVSulphurAllInOne",
+      "LoadImage",
+      "SaveText",
+      "SaveVideo",
+      "ShowText|pysssss",
+      "SineForgeLTXPodcastPlanner"
+    ],
+    "model_files": [
+      {
+        "node_id": "3",
+        "node_type": "LTXVSulphurAllInOne",
+        "input": "base_model",
+        "value": "sulphur2Base_distilled.safetensors"
+      },
+      {
+        "node_id": "3",
+        "node_type": "LTXVSulphurAllInOne",
+        "input": "clip_1",
+        "value": "gemma_3_12B_it_fp8_e4m3fn.safetensors"
+      },
+      {
+        "node_id": "3",
+        "node_type": "LTXVSulphurAllInOne",
+        "input": "clip_2",
+        "value": "ltx-2.3_text_projection_bf16.safetensors"
+      },
+      {
+        "node_id": "3",
+        "node_type": "LTXVSulphurAllInOne",
+        "input": "vae",
+        "value": "LTX23_video_vae_bf16.safetensors"
+      },
+      {
+        "node_id": "3",
+        "node_type": "LTXVSulphurAllInOne",
+        "input": "audio_vae",
+        "value": "LTX23_audio_vae_bf16.safetensors"
+      },
+      {
+        "node_id": "3",
+        "node_type": "LTXVSulphurAllInOne",
+        "input": "upscale_model",
+        "value": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors"
+      }
+    ],
+    "local_services": [
+      {
+        "service": "LM Studio",
+        "url": "http://127.0.0.1:1234",
+        "model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+        "cloud": false,
+        "unload_required_before_render": true
+      }
+    ],
+    "media_inputs": [
+      {
+        "node_id": "1",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "example.png",
+        "purpose": "Two-person podcast first-frame anchor"
+      }
+    ],
+    "prompt_field_count": 2,
+    "output_node_count": 3,
+    "prompt_contract": "Workflows/LTX23/SineForge_LTX23_Dynamic_Podcast.prompt.json",
+    "semantic_manifest": "Workflows/LTX23/SineForge_LTX23_Dynamic_Podcast.manifest.json",
+    "qualification": {
+      "status": "static_validated_not_rendered",
+      "reason": "No expensive generation was queued while building the read-only library entry.",
+      "recommended_first_run": {
+        "seconds": 8,
+        "fps": 24,
+        "width": 768,
+        "height": 448,
+        "sigma_preset": "12 steps",
+        "queue_depth": 1
+      }
+    },
+    "documentation_notes": "The local planner's system prompt, user request, and generated record are JSON. `SaveText` is fixed to format=json. The LTX positive/negative strings are extracted runtime values retained inside that JSON record. A resized JPEG is sent only to local Qwen for visual analysis; LTX receives the original image tensor. Native two-speaker speech is probabilistic."
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_native_workflow",
+  "source_id": "sineforge:ltx23-dynamic-podcast-qwen40b-v1",
+  "source_filename": "SineForge_LTX23_Dynamic_Podcast_Qwen40B.workflow.json",
+  "source_archive": null,
+  "source_entry": "Workflows/LTX23/SineForge_LTX23_Dynamic_Podcast_Qwen40B.workflow.json",
+  "source_workflow": {
+    "id": "9999ce00-0e9e-51e9-b3cc-c755ed032549",
+    "revision": 0,
+    "last_node_id": 8,
+    "last_link_id": 14,
+    "nodes": [
+      {
+        "id": 1,
+        "type": "LoadImage",
+        "pos": [
+          80,
+          420
+        ],
+        "size": [
+          320,
+          420
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "COMBO",
+            "widget": {
+              "name": "image"
+            },
+            "link": null
+          },
+          {
+            "name": "upload",
+            "type": "IMAGEUPLOAD",
+            "widget": {
+              "name": "upload"
+            },
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              1,
+              2
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "title": "1 · Podcast reference image",
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.5.1",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "example.png",
+          "image"
+        ],
+        "color": "#17304a",
+        "bgcolor": "#102238"
+      },
+      {
+        "id": 2,
+        "type": "SineForgeLTXPodcastPlanner",
+        "pos": [
+          470,
+          350
+        ],
+        "size": [
+          650,
+          920
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 1,
+            "shape": 7
+          }
+        ],
+        "outputs": [
+          {
+            "name": "prompt_json",
+            "type": "STRING",
+            "links": [
+              7
+            ]
+          },
+          {
+            "name": "positive_prompt",
+            "type": "STRING",
+            "links": [
+              3
+            ]
+          },
+          {
+            "name": "negative_prompt",
+            "type": "STRING",
+            "links": [
+              4
+            ]
+          },
+          {
+            "name": "variation_seed",
+            "type": "INT",
+            "links": null
+          },
+          {
+            "name": "video_seed",
+            "type": "INT",
+            "links": [
+              5
+            ]
+          },
+          {
+            "name": "duration_seconds",
+            "type": "INT",
+            "links": [
+              6
+            ]
+          },
+          {
+            "name": "output_prefix",
+            "type": "STRING",
+            "links": [
+              13,
+              14
+            ]
+          },
+          {
+            "name": "status_json",
+            "type": "STRING",
+            "links": [
+              8
+            ]
+          }
+        ],
+        "title": "2 · Local Qwen 3.6 40B · strict JSON + unload",
+        "properties": {
+          "cnr_id": "SineForge-Workflow-Bridge",
+          "ver": "2",
+          "Node name for S&R": "SineForgeLTXPodcastPlanner"
+        },
+        "widgets_values": [
+          "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+          "new variation every run",
+          20260730,
+          "fixed",
+          "{\n  \"schema_version\": \"sineforge.ltx23-podcast-variation-request/v1\",\n  \"language\": \"English\",\n  \"duration_seconds\": 8,\n  \"speaker_assignment\": {\n    \"MAN_A\": \"camera-left\",\n    \"MAN_B\": \"camera-right\"\n  },\n  \"primary_topic_brief\": \"Choose a fresh, specific subject from the supplied primary category hint. It may be current affairs, science, technology, culture, work, design, history, food, travel, or everyday life.\",\n  \"pivot_topic_brief\": \"Choose a clearly unrelated, specific subject from the supplied pivot category hint.\",\n  \"tone\": \"thoughtful, concise, natural broadcast conversation with a lightly curious tone\",\n  \"dialogue_limits\": {\n    \"max_words_per_line\": 6,\n    \"max_total_words\": 18\n  },\n  \"factuality_policy\": \"Without approved source_notes, frame changing real-world matters as fictional opinion or broad discussion and avoid precise unsupported claims.\",\n  \"source_notes\": [],\n  \"avoid_topics\": []\n}",
+          "[]",
+          0.9,
+          0.95,
+          1600,
+          900
+        ],
+        "color": "#2b1d52",
+        "bgcolor": "#1d163c"
+      },
+      {
+        "id": 3,
+        "type": "LTXVSulphurAllInOne",
+        "pos": [
+          1190,
+          350
+        ],
+        "size": [
+          520,
+          1040
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 2,
+            "shape": 7
+          },
+          {
+            "name": "positive_prompt",
+            "type": "STRING",
+            "link": 3
+          },
+          {
+            "name": "negative_prompt",
+            "type": "STRING",
+            "link": 4
+          },
+          {
+            "name": "seconds",
+            "type": "INT",
+            "link": 6
+          },
+          {
+            "name": "seed",
+            "type": "INT",
+            "link": 5
+          }
+        ],
+        "outputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "links": [
+              9
+            ]
+          },
+          {
+            "name": "audio",
+            "type": "AUDIO",
+            "links": [
+              10
+            ]
+          },
+          {
+            "name": "frame_rate",
+            "type": "FLOAT",
+            "links": [
+              11
+            ]
+          }
+        ],
+        "title": "3 · LTX-2.3 · two-pass native-audio I2V",
+        "properties": {
+          "cnr_id": "comfyui_starnodes",
+          "ver": "local",
+          "Node name for S&R": "LTXVSulphurAllInOne"
+        },
+        "widgets_values": [
+          "▶️ image_to_video",
+          "",
+          "",
+          "sulphur2Base_distilled.safetensors",
+          "gemma_3_12B_it_fp8_e4m3fn.safetensors",
+          "ltx-2.3_text_projection_bf16.safetensors",
+          "LTX23_video_vae_bf16.safetensors",
+          "LTX23_audio_vae_bf16.safetensors",
+          "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+          "Custom",
+          "16:9",
+          false,
+          768,
+          448,
+          24,
+          8,
+          20260730,
+          "fixed",
+          "12 steps",
+          false,
+          "None",
+          0.0,
+          "None",
+          0.0,
+          "None",
+          0.0,
+          "1.0, 0.995833, 0.991667, 0.9875, 0.983333, 0.979167, 0.975, 0.93125, 0.847917, 0.725, 0.522917, 0.28125, 0.0",
+          "0.85, 0.725, 0.6, 0.4219, 0.0",
+          1.0,
+          "euler_ancestral_cfg_pp",
+          "euler_cfg_pp",
+          "default",
+          ""
+        ],
+        "color": "#123a30",
+        "bgcolor": "#0d2b24"
+      },
+      {
+        "id": 4,
+        "type": "CreateVideo",
+        "pos": [
+          1800,
+          440
+        ],
+        "size": [
+          350,
+          260
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 9
+          },
+          {
+            "name": "fps",
+            "type": "FLOAT",
+            "link": 11
+          },
+          {
+            "name": "audio",
+            "type": "AUDIO",
+            "link": 10,
+            "shape": 7
+          },
+          {
+            "name": "bit_depth",
+            "type": "INT",
+            "widget": {
+              "name": "bit_depth"
+            },
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "VIDEO",
+            "type": "VIDEO",
+            "links": [
+              12
+            ]
+          }
+        ],
+        "title": "4 · Mux native video + audio",
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.5.1",
+          "Node name for S&R": "CreateVideo"
+        },
+        "widgets_values": [
+          8
+        ],
+        "color": "#4a3218",
+        "bgcolor": "#35240f"
+      },
+      {
+        "id": 5,
+        "type": "SaveVideo",
+        "pos": [
+          2220,
+          390
+        ],
+        "size": [
+          430,
+          310
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "video",
+            "type": "VIDEO",
+            "link": 12
+          },
+          {
+            "name": "filename_prefix",
+            "type": "STRING",
+            "link": 13
+          },
+          {
+            "name": "format",
+            "type": "COMBO",
+            "widget": {
+              "name": "format"
+            },
+            "link": null
+          },
+          {
+            "name": "codec",
+            "type": "COMBO",
+            "widget": {
+              "name": "codec"
+            },
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "video",
+            "type": "VIDEO",
+            "links": null
+          }
+        ],
+        "title": "5 · Save MP4",
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.5.1",
+          "Node name for S&R": "SaveVideo"
+        },
+        "widgets_values": [
+          "SineForge/LTX23_Podcast/podcast",
+          "mp4",
+          "h264"
+        ],
+        "color": "#52311f",
+        "bgcolor": "#3b2114"
+      },
+      {
+        "id": 6,
+        "type": "SaveText",
+        "pos": [
+          2220,
+          760
+        ],
+        "size": [
+          430,
+          250
+        ],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "link": 7
+          },
+          {
+            "name": "filename_prefix",
+            "type": "STRING",
+            "link": 14
+          },
+          {
+            "name": "format",
+            "type": "COMBO",
+            "widget": {
+              "name": "format"
+            },
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "links": null
+          }
+        ],
+        "title": "6 · Save exact prompt artifact · JSON",
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.5.1",
+          "Node name for S&R": "SaveText"
+        },
+        "widgets_values": [
+          "SineForge/LTX23_Podcast/podcast",
+          "json"
+        ],
+        "color": "#52311f",
+        "bgcolor": "#3b2114"
+      },
+      {
+        "id": 7,
+        "type": "ShowText|pysssss",
+        "pos": [
+          1800,
+          760
+        ],
+        "size": [
+          350,
+          330
+        ],
+        "flags": {},
+        "order": 6,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "text",
+            "type": "STRING",
+            "link": 8
+          }
+        ],
+        "outputs": [
+          {
+            "name": "STRING",
+            "type": "STRING",
+            "links": null
+          }
+        ],
+        "title": "Planner status · seeds · hashes",
+        "properties": {
+          "cnr_id": "pysssss/ComfyUI-Custom-Scripts",
+          "ver": "local",
+          "Node name for S&R": "ShowText|pysssss"
+        },
+        "widgets_values": [
+          ""
+        ],
+        "color": "#283140",
+        "bgcolor": "#1c2430"
+      },
+      {
+        "id": 8,
+        "type": "MarkdownNote",
+        "pos": [
+          80,
+          30
+        ],
+        "size": [
+          2570,
+          230
+        ],
+        "flags": {},
+        "order": 7,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "READ ME · one-click local planner → safe VRAM handoff → LTX-2.3",
+        "properties": {},
+        "widgets_values": [
+          "# SineForge · LTX-2.3 Dynamic Podcast\n\n1. Load a two-person podcast image. The original image goes directly to LTX as the first frame.\n2. Edit `topic_request_json` only as valid JSON. MAN_A defaults to camera-left; MAN_B defaults to camera-right.\n3. `new variation every run` creates a fresh topic, reply, unrelated pivot, JSON artifact, and video seed.\n4. Local Qwen 3.6 40B is called through LM Studio on loopback. Comfy models are released first, and Qwen must be confirmed unloaded before LTX can start.\n5. LTX-2.3 renders one 8-second, two-pass, native-audio I2V clip. The accepted prompt is saved beside the video as `.json`.\n\n**Reality check:** native two-person speech is experimental. Exact words, voice separation, and which face speaks are QA conditions, not guarantees. For verified current affairs, add approved source notes or treat the dialogue as fictional commentary."
+        ],
+        "color": "#26354f",
+        "bgcolor": "#172237"
+      }
+    ],
+    "links": [
+      [
+        1,
+        1,
+        0,
+        2,
+        0,
+        "IMAGE"
+      ],
+      [
+        2,
+        1,
+        0,
+        3,
+        0,
+        "IMAGE"
+      ],
+      [
+        3,
+        2,
+        1,
+        3,
+        1,
+        "STRING"
+      ],
+      [
+        4,
+        2,
+        2,
+        3,
+        2,
+        "STRING"
+      ],
+      [
+        5,
+        2,
+        4,
+        3,
+        4,
+        "INT"
+      ],
+      [
+        6,
+        2,
+        5,
+        3,
+        3,
+        "INT"
+      ],
+      [
+        7,
+        2,
+        0,
+        6,
+        0,
+        "STRING"
+      ],
+      [
+        8,
+        2,
+        7,
+        7,
+        0,
+        "STRING"
+      ],
+      [
+        9,
+        3,
+        0,
+        4,
+        0,
+        "IMAGE"
+      ],
+      [
+        10,
+        3,
+        1,
+        4,
+        2,
+        "AUDIO"
+      ],
+      [
+        11,
+        3,
+        2,
+        4,
+        1,
+        "FLOAT"
+      ],
+      [
+        12,
+        4,
+        0,
+        5,
+        0,
+        "VIDEO"
+      ],
+      [
+        13,
+        2,
+        6,
+        5,
+        1,
+        "STRING"
+      ],
+      [
+        14,
+        2,
+        6,
+        6,
+        1,
+        "STRING"
+      ]
+    ],
+    "groups": [
+      {
+        "id": 1,
+        "title": "INPUT · original image remains the first-frame anchor",
+        "bounding": [
+          50,
+          300,
+          380,
+          650
+        ],
+        "color": "#3977a8",
+        "flags": {}
+      },
+      {
+        "id": 2,
+        "title": "PLAN · local Qwen 3.6 40B · strict JSON · unload gate",
+        "bounding": [
+          440,
+          300,
+          710,
+          1120
+        ],
+        "color": "#7357c8",
+        "flags": {}
+      },
+      {
+        "id": 3,
+        "title": "RENDER · LTX-2.3 · one two-pass GPU job",
+        "bounding": [
+          1160,
+          300,
+          580,
+          1120
+        ],
+        "color": "#3a9a76",
+        "flags": {}
+      },
+      {
+        "id": 4,
+        "title": "OUTPUT · MP4 + immutable JSON prompt record",
+        "bounding": [
+          1760,
+          300,
+          920,
+          820
+        ],
+        "color": "#b47a35",
+        "flags": {}
+      }
+    ],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 0.82,
+        "offset": [
+          20,
+          80
+        ]
+      },
+      "frontendVersion": "1.47.10",
+      "sineforge": {
+        "schema_version": "sineforge.ltx23-dynamic-podcast-workflow/v1",
+        "read_only_library_source": true,
+        "prompt_contract": "SineForge_LTX23_Dynamic_Podcast.prompt.json"
+      }
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "fca249d0b738c7d0ba29f6b7d9233e0c8dbff4268b7a1962f216d48d10f06f82",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "image": "example.png"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "1 · Podcast reference image"
+      }
+    },
+    "2": {
+      "inputs": {
+        "model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+        "variation_mode": "new variation every run",
+        "seed": 20260730,
+        "topic_request_json": "{\n  \"schema_version\": \"sineforge.ltx23-podcast-variation-request/v1\",\n  \"language\": \"English\",\n  \"duration_seconds\": 8,\n  \"speaker_assignment\": {\n    \"MAN_A\": \"camera-left\",\n    \"MAN_B\": \"camera-right\"\n  },\n  \"primary_topic_brief\": \"Choose a fresh, specific subject from the supplied primary category hint. It may be current affairs, science, technology, culture, work, design, history, food, travel, or everyday life.\",\n  \"pivot_topic_brief\": \"Choose a clearly unrelated, specific subject from the supplied pivot category hint.\",\n  \"tone\": \"thoughtful, concise, natural broadcast conversation with a lightly curious tone\",\n  \"dialogue_limits\": {\n    \"max_words_per_line\": 6,\n    \"max_total_words\": 18\n  },\n  \"factuality_policy\": \"Without approved source_notes, frame changing real-world matters as fictional opinion or broad discussion and avoid precise unsupported claims.\",\n  \"source_notes\": [],\n  \"avoid_topics\": []\n}",
+        "recent_topics_json": "[]",
+        "temperature": 0.9,
+        "top_p": 0.95,
+        "max_tokens": 1600,
+        "timeout_seconds": 900,
+        "image": [
+          "1",
+          0
+        ]
+      },
+      "class_type": "SineForgeLTXPodcastPlanner",
+      "_meta": {
+        "title": "2 · Local Qwen 3.6 40B · strict JSON + unload"
+      }
+    },
+    "3": {
+      "inputs": {
+        "mode": "▶️ image_to_video",
+        "positive_prompt": [
+          "2",
+          1
+        ],
+        "negative_prompt": [
+          "2",
+          2
+        ],
+        "base_model": "sulphur2Base_distilled.safetensors",
+        "clip_1": "gemma_3_12B_it_fp8_e4m3fn.safetensors",
+        "clip_2": "ltx-2.3_text_projection_bf16.safetensors",
+        "vae": "LTX23_video_vae_bf16.safetensors",
+        "audio_vae": "LTX23_audio_vae_bf16.safetensors",
+        "upscale_model": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+        "video_size": "Custom",
+        "ratio": "16:9",
+        "ratio_from_image": false,
+        "custom_width": 768,
+        "custom_height": 448,
+        "frame_rate": 24,
+        "seconds": [
+          "2",
+          5
+        ],
+        "seed": [
+          "2",
+          4
+        ],
+        "sigma_preset": "12 steps",
+        "image": [
+          "1",
+          0
+        ],
+        "override_audio": false,
+        "lora_1": "None",
+        "lora_1_strength": 0.0,
+        "lora_2": "None",
+        "lora_2_strength": 0.0,
+        "lora_3": "None",
+        "lora_3_strength": 0.0,
+        "custom_sigmas_pass1": "1.0, 0.995833, 0.991667, 0.9875, 0.983333, 0.979167, 0.975, 0.93125, 0.847917, 0.725, 0.522917, 0.28125, 0.0",
+        "sigmas_pass2": "0.85, 0.725, 0.6, 0.4219, 0.0",
+        "cfg": 1.0,
+        "sampler_pass1": "euler_ancestral_cfg_pp",
+        "sampler_pass2": "euler_cfg_pp",
+        "weight_dtype": "default"
+      },
+      "class_type": "LTXVSulphurAllInOne",
+      "_meta": {
+        "title": "3 · LTX-2.3 · two-pass native-audio I2V"
+      }
+    },
+    "4": {
+      "inputs": {
+        "images": [
+          "3",
+          0
+        ],
+        "fps": [
+          "3",
+          2
+        ],
+        "audio": [
+          "3",
+          1
+        ],
+        "bit_depth": 8
+      },
+      "class_type": "CreateVideo",
+      "_meta": {
+        "title": "4 · Mux native video + audio"
+      }
+    },
+    "5": {
+      "inputs": {
+        "video": [
+          "4",
+          0
+        ],
+        "filename_prefix": [
+          "2",
+          6
+        ],
+        "format": "mp4",
+        "codec": "h264"
+      },
+      "class_type": "SaveVideo",
+      "_meta": {
+        "title": "5 · Save MP4"
+      }
+    },
+    "6": {
+      "inputs": {
+        "text": [
+          "2",
+          0
+        ],
+        "filename_prefix": [
+          "2",
+          6
+        ],
+        "format": "json"
+      },
+      "class_type": "SaveText",
+      "_meta": {
+        "title": "6 · Save exact prompt artifact · JSON"
+      }
+    },
+    "7": {
+      "inputs": {
+        "text": [
+          "2",
+          7
+        ]
+      },
+      "class_type": "ShowText|pysssss",
+      "_meta": {
+        "title": "Planner status · seeds · hashes"
+      }
+    }
+  },
+  "sha256": "70a3c41a9aa98982abdd96e30645515e5b0bc37162b33a34b993dd3efc16bb99",
+  "created_at": "2026-07-30T12:00:00-07:00",
+  "updated_at": "2026-07-30T12:00:00-07:00"
+}

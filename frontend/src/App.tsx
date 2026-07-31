@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { api, type Project } from './api/client'
 import { AppShell, type PageId, type ShellView } from './components/AppShell'
+import { requestAppNavigation } from './navigationGuard'
 import { Projects } from './pages/Projects'
 import { StoryboardStudio } from './pages/StoryboardStudio'
+import type { ProjectWorkflowLane } from './workflowLanes'
+import type { PlanningAgent } from './planningAgents'
 
 /** Legacy slug only for URL rewrite — never use as an API project id. */
 const LEGACY_PROJECT_SLUG = 'a-new-journey'
@@ -16,7 +19,9 @@ const PAGE_TO_ROUTE: Record<PageId, string> = {
   images: 'starting-images',
   routing: 'model-routing',
   workflows: 'workflows',
+  'sequence-sheet': 'sequence-sheet',
   'api-caller': 'api-caller',
+  'api-runner': 'api-runner',
   downloads: 'downloads',
   exports: 'exports',
   settings: 'settings',
@@ -33,7 +38,9 @@ const ROUTE_TO_PAGE: Record<string, PageId> = {
   'model-routing': 'routing',
   routing: 'routing',
   workflows: 'workflows',
+  'sequence-sheet': 'sequence-sheet',
   'api-caller': 'api-caller',
+  'api-runner': 'api-runner',
   downloads: 'downloads',
   exports: 'exports',
   settings: 'settings',
@@ -117,23 +124,53 @@ function App() {
     }
     return parsed.route
   })
+  const routeStateRef = useRef(routeState)
   const [backendStatus, setBackendStatus] = useState('checking')
   const [projectName, setProjectName] = useState('Select a project')
+  const [activeProject, setActiveProject] = useState<Project | null>(null)
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(() =>
     routeState.kind === 'studio' && isRealProjectId(routeState.projectId)
       ? routeState.projectId
       : null,
   )
   const [projectCount, setProjectCount] = useState(0)
+  const [newProjectWorkflowLane, setNewProjectWorkflowLane] =
+    useState<ProjectWorkflowLane | null>(null)
+  const [newProjectPlanningAgent, setNewProjectPlanningAgent] =
+    useState<PlanningAgent>('qwen')
+
+  useEffect(() => {
+    routeStateRef.current = routeState
+  }, [routeState])
 
   const navigateTo = useCallback((route: AppRoute, options?: { replace?: boolean }) => {
     const path = routePath(route)
     const method = options?.replace ? 'replaceState' : 'pushState'
-    if (window.location.pathname !== path) {
-      window.history[method](route, '', path)
+    const proceed = () => {
+      if (window.location.pathname !== path) {
+        window.history[method](route, '', path)
+      }
+      routeStateRef.current = route
+      setRouteState(route)
     }
-    setRouteState(route)
+    if (window.location.pathname === path) {
+      proceed()
+      return
+    }
+    requestAppNavigation(proceed)
   }, [])
+
+  const startNewProject = useCallback(
+    (
+      workflowLane: ProjectWorkflowLane | null = null,
+      planningAgent: PlanningAgent = 'qwen',
+    ) => {
+      setNewProjectWorkflowLane(workflowLane)
+      setNewProjectPlanningAgent(planningAgent)
+      navigateTo({ kind: 'new-project' })
+    },
+    [navigateTo],
+  )
 
   const navigateStudio = useCallback(
     (page: PageId) => {
@@ -156,6 +193,7 @@ function App() {
         navigateTo({ kind: 'projects' })
         return
       }
+      setActiveProject(null)
       setSelectedProjectId(projectId)
       if (name) setProjectName(name)
       navigateTo({ kind: 'studio', projectId, page: 'overview' })
@@ -166,6 +204,7 @@ function App() {
   const openProjectPage = useCallback(
     (projectId: string, name: string, page: PageId) => {
       if (!isRealProjectId(projectId)) return
+      setActiveProject(null)
       setSelectedProjectId(projectId)
       setProjectName(name)
       navigateTo({ kind: 'studio', projectId, page })
@@ -215,7 +254,21 @@ function App() {
   }, [])
 
   useEffect(() => {
-    const onPopState = () => setRouteState(readAppRoute().route)
+    const onPopState = () => {
+      const parsed = readAppRoute()
+      const targetPath = parsed.canonicalPath ?? routePath(parsed.route)
+      const currentRoute = routeStateRef.current
+      const proceed = () => {
+        if (window.location.pathname !== targetPath) {
+          window.history.replaceState(parsed.route, '', targetPath)
+        }
+        routeStateRef.current = parsed.route
+        setRouteState(parsed.route)
+      }
+      if (!requestAppNavigation(proceed)) {
+        window.history.pushState(currentRoute, '', routePath(currentRoute))
+      }
+    }
     window.addEventListener('popstate', onPopState)
     return () => window.removeEventListener('popstate', onPopState)
   }, [])
@@ -229,12 +282,14 @@ function App() {
       .getProject(routeState.projectId)
       .then((project) => {
         if (active) {
+          setActiveProject(project)
           setProjectName(project.name)
           setSelectedProjectId(project.id)
         }
       })
       .catch(() => {
         if (active) {
+          setActiveProject(null)
           setProjectName('Selected project')
           // Unknown API id — send user back to the project list (async path, not sync-in-effect).
           navigateTo({ kind: 'projects' }, { replace: true })
@@ -268,6 +323,10 @@ function App() {
       ? routeState.projectId
       : selectedProjectId ?? ''
   const activeProjectName = projectName
+  const activeProjectWorkflowLane =
+    routeState.kind === 'studio' && activeProject?.id === routeState.projectId
+      ? activeProject.workflow_lane
+      : null
 
   return (
     <AppShell
@@ -275,11 +334,12 @@ function App() {
       backendStatus={backendStatus}
       projectId={activeProjectId}
       projectName={activeProjectName}
+      workflowLane={activeProjectWorkflowLane}
       projectCount={projectCount}
       view={shellView}
       onNavigate={navigateStudio}
       onOpenProjects={() => navigateTo({ kind: 'projects' })}
-      onCreateProject={() => navigateTo({ kind: 'new-project' })}
+      onCreateProject={() => startNewProject()}
       onRefreshStatus={() => void refreshBackendStatus()}
     >
       {routeState.kind === 'projects' ? (
@@ -287,7 +347,10 @@ function App() {
           key="projects-list"
           mode="list"
           currentProjectId={selectedProjectId}
-          onCreateNew={() => navigateTo({ kind: 'new-project' })}
+          onCreateNew={() => startNewProject()}
+          onContinueAgentless={(planningAgent) =>
+            startNewProject('agentless', planningAgent)
+          }
           onOpenProject={openProject}
           onOpenProjectPage={openProjectPage}
           onProjectsLoaded={handleProjectsLoaded}
@@ -304,6 +367,8 @@ function App() {
         <Projects
           key="project-create"
           mode="create"
+          initialWorkflowLane={newProjectWorkflowLane}
+          initialPlanningAgent={newProjectPlanningAgent}
           onBackToProjects={() => navigateTo({ kind: 'projects' })}
           onOpenProject={openProject}
         />
@@ -313,6 +378,7 @@ function App() {
           key={routeState.projectId}
           page={routeState.page}
           projectId={routeState.projectId}
+          workflowLane={activeProjectWorkflowLane}
           backendStatus={backendStatus}
           onNavigate={navigateStudio}
         />

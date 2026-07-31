@@ -24,12 +24,11 @@ DEFAULT_QWEN_MODEL_PATH = (
     / ".lmstudio"
     / "models"
     / "DavidAU"
-    / "Qwen3.6-40B-Claude-4.6-Opus-Deckard-Heretic-Uncensored-Thinking-NEO-CODE-Di-IMatrix-MAX-GGUF"
-    / "Qwen3.6-40B-Deck-Opus-NEO-CODE-HERE-2T-OT-Q4_K_S.gguf"
+    / "Qwen3-4B-Hivemind-Instruct-Heretic-Abliterated-Uncensored-NEO-Imatrix-GGUF"
+    / "Qwen3-4B-Hivemind-Inst-Hrtic-Ablit-Uncensored-Q4_K_M-imat.gguf"
 )
 DEFAULT_QWEN_MODEL_ID = (
-    "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-"
-    "neo-code-di-imatrix-max"
+    "qwen3-4b-hivemind-instruct-heretic-abliterated-uncensored-neo-imatrix"
 )
 
 _MODEL_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._/:-]{0,199}$")
@@ -208,6 +207,15 @@ class Settings(BaseSettings):
             self.sulphur_planning_enabled
             and self.sulphur_model_path.is_file()
             and self.sulphur_model_path.suffix.casefold() == ".gguf"
+        )
+
+    @property
+    def qwen_configured(self) -> bool:
+        """True when the approved local Qwen model may serve planning."""
+        return (
+            self.sulphur_planning_enabled
+            and self.qwen_model_path.is_file()
+            and self.qwen_model_path.suffix.casefold() == ".gguf"
         )
 
     @property

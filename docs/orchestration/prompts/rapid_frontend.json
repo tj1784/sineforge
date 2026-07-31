@@ -1,0 +1,9 @@
+{
+  "schema_version": "sineforge.orchestration-prompt-history/v1",
+  "artifact_format": "json",
+  "artifact_filename": "rapid_frontend.json",
+  "status": "historical_reference",
+  "source": {
+    "user_text": "You are Grok 4.5 High implementing the production CineForge Storyboard Phase 1 Vite/React UI from the supplied screenshots and existing Studio. No tools; use context; return strict complete-file patches. Own only `frontend/src/App.tsx`, `frontend/src/api/client.ts`, `frontend/src/components/AppShell.tsx`, `frontend/src/pages/StoryboardStudio.tsx`, `frontend/src/styles.css`, plus new files under `frontend/src/studio/**`. Do not edit package manifests or lockfiles and use existing React only.\r\n\r\nDeliver all ten API-backed pages: Overview, Storyboard, Story & Chapters, Characters, Voices, Starting Images, Model Routing, Workflows, Exports, Settings. Preserve existing ops behavior and dark CineForge visual language. Replace future placeholders with real loading/empty/error/readiness displays and server actions; never hard-code readiness truth or use localStorage as canonical. Voice UI exposes exact eight modes and provider-safe preview actions. Planning/approval never renders, queues, installs, clones, or generates audio automatically. Add keyboard/focus semantics, skip/main landmarks, mobile navigation, 44px targets, readable text, reduced motion, responsive 360–1920 layouts, and truthful disabled states where an API is unavailable.\r\n"
+  }
+}

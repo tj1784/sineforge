@@ -1,0 +1,431 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "0486c492-e02b-5a4d-a057-19a5324d9252",
+  "name": "02. Remove Background with Sam3",
+  "version": "1.0",
+  "description": "02. Remove Background with Sam3 is a cleanup & background workflow designed to isolate the subject or remove unwanted image content using the models configured in the graph. Its 5-node graph exposes 0 prompt/text field(s), 1 media input target(s), and 2 save/preview stage(s), while preserving the original editor-format graph for reference. The imported graph contains unresolved custom-node classes, so install or map the listed nodes and reconvert from the included editor graph before production use.",
+  "category": "Image Editing & Composition",
+  "subcategory": "Cleanup & background",
+  "episode": "EP08",
+  "instructions": "1. Install or map the unresolved node classes listed in Requirements, open the included editor-format source in the main LTX ComfyUI install, and export API format again before attempting a run.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Check image order, masks, crop/resize behavior, denoise strength, and edit prompt. Preview the mask or composite before spending time on the final sample.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "Cleanup & background",
+    "EP08",
+    "Image Editing & Composition"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "ComfyUI-RMBG",
+      "pixaroma",
+      "Pixaroma YouTube Channel"
+    ],
+    "unresolved_node_classes": [
+      "AILab_CropObject",
+      "SAM3Segment"
+    ],
+    "node_classes": [
+      "AILab_CropObject",
+      "LoadImage",
+      "SAM3Segment",
+      "SaveImage"
+    ],
+    "model_files": [],
+    "media_inputs": [
+      {
+        "node_id": "12",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "GameItems.png"
+      }
+    ],
+    "prompt_field_count": 0,
+    "output_node_count": 2,
+    "documentation_notes": "The **sam3.pt** model is downloaded first time you use it and is saved in sam3 folder ..ComfyUI\\models\\sam3\n\n## 🧩 Nodes Installed from Manager  \n\n- ComfyUI-RMBG\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)"
+  },
+  "workflow_status": "requires_custom_nodes",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep08 workflows/ep08 workflows/02. remove background with sam3.json",
+  "source_filename": "02. Remove Background with Sam3.json",
+  "source_archive": "Ep08 Workflows.zip",
+  "source_entry": "Ep08 Workflows/Ep08 Workflows/02. Remove Background with Sam3.json",
+  "source_workflow": {
+    "id": "78224ffd-171f-4565-80ea-bb100e63c26e",
+    "revision": 0,
+    "last_node_id": 12,
+    "last_link_id": 16,
+    "nodes": [
+      {
+        "id": 4,
+        "type": "MarkdownNote",
+        "pos": [
+          109.41784385726716,
+          304.0392977727331
+        ],
+        "size": [
+          295.79611635744646,
+          199.45572013239916
+        ],
+        "flags": {
+          "collapsed": false
+        },
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [],
+        "title": "👑 Pixaroma - Note - START HERE",
+        "properties": {},
+        "widgets_values": [
+          "The **sam3.pt** model is downloaded first time you use it and is saved in sam3 folder ..ComfyUI\\models\\sam3\n\n## 🧩 Nodes Installed from Manager  \n\n- ComfyUI-RMBG\n\n---\n\n## 📚 Resources  \n🎥 **Tutorials:** [Pixaroma YouTube Channel](https://www.youtube.com/@pixaroma)  \n💬 **Community Discord:** [Join Here](https://discord.com/invite/gggpkVgBf3)\n"
+        ],
+        "color": "#432",
+        "bgcolor": "#653"
+      },
+      {
+        "id": 11,
+        "type": "SAM3Segment",
+        "pos": [
+          817.8659859689949,
+          304.0392977727331
+        ],
+        "size": [
+          340,
+          394
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "type": "IMAGE",
+            "link": 16
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              14,
+              15
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          },
+          {
+            "name": "MASK_IMAGE",
+            "type": "IMAGE",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfyui-rmbg",
+          "ver": "d7402513f23f58db7d56754b02a4f51a148b4941",
+          "Node name for S&R": "SAM3Segment"
+        },
+        "widgets_values": [
+          "the bottle",
+          "Merged",
+          0.5,
+          0,
+          0,
+          0,
+          0,
+          "Auto",
+          false,
+          false,
+          "Alpha",
+          "#222222"
+        ],
+        "color": "#222e40",
+        "bgcolor": "#364254"
+      },
+      {
+        "id": 3,
+        "type": "SaveImage",
+        "pos": [
+          1183.7925847836354,
+          304.0392977727331
+        ],
+        "size": [
+          360.798828125,
+          446.66668701171875
+        ],
+        "flags": {},
+        "order": 3,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 14
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.16.4",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "PNG"
+        ]
+      },
+      {
+        "id": 9,
+        "type": "SaveImage",
+        "pos": [
+          1570.518011723276,
+          304.0392977727331
+        ],
+        "size": [
+          360.798828125,
+          446.66668701171875
+        ],
+        "flags": {},
+        "order": 5,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 12
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.16.4",
+          "Node name for S&R": "SaveImage"
+        },
+        "widgets_values": [
+          "PNGCrop"
+        ]
+      },
+      {
+        "id": 10,
+        "type": "AILab_CropObject",
+        "pos": [
+          1214.1919988461354,
+          814.4917152979486
+        ],
+        "size": [
+          300,
+          78
+        ],
+        "flags": {},
+        "order": 4,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image",
+            "shape": 7,
+            "type": "IMAGE",
+            "link": 15
+          },
+          {
+            "name": "mask",
+            "shape": 7,
+            "type": "MASK",
+            "link": null
+          }
+        ],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              12
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfyui-rmbg",
+          "ver": "d7402513f23f58db7d56754b02a4f51a148b4941",
+          "Node name for S&R": "AILab_CropObject"
+        },
+        "widgets_values": [
+          0
+        ],
+        "color": "#2e3e57",
+        "bgcolor": "#4b5b73"
+      },
+      {
+        "id": 12,
+        "type": "LoadImage",
+        "pos": [
+          431.1405590293542,
+          304.0392977727331
+        ],
+        "size": [
+          371.44642220726837,
+          396.0810855923976
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              16
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.16.4",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "GameItems.png",
+          "image"
+        ]
+      }
+    ],
+    "links": [
+      [
+        12,
+        10,
+        0,
+        9,
+        0,
+        "IMAGE"
+      ],
+      [
+        14,
+        11,
+        0,
+        3,
+        0,
+        "IMAGE"
+      ],
+      [
+        15,
+        11,
+        0,
+        10,
+        0,
+        "IMAGE"
+      ],
+      [
+        16,
+        12,
+        0,
+        11,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "workflowRendererVersion": "LG",
+      "ds": {
+        "scale": 1.0152559799477072,
+        "offset": [
+          18.54031175550615,
+          -78.23540916276113
+        ]
+      },
+      "frontendVersion": "1.39.19",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "38bf375ad36f28940e3d3a441b86cbaf9e1d4cb86add7a90322eac000866f1b0",
+  "workflow": {
+    "3": {
+      "inputs": {
+        "filename_prefix": "PNG",
+        "images": [
+          "11",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image"
+      }
+    },
+    "9": {
+      "inputs": {
+        "filename_prefix": "PNGCrop",
+        "images": [
+          "10",
+          0
+        ]
+      },
+      "class_type": "SaveImage",
+      "_meta": {
+        "title": "Save Image"
+      }
+    },
+    "10": {
+      "inputs": {
+        "UNKNOWN": 0,
+        "image": [
+          "11",
+          0
+        ]
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::AILab_CropObject"
+    },
+    "11": {
+      "inputs": {
+        "UNKNOWN": "the bottle",
+        "UNKNOWN_1": "Merged",
+        "UNKNOWN_2": 0.5,
+        "UNKNOWN_3": 0,
+        "UNKNOWN_4": 0,
+        "UNKNOWN_5": 0,
+        "UNKNOWN_6": 0,
+        "UNKNOWN_7": "Auto",
+        "UNKNOWN_8": false,
+        "UNKNOWN_9": false,
+        "UNKNOWN_10": "Alpha",
+        "UNKNOWN_11": "#222222",
+        "image": [
+          "12",
+          0
+        ]
+      },
+      "_meta": {},
+      "class_type": "UNRESOLVED::SAM3Segment"
+    },
+    "12": {
+      "inputs": {
+        "image": "GameItems.png"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    }
+  },
+  "sha256": "9e77292108c32550f59f50e2c1272ac2067531fa3e909a494d8fdbb22d29c6d9",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

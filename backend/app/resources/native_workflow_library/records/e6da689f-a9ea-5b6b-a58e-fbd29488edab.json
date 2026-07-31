@@ -1,0 +1,246 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "e6da689f-a9ea-5b6b-a58e-fbd29488edab",
+  "name": "Image Compare Pixaroma Workflow",
+  "version": "1.0",
+  "description": "Image Compare Pixaroma Workflow is a image utilities workflow designed to inspect, transform, compare, or compose image assets using the models configured in the graph. Its 3-node graph exposes 0 prompt/text field(s), 2 media input target(s), and 0 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Image Editing & Composition",
+  "subcategory": "Image utilities",
+  "episode": "EP11",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. Upload and assign the required image, mask, video, or audio files to the listed media inputs. Keep the source dimensions and duration appropriate for the selected model.\n4. Check image order, masks, crop/resize behavior, denoise strength, and edit prompt. Preview the mask or composite before spending time on the final sample.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP11",
+    "Image Editing & Composition",
+    "Image utilities"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "LoadImage",
+      "PixaromaCompare"
+    ],
+    "model_files": [],
+    "media_inputs": [
+      {
+        "node_id": "2",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "Architecture.png"
+      },
+      {
+        "node_id": "3",
+        "node_type": "LoadImage",
+        "input": "image",
+        "default": "BunnyExplorer.png"
+      }
+    ],
+    "prompt_field_count": 0,
+    "output_node_count": 0,
+    "documentation_notes": null
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep11 workflows/ep11 workflows/image compare pixaroma workflow.json",
+  "source_filename": "Image Compare Pixaroma Workflow.json",
+  "source_archive": "Ep11 Workflows.zip",
+  "source_entry": "Ep11 Workflows/Ep11 Workflows/Image Compare Pixaroma Workflow.json",
+  "source_workflow": {
+    "id": "445748e9-788e-4218-bc5e-09e7ec0df5af",
+    "revision": 0,
+    "last_node_id": 3,
+    "last_link_id": 2,
+    "nodes": [
+      {
+        "id": 2,
+        "type": "LoadImage",
+        "pos": [
+          481.6144784311822,
+          272.6199231393919
+        ],
+        "size": [
+          282.798828125,
+          314
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              1
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.18.1",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "Architecture.png",
+          "image"
+        ]
+      },
+      {
+        "id": 3,
+        "type": "LoadImage",
+        "pos": [
+          481.6144784311822,
+          641.862338134065
+        ],
+        "size": [
+          282.798828125,
+          314
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              2
+            ]
+          },
+          {
+            "name": "MASK",
+            "type": "MASK",
+            "links": null
+          }
+        ],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.18.1",
+          "Node name for S&R": "LoadImage"
+        },
+        "widgets_values": [
+          "BunnyExplorer.png",
+          "image"
+        ]
+      },
+      {
+        "id": 1,
+        "type": "PixaromaCompare",
+        "pos": [
+          859.3162020529888,
+          368.93345335413306
+        ],
+        "size": [
+          400,
+          454
+        ],
+        "flags": {},
+        "order": 2,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "image1",
+            "type": "IMAGE",
+            "link": 1
+          },
+          {
+            "name": "image2",
+            "type": "IMAGE",
+            "link": 2
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "Node name for S&R": "PixaromaCompare"
+        },
+        "widgets_values": []
+      }
+    ],
+    "links": [
+      [
+        1,
+        2,
+        0,
+        1,
+        0,
+        "IMAGE"
+      ],
+      [
+        2,
+        3,
+        0,
+        1,
+        1,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 1.1000000000000005,
+        "offset": [
+          -113.30574555220872,
+          -127.92169521329964
+        ]
+      },
+      "frontendVersion": "1.41.21",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "cfd17ee7fc6e9b72c919ea9a684e506edb2b67bb86fb655d066f4ff08b891e3a",
+  "workflow": {
+    "1": {
+      "inputs": {
+        "image1": [
+          "2",
+          0
+        ],
+        "image2": [
+          "3",
+          0
+        ]
+      },
+      "class_type": "PixaromaCompare",
+      "_meta": {
+        "title": "Image Compare Pixaroma"
+      }
+    },
+    "2": {
+      "inputs": {
+        "image": "Architecture.png"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    },
+    "3": {
+      "inputs": {
+        "image": "BunnyExplorer.png"
+      },
+      "class_type": "LoadImage",
+      "_meta": {
+        "title": "Load Image"
+      }
+    }
+  },
+  "sha256": "eed43f31e8a3973f10e585f4d0af1dde528a3926c74b2169927c2bcf8115783f",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

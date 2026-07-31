@@ -11,9 +11,20 @@ import { projectCoverUrl } from '../studio/mediaUrls'
 import { EmptyState, ErrorNotice } from '../components/Cards'
 import { PageHeader } from '../components/Page'
 import { StudioHomeHero } from '../components/StudioHomeHero'
+import { LocalPlanningAgentFieldset } from '../components/LocalPlanningAgentFieldset'
 import { ChapterIntakeForm } from '../components/ChapterIntakeForm'
 import { makeChapterIntakeDraft, type ChapterIntakeDraft } from '../components/chapterIntake'
+import {
+  localPlanningAgent,
+  type PlanningAgent,
+} from '../planningAgents'
 import type { PageId } from '../components/AppShell'
+import {
+  PROJECT_WORKFLOW_LANES,
+  projectWorkflowLaneLabel,
+  type ProjectWorkflowLane,
+} from '../workflowLanes'
+import '../workflow-lanes.css'
 /* PIXEL: Sites project-card density (also loaded last from main.tsx). */
 import '../projects-sites-density.css'
 
@@ -25,6 +36,9 @@ type ProjectsProps = {
   onOpenProjectPage?: (projectId: string, projectName: string, page: PageId) => void
   onProjectsLoaded?: (projects: Project[]) => void
   onNavigateStudio?: (page: PageId) => void
+  onContinueAgentless?: (planningAgent: PlanningAgent) => void
+  initialWorkflowLane?: ProjectWorkflowLane | null
+  initialPlanningAgent?: PlanningAgent
   /** Currently selected workspace project — used for the Gold "Current project" cover chip. */
   currentProjectId?: string | null
 }
@@ -41,6 +55,9 @@ type ProjectSummary = {
 type SourceMode = 'story' | 'blank' | 'import'
 
 type ProjectDraft = {
+  workflowLane: ProjectWorkflowLane | null
+  planningAgent: PlanningAgent
+  planningModelId: string | null
   name: string
   description: string
   sourceMode: SourceMode
@@ -55,7 +72,7 @@ type ProjectDraft = {
   visualStyle: string
   aspectRatio: string
   fps: number
-  productionProfileKey: 'ltx_base@1' | 'wan_base@1'
+  productionProfileKey: 'ltx_base@1' | 'ltx_base@2' | 'wan_base@1'
   stitchStage: 'phase7_before_audio' | 'phase8_before_foley'
   orchestrationMode: string
   privacy: string
@@ -78,6 +95,9 @@ function makeChapterIntakes(count: number, targetRuntime: number): ChapterIntake
 }
 
 const EMPTY_DRAFT: ProjectDraft = {
+  workflowLane: null,
+  planningAgent: 'qwen',
+  planningModelId: null,
   name: '',
   description: '',
   sourceMode: 'story',
@@ -103,6 +123,26 @@ const EMPTY_DRAFT: ProjectDraft = {
   narrationDialoguePreference: 'Non-diegetic narration with intentional silence; dialogue only when the story requires it.',
   sourceFidelityConstraints: '',
   contentConstraints: '',
+}
+
+function makeInitialDraft(
+  initialWorkflowLane: ProjectWorkflowLane | null,
+  initialPlanningAgent: PlanningAgent = 'qwen',
+): ProjectDraft {
+  return {
+    ...EMPTY_DRAFT,
+    chapterIntake: EMPTY_DRAFT.chapterIntake.map((chapter) => ({ ...chapter })),
+    workflowLane: initialWorkflowLane,
+    planningAgent: initialPlanningAgent,
+    ...(initialWorkflowLane === 'agentless'
+      ? {
+          productionProfileKey: 'ltx_base@2' as const,
+          fps: 24,
+          orchestrationMode: 'Manual',
+          privacy: 'Local only',
+        }
+      : {}),
+  }
 }
 
 const SOURCE_OPTIONS: { id: SourceMode; icon: string; title: string; detail: string }[] = [
@@ -197,8 +237,9 @@ function ProjectList({
   onOpenProjectPage,
   onProjectsLoaded,
   onNavigateStudio,
+  onContinueAgentless,
   currentProjectId,
-}: Pick<ProjectsProps, 'onCreateNew' | 'onOpenProject' | 'onOpenProjectPage' | 'onProjectsLoaded' | 'onNavigateStudio' | 'currentProjectId'>) {
+}: Pick<ProjectsProps, 'onCreateNew' | 'onOpenProject' | 'onOpenProjectPage' | 'onProjectsLoaded' | 'onNavigateStudio' | 'onContinueAgentless' | 'currentProjectId'>) {
   const [summaries, setSummaries] = useState<ProjectSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -259,13 +300,30 @@ function ProjectList({
     <div className="page projects-page">
       {onNavigateStudio ? (
         <StudioHomeHero
-          onCreateProject={async (prompt, idempotencyKey): Promise<SulphurProjectWorkspace> => {
+          onCreateProject={async (
+            prompt,
+            idempotencyKey,
+            planningAgent,
+            planningModelId,
+          ): Promise<SulphurProjectWorkspace> => {
             const workspace = await api.createProjectFromSulphur({
               idempotency_key: idempotencyKey,
               prompt,
+              workflow_lane: 'cineforge_studio',
+              planning_agent: planningAgent,
+              planning_model_id: planningModelId,
+              prompt_artifact_format: 'json',
+              prompt_schema_version: 'sineforge.local-planning-prompt/v1',
             })
             onOpenProject?.(workspace.project.id, workspace.project.name)
             return workspace
+          }}
+          onContinueAgentless={(planningAgent) => {
+            if (onContinueAgentless) {
+              onContinueAgentless(planningAgent)
+              return
+            }
+            onCreateNew?.()
           }}
           onNavigateStudio={(page) => {
             const target =
@@ -359,7 +417,13 @@ function ProjectList({
                     <button type="button" onClick={open}><h2>{project.name}</h2><p>{project.description || 'A CineForge production plan.'}</p></button>
                   </div>
                   <div className="project-meta">
-                    <span>{phaseLabel(story, snapshot)}</span><i /><span>{formatRuntime(snapshot?.target_duration_sec ?? story?.target_duration_sec ?? 300)} target</span><i /><span>16:9</span>
+                    <span className="project-workflow-lane">{projectWorkflowLaneLabel(project.workflow_lane)}</span>
+                    <i />
+                    <span>{phaseLabel(story, snapshot)}</span>
+                    <i />
+                    <span>{formatRuntime(snapshot?.target_duration_sec ?? story?.target_duration_sec ?? 300)} target</span>
+                    <i />
+                    <span>16:9</span>
                   </div>
                   <div className="project-readiness">
                     <span><b>{readiness}%</b> plan readiness</span>
@@ -403,9 +467,22 @@ function ProjectList({
   )
 }
 
-function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'onBackToProjects' | 'onOpenProject'>) {
+function NewProject({
+  onBackToProjects,
+  onOpenProject,
+  initialWorkflowLane,
+  initialPlanningAgent,
+}: Pick<
+  ProjectsProps,
+  | 'onBackToProjects'
+  | 'onOpenProject'
+  | 'initialWorkflowLane'
+  | 'initialPlanningAgent'
+>) {
   const [step, setStep] = useState(1)
-  const [draft, setDraft] = useState<ProjectDraft>(EMPTY_DRAFT)
+  const [draft, setDraft] = useState<ProjectDraft>(() =>
+    makeInitialDraft(initialWorkflowLane ?? null, initialPlanningAgent),
+  )
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const idempotencyKey = useRef(`project-workspace-${crypto.randomUUID()}`)
@@ -414,6 +491,29 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
 
   const update = <Key extends keyof ProjectDraft>(key: Key, value: ProjectDraft[Key]) => {
     setDraft((current) => ({ ...current, [key]: value }))
+  }
+
+  const selectWorkflowLane = (workflowLane: ProjectWorkflowLane) => {
+    setDraft((current) => ({
+      ...current,
+      workflowLane,
+      ...(workflowLane === 'agentless'
+        ? {
+            productionProfileKey: 'ltx_base@2',
+            fps: 24,
+            orchestrationMode: 'Manual',
+            privacy: 'Local only',
+          }
+        : current.workflowLane === 'agentless'
+          ? {
+              productionProfileKey: EMPTY_DRAFT.productionProfileKey,
+              fps: EMPTY_DRAFT.fps,
+              orchestrationMode: EMPTY_DRAFT.orchestrationMode,
+              privacy: EMPTY_DRAFT.privacy,
+            }
+          : {}),
+    }))
+    setError(null)
   }
 
   const setRuntime = (nextMinutes: number, nextSeconds: number) => {
@@ -470,6 +570,14 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
   }
 
   const validate = () => {
+    if (!draft.workflowLane) {
+      setError('Choose CineForge Studio Workflow or Agentless Workflow.')
+      return false
+    }
+    if (!draft.planningAgent) {
+      setError('Choose a local planning agent.')
+      return false
+    }
     if (step === 2 && draft.sourceMode !== 'blank' && !draft.baseStory.trim()) {
       setError(draft.sourceMode === 'import' ? 'Choose a source file or paste its contents.' : 'Add the source story, script, or treatment.')
       return false
@@ -493,11 +601,16 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
   const createProject = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!validate()) return
+    const workflowLane = draft.workflowLane
+    if (!workflowLane) return
     setSaving(true)
     setError(null)
     try {
       const dimensions = OUTPUT_DIMENSIONS[draft.aspectRatio] ?? OUTPUT_DIMENSIONS['16:9']
-      const hostedAllowed = draft.privacy === 'Hosted providers allowed'
+      const isAgentlessWorkflow = workflowLane === 'agentless'
+      const hostedAllowed =
+        !isAgentlessWorkflow && draft.privacy === 'Hosted providers allowed'
+      const shouldRunInitialPlan = draft.sourceMode !== 'blank'
       const autoTitle = !draft.name.trim()
       const workingTitle = draft.name.trim() || 'CineForge Production'
       const chapterIntake = draft.chapterIntake.slice(0, draft.requestedChapterCount).map((chapter, index) => ({
@@ -512,6 +625,11 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
       }))
       const workspace = await api.createProjectWorkspace({
         idempotency_key: idempotencyKey.current,
+        workflow_lane: workflowLane,
+        planning_agent: draft.planningAgent,
+        planning_model_id: draft.planningModelId,
+        prompt_artifact_format: 'json',
+        prompt_schema_version: 'sineforge.local-planning-prompt/v1',
         name: workingTitle,
         auto_title: autoTitle,
         description: draft.description.trim() || null,
@@ -531,25 +649,34 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
         content_constraints: draft.contentConstraints.trim() || null,
         requested_chapter_count: draft.requestedChapterCount,
         chapter_intake: chapterIntake,
-        run_phase_one: draft.sourceMode !== 'blank',
+        run_phase_one: shouldRunInitialPlan,
+        bootstrap_phase_plan: shouldRunInitialPlan,
+        auto_approve_phases_through: shouldRunInitialPlan ? 5 : null,
         aspect_ratio: draft.aspectRatio,
         preview_width: dimensions.preview[0],
         preview_height: dimensions.preview[1],
         final_width: dimensions.final[0],
         final_height: dimensions.final[1],
-        fps: draft.fps,
+        fps: isAgentlessWorkflow ? 24 : draft.fps,
         captions_enabled: true,
         audio_enabled: true,
-        production_profile_key: draft.productionProfileKey,
+        production_profile_key: isAgentlessWorkflow
+          ? 'ltx_base@2'
+          : draft.productionProfileKey,
         stitch_stage: draft.stitchStage,
         speaking_rate: 1,
         prefer_hosted_providers: hostedAllowed,
-        prefer_local_providers: draft.privacy !== 'Hosted providers allowed' || draft.orchestrationMode === 'Hybrid',
-        allow_model_download: true,
-        allow_rendering: true,
-        require_production_plan_approval: true,
-        orchestration_mode: draft.orchestrationMode,
-        privacy_preference: draft.privacy,
+        prefer_local_providers: isAgentlessWorkflow
+          ? true
+          : draft.privacy !== 'Hosted providers allowed' ||
+            draft.orchestrationMode === 'Hybrid',
+        allow_model_download: !isAgentlessWorkflow,
+        allow_rendering: !isAgentlessWorkflow,
+        require_production_plan_approval: !shouldRunInitialPlan,
+        orchestration_mode: isAgentlessWorkflow
+          ? 'deterministic_python'
+          : draft.orchestrationMode,
+        privacy_preference: isAgentlessWorkflow ? 'Local only' : draft.privacy,
         quality_preference: draft.qualityPreference,
         cost_sensitivity: draft.costSensitivity,
       })
@@ -567,6 +694,17 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
   )
   const chapterDurationTotal = visibleChapterIntake.reduce((total, chapter) => total + chapter.targetDurationSec, 0)
   const chapterRuntimeDelta = chapterDurationTotal - draft.targetRuntime
+  const isAgentless = draft.workflowLane === 'agentless'
+  const selectedPlanningAgent = localPlanningAgent(draft.planningAgent)
+  const submitLabel = saving
+    ? isAgentless
+      ? `${selectedPlanningAgent?.label ?? 'Local agent'} · drafting Phase 1…`
+      : 'Phase 1 · Drafting complete script…'
+    : isAgentless
+      ? `Create with ${selectedPlanningAgent?.label ?? 'local agent'}`
+      : draft.sourceMode === 'blank'
+        ? '✦ Create project shell'
+        : '✦ Create project & complete script'
 
   return (
     <form className="page new-project-page" onSubmit={createProject}>
@@ -587,7 +725,50 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
         <section className="wizard-panel">
           {step === 1 ? (
             <div className="wizard-section">
-              <div className="wizard-heading"><span>STEP 1 OF 3</span><h2>How should this project begin?</h2><p>Choose the intake path. A title is optional—CineForge can create the first working title from your prompt.</p></div>
+              <div className="wizard-heading"><span>STEP 1 OF 3</span><h2>Choose the workflow and project foundation</h2><p>Select how CineForge should operate, then choose the intake path. A title is optional.</p></div>
+              <fieldset className="workflow-lane-fieldset">
+                <legend>
+                  Project workflow <em>Required</em>
+                </legend>
+                <div className="workflow-lane-options">
+                  {PROJECT_WORKFLOW_LANES.map((option) => (
+                    <label className="workflow-lane-card" key={option.value}>
+                      <input
+                        type="radio"
+                        name="project-workflow-lane"
+                        value={option.value}
+                        checked={draft.workflowLane === option.value}
+                        required
+                        onChange={() => selectWorkflowLane(option.value)}
+                      />
+                      <span>
+                        <b>{option.label}</b>
+                        <small>{option.description}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              {draft.workflowLane ? (
+                <LocalPlanningAgentFieldset
+                  name="wizard-planning-agent"
+                  value={draft.planningAgent}
+                  onChange={(planningAgent) => update('planningAgent', planningAgent)}
+                  modelId={draft.planningModelId}
+                  onModelChange={(planningModelId, planningAgent) => {
+                    setDraft((current) => ({
+                      ...current,
+                      planningAgent,
+                      planningModelId,
+                    }))
+                  }}
+                  policyNote={
+                    draft.workflowLane === 'agentless'
+                      ? 'No hosted/API agents. The selected local LM Studio agent builds Phase 1; deterministic Python owns JSON scene manifests and rendering.'
+                      : 'Live LM Studio catalog. Select any installed local model; the list refreshes automatically.'
+                  }
+                />
+              ) : null}
               <div className="source-options">
                 {SOURCE_OPTIONS.map((option) => (
                   <button type="button" key={option.id} className={draft.sourceMode === option.id ? 'selected' : ''} onClick={() => update('sourceMode', option.id)}>
@@ -604,7 +785,15 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
 
           {step === 2 ? (
             <div className="wizard-section">
-              <div className="wizard-heading"><span>STEP 2 OF 3</span><h2>Give CineForge one creative prompt</h2><p>Phase 1 will expand it into a complete editable script, narration/dialogue structure, pacing plan, duration analysis, assumptions, and QA report. Scene and shot segmentation remains locked for Phase 2.</p></div>
+              <div className="wizard-heading">
+                <span>STEP 2 OF 3</span>
+                <h2>Give CineForge one creative prompt</h2>
+                <p>
+                  {draft.workflowLane === 'agentless'
+                    ? `${selectedPlanningAgent?.label ?? 'The selected local agent'} will build the editable Phase 1 package locally. Hosted/API agents remain blocked, and deterministic Python retains control of JSON scene manifests and rendering.`
+                    : 'Phase 1 will expand it into a complete editable script, narration/dialogue structure, pacing plan, duration analysis, assumptions, and QA report. Scene and shot segmentation remains locked for Phase 2.'}
+                </p>
+              </div>
               {draft.sourceMode === 'import' ? <label className="import-drop"><input type="file" accept=".txt,.md,.json,text/plain,application/json" onChange={(event) => void loadSource(event)} /><span>⇧</span><b>{draft.baseStory ? 'Source file loaded' : 'Choose a source file'}</b><small>TXT, Markdown, or JSON · the file stays in this browser until project creation</small></label> : null}
               {draft.sourceMode === 'blank' ? (
                 <div className="blank-start-note"><span>✦</span><span><b>Blank structure selected</b><p>The new project will open as an empty project shell so you can build without inherited story content.</p></span></div>
@@ -677,20 +866,30 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                 <label>Point of view<select value={draft.pointOfView} onChange={(event) => update('pointOfView', event.target.value)}><option>Third person</option><option>First person</option><option>Second person</option><option>Omniscient</option></select></label>
                 <label className="full-span">Visual style<input value={draft.visualStyle} onChange={(event) => update('visualStyle', event.target.value)} /></label>
                 <label>Aspect ratio<select value={draft.aspectRatio} onChange={(event) => update('aspectRatio', event.target.value)}><option>16:9</option><option>9:16</option><option>2.39:1</option><option>1:1</option></select></label>
-                <label>Frame rate<select value={draft.fps} onChange={(event) => update('fps', Number(event.target.value))}><option value="24">24 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
+                <label>Frame rate<select value={draft.fps} disabled={isAgentless} onChange={(event) => update('fps', Number(event.target.value))}><option value="24">24 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select></label>
                 <label>
                   Base-model profile
                   <select
                     value={draft.productionProfileKey}
+                    disabled={isAgentless}
                     onChange={(event) => update('productionProfileKey', event.target.value as ProjectDraft['productionProfileKey'])}
                   >
                     <option value="ltx_base@1">LTX Base v1 · qualified compatibility profile</option>
-                    <option value="wan_base@1">WAN Base v1 · runtime qualification required</option>
+                    <option value="ltx_base@2">
+                      {isAgentless
+                        ? 'Agentless scene reset · FLUX.2 + LTX-2.3'
+                        : 'LTX Base v2 · 8–15 second Sequence Sheet'}
+                    </option>
+                    <option value="wan_base@1" disabled>WAN Base v1 · on hold after failed dry run</option>
                   </select>
                   <small>
                     {draft.productionProfileKey === 'wan_base@1'
-                      ? 'WAN is saved with the project but rendering stays fail-closed until its exact workflow, models, nodes, and workstation pass admission.'
-                      : 'Preserves the current LTX rendering contract and remains the qualified default.'}
+                      ? 'WAN remains visible for existing projects, but it is disabled and cannot queue work while its failed dry run is on hold.'
+                      : isAgentless
+                        ? 'Compiles fresh multi-reference FLUX anchors and LTX-2.3 Ingredients plus first-frame I2V jobs. Execution remains fail-closed until exact workflows are admitted.'
+                        : draft.productionProfileKey === 'ltx_base@2'
+                        ? 'Uses one visible LTX request per 8–15 second Sequence Sheet row. Rendering stays fail-closed until the exact API workflow passes local qualification.'
+                        : 'Preserves the existing qualified 6–10 second LTX compatibility contract.'}
                   </small>
                 </label>
                 <label>
@@ -703,8 +902,8 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
                     <option value="phase8_before_foley">Phase 8 · materialize locked EDL before Foley</option>
                   </select>
                 </label>
-                <label>Orchestration<select value={draft.orchestrationMode} onChange={(event) => update('orchestrationMode', event.target.value)}><option>Hybrid</option><option>Automatic</option><option>Manual</option></select></label>
-                <label>Privacy preference<select value={draft.privacy} onChange={(event) => update('privacy', event.target.value)}><option>Prefer local for bulk work</option><option>Hosted providers allowed</option><option>Local only</option></select></label>
+                <label>Orchestration<select value={draft.orchestrationMode} disabled={isAgentless} onChange={(event) => update('orchestrationMode', event.target.value)}><option value="Hybrid">Hybrid</option><option value="Automatic">Automatic</option><option value="Manual">Deterministic Python + local agent planning</option></select></label>
+                <label>Privacy preference<select value={draft.privacy} disabled={isAgentless} onChange={(event) => update('privacy', event.target.value)}><option>Prefer local for bulk work</option><option>Hosted providers allowed</option><option>Local only</option></select></label>
                 <label>Quality preference<select value={draft.qualityPreference} onChange={(event) => update('qualityPreference', event.target.value)}><option>Quality weighted</option><option>Balanced</option><option>Speed weighted</option></select></label>
                 <label>Cost sensitivity<select value={draft.costSensitivity} onChange={(event) => update('costSensitivity', event.target.value)}><option>Balanced</option><option>Minimize hosted usage</option><option>Quality first</option></select></label>
                 <label className="full-span">Narration and dialogue preference<textarea value={draft.narrationDialoguePreference} onChange={(event) => update('narrationDialoguePreference', event.target.value)} /></label>
@@ -719,28 +918,48 @@ function NewProject({ onBackToProjects, onOpenProject }: Pick<ProjectsProps, 'on
           <footer className="wizard-actions">
             <button type="button" className="secondary-button" onClick={() => step === 1 ? onBackToProjects?.() : setStep((current) => current - 1)}>{step === 1 ? 'Cancel' : 'Back'}</button>
             <span>Step {step} of 3</span>
-            {step < 3 ? <button type="button" className="primary-button" onClick={() => validate() && setStep((current) => current + 1)}>Continue →</button> : <button type="submit" className="primary-button" disabled={saving}>{saving ? 'Phase 1 · Drafting complete script…' : draft.sourceMode === 'blank' ? '✦ Create project shell' : '✦ Create project & complete script'}</button>}
+            {step < 3 ? <button type="button" className="primary-button" onClick={() => validate() && setStep((current) => current + 1)}>Continue →</button> : <button type="submit" className="primary-button" disabled={saving}>{submitLabel}</button>}
           </footer>
         </section>
 
         <aside className="project-preview">
           <div className="preview-cover"><span className="cover-grid" /><span className="cover-orb orb-a" /><span className="cover-orb orb-b" /><b>{projectInitials(draft.name || 'New project')}</b><small>PROJECT PREVIEW</small></div>
-          <div className="preview-copy"><span className="eyebrow">PRODUCTION FOUNDATION</span><h2>{draft.name.trim() || 'Title generated from your prompt'}</h2><p>{draft.description.trim() || 'Your complete Phase 1 script will remain editable and unapproved.'}</p></div>
+          <div className="preview-copy"><span className="eyebrow">PRODUCTION FOUNDATION</span><h2>{draft.name.trim() || 'Title generated from your prompt'}</h2><p>{draft.description.trim() || (isAgentless ? 'Your source and deterministic production settings remain editable.' : 'Your complete Phase 1 script will remain editable and unapproved.')}</p></div>
           <dl>
+            <div><dt>Workflow</dt><dd>{draft.workflowLane ? projectWorkflowLaneLabel(draft.workflowLane) : 'Choose a workflow'}</dd></div>
             <div><dt>Source</dt><dd>{SOURCE_OPTIONS.find((option) => option.id === draft.sourceMode)?.title.replace('Start from a ', '')}</dd></div>
             <div><dt>Target runtime</dt><dd>{formatRuntime(draft.targetRuntime)}</dd></div><div><dt>Output</dt><dd>{draft.aspectRatio} · {draft.fps} fps</dd></div>
             <div><dt>Chapters</dt><dd>{draft.requestedChapterCount}</dd></div>
-            <div><dt>Base model</dt><dd>{draft.productionProfileKey === 'wan_base@1' ? 'WAN Base v1 · qualification required' : 'LTX Base v1'}</dd></div>
-            <div><dt>Mode</dt><dd>{draft.orchestrationMode}</dd></div><div><dt>Visual style</dt><dd>{draft.visualStyle}</dd></div>
+            <div>
+              <dt>Base model</dt>
+              <dd>
+                {isAgentless
+                  ? 'Agentless scene reset · FLUX.2 + LTX-2.3'
+                  : draft.productionProfileKey === 'wan_base@1'
+                  ? 'WAN Base v1 · on hold'
+                  : draft.productionProfileKey === 'ltx_base@2'
+                    ? 'LTX Base v2 · 8–15 s'
+                    : 'LTX Base v1'}
+              </dd>
+            </div>
+            <div><dt>Planning agent</dt><dd>{selectedPlanningAgent?.label ?? 'Qwen3 4B Hivemind'}</dd></div>
+            <div><dt>Mode</dt><dd>{isAgentless ? 'Local agent planning · deterministic production' : draft.orchestrationMode === 'Manual' ? 'Manual creative routing' : draft.orchestrationMode}</dd></div><div><dt>Visual style</dt><dd>{draft.visualStyle}</dd></div>
           </dl>
-          <div className="creation-boundary"><span>▣</span><p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–8 stay locked. No image, voice, video, audio, ComfyUI, FFmpeg, model-download, or render job can start.</p></div>
+          <div className="creation-boundary">
+            <span>▣</span>
+            {isAgentless ? (
+              <p><b>Local-only Agentless creation</b>The selected LM Studio agent builds Phase 1 using structured JSON prompts. Hosted/API agents stay blocked, and no rendering starts during creation.</p>
+            ) : (
+              <p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–8 stay locked. No image, voice, video, audio, ComfyUI, FFmpeg, model-download, or render job can start.</p>
+            )}
+          </div>
         </aside>
       </div>
-      {saving ? (
+      {saving && draft.sourceMode !== 'blank' ? (
         <div className="phase-one-progress" role="status" aria-live="polite">
           <div className="phase-one-progress-card">
             <span className="phase-one-spinner" aria-hidden="true" />
-            <div><span className="eyebrow">PHASE 1 OF EXACTLY 8</span><h2>Building your complete script</h2><p>CineForge is drafting the narrative package and running Phase 1 QA. Approval is never automatic.</p></div>
+            <div><span className="eyebrow">PHASE 1 OF EXACTLY 8</span><h2>Building your complete script</h2><p>{selectedPlanningAgent?.label ?? 'The selected local agent'} is drafting a structured JSON narrative package and running Phase 1 QA. Approval is never automatic.</p></div>
             <ol>
               <li className="active"><b>1</b><span>Script and Narrative Development<small>Drafting · QA pending</small></span></li>
               {[
@@ -768,10 +987,20 @@ export function Projects({
   onOpenProjectPage,
   onProjectsLoaded,
   onNavigateStudio,
+  onContinueAgentless,
+  initialWorkflowLane,
+  initialPlanningAgent,
   currentProjectId,
 }: ProjectsProps) {
   return mode === 'create'
-    ? <NewProject onBackToProjects={onBackToProjects} onOpenProject={onOpenProject} />
+    ? (
+      <NewProject
+        onBackToProjects={onBackToProjects}
+        onOpenProject={onOpenProject}
+        initialWorkflowLane={initialWorkflowLane}
+        initialPlanningAgent={initialPlanningAgent}
+      />
+    )
     : (
       <ProjectList
         onCreateNew={onCreateNew}
@@ -779,6 +1008,7 @@ export function Projects({
         onOpenProjectPage={onOpenProjectPage}
         onProjectsLoaded={onProjectsLoaded}
         onNavigateStudio={onNavigateStudio}
+        onContinueAgentless={onContinueAgentless}
         currentProjectId={currentProjectId}
       />
     )

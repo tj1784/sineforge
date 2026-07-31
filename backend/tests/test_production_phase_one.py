@@ -28,6 +28,7 @@ from backend.app.db.base import (
 )
 from backend.app.db.session import get_db
 from backend.app.main import app
+from backend.app.services import production_phases
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -40,10 +41,24 @@ PROMPT = (
 ).read_text(encoding="utf-8")
 
 
+@pytest.fixture(autouse=True)
+def deterministic_phase_one_baseline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep acceptance coverage independent from the workstation LM runtime."""
+
+    monkeypatch.setattr(
+        production_phases,
+        "_apply_sulphur_phase_one_enhancement",
+        lambda package, _payload, **_kwargs: package,
+    )
+
+
 def _workspace_payload(**overrides) -> dict:
     payload = {
         "idempotency_key": "transfiguration-phase-one-acceptance-001",
         "name": "Transfiguration Phase 1 Acceptance",
+        "workflow_lane": "cineforge_studio",
         "description": "A fresh one-prompt Phase 1 quality comparison.",
         "source_mode": "story",
         "story_title": "The Transfiguration — Fresh Phase 1",

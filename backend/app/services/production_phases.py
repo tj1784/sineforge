@@ -22,10 +22,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from backend.app.core.config import get_settings
-from backend.app.services.lm_studio_models import (
-    get_active_lm_studio_model_filename,
-    get_active_lm_studio_model_id,
-)
 from backend.app.db.base import (
     AuditLog,
     Chapter,
@@ -64,11 +60,16 @@ from backend.app.schemas.production import (
     ProductionPipelineRead,
     QAReportRead,
 )
+from backend.app.schemas.project_workflows import is_agentless_workflow_lane
 from backend.app.services.clip_planning import (
     MAX_CLIP_DURATION_SEC,
     MIN_CLIP_DURATION_SEC,
     NOMINAL_CLIP_DURATION_SEC,
     plan_scenes_for_duration,
+)
+from backend.app.services.lm_studio_models import (
+    get_active_lm_studio_model_filename,
+    get_active_lm_studio_model_id,
 )
 from backend.app.services.planning.sulphur_phase_one import enhance_phase_one_package
 
@@ -551,13 +552,26 @@ def _refresh_phase_one_metrics(
 def _apply_sulphur_phase_one_enhancement(
     package: dict[str, Any],
     payload: PhaseOneGenerationInput,
+    *,
+    required: bool = False,
 ) -> dict[str, Any]:
     """Use Sulphur when enabled, retaining the valid deterministic package on failure."""
 
     settings = get_settings()
-    active_model_id = get_active_lm_studio_model_id(settings)
+    selected_agent = payload.planning_agent
+    active_model_id = (
+        payload.planning_model_id
+        or get_active_lm_studio_model_id(settings)
+    )
     active_model_file = get_active_lm_studio_model_filename(settings)
-    if not (settings.sulphur_configured and settings.sulphur_phase_one_enabled):
+    if not (
+        settings.sulphur_planning_enabled
+        and settings.sulphur_phase_one_enabled
+    ):
+        if required:
+            raise ProductionPhaseError(
+                f"Selected local planning agent '{selected_agent}' is unavailable."
+            )
         return package
 
     enhanced_package = dict(package)
@@ -567,21 +581,28 @@ def _apply_sulphur_phase_one_enhancement(
             target_duration_sec=float(payload.target_duration_sec),
             creative_direction=dict(package.get("creative_direction") or {}),
             baseline_package=package,
+            model_id=active_model_id,
             settings=settings,
         )
         enhanced_package.update(enhancement)
         creative_direction = dict(enhanced_package.get("creative_direction") or {})
         creative_direction.update(
             {
-                "script_provider": "sulphur",
+                "script_provider": "local_lm_studio",
+                "planning_agent": selected_agent,
                 "script_model": active_model_id,
                 "script_model_file": active_model_file,
+                "prompt_artifact_format": payload.prompt_artifact_format,
+                "prompt_schema_version": payload.prompt_schema_version,
             }
         )
         enhanced_package["creative_direction"] = creative_direction
         enhanced_package["source_fidelity_notes"] = [
             *list(enhanced_package.get("source_fidelity_notes") or []),
-            "Script language was enhanced locally by Sulphur; deterministic QA remains authoritative.",
+            (
+                f"Script language was enhanced locally by {selected_agent}; "
+                "deterministic QA remains authoritative."
+            ),
         ]
         _refresh_phase_one_metrics(enhanced_package, payload)
         enhanced_qa = _qa_report(enhanced_package, payload)
@@ -593,20 +614,28 @@ def _apply_sulphur_phase_one_enhancement(
             "sulphur_phase_one_fallback error_type=%s",
             exc.__class__.__name__,
         )
+        if required:
+            raise ProductionPhaseError(
+                f"Selected local planning agent '{selected_agent}' did not "
+                "produce a valid structured JSON Phase 1 package."
+            ) from exc
         fallback = dict(package)
         creative_direction = dict(fallback.get("creative_direction") or {})
         creative_direction.update(
             {
                 "script_provider": "deterministic_fallback",
+                "planning_agent": selected_agent,
                 "script_model": active_model_id,
                 "script_model_file": active_model_file,
+                "prompt_artifact_format": payload.prompt_artifact_format,
+                "prompt_schema_version": payload.prompt_schema_version,
             }
         )
         fallback["creative_direction"] = creative_direction
         fallback["source_fidelity_notes"] = [
             *list(fallback.get("source_fidelity_notes") or []),
             (
-                "Sulphur was requested but its structured enhancement did not pass the "
+                f"{selected_agent} was requested but its structured enhancement did not pass the "
                 "Phase 1 contract; the deterministic source-faithful script was retained."
             ),
         ]
@@ -1154,10 +1183,55 @@ def generate_phase_one(
             details={"story_id": str(story.id), "approved": False},
         )
     )
-    package = _apply_sulphur_phase_one_enhancement(
-        _build_phase_one_package(story, payload),
-        payload,
+    project = db.get(Project, story.project_id)
+    local_agent_required = bool(
+        project is not None
+        and is_agentless_workflow_lane(project.workflow_lane)
     )
+    if local_agent_required:
+        project_settings = db.scalar(
+            select(ProjectStoryboardSettings).where(
+                ProjectStoryboardSettings.project_id == story.project_id
+            )
+        )
+        prompting_policy = (
+            dict(project_settings.prompting_policy_json or {})
+            if project_settings is not None
+            else {}
+        )
+        selected_agent = str(
+            prompting_policy.get("planning_agent") or "qwen"
+        )
+        if selected_agent not in {"qwen", "sulphur"}:
+            raise ProductionPhaseError(
+                "Agentless Phase 1 requires a valid persisted local planning "
+                "agent (qwen or sulphur)."
+            )
+        payload = payload.model_copy(
+            update={
+                "planning_agent": selected_agent,
+                "prompt_artifact_format": "json",
+                "prompt_schema_version": (
+                    "sineforge.local-planning-prompt/v1"
+                ),
+            }
+        )
+    package = _build_phase_one_package(story, payload)
+    package = _apply_sulphur_phase_one_enhancement(
+        package,
+        payload,
+        required=local_agent_required,
+    )
+    if local_agent_required:
+        creative_direction = dict(package.get("creative_direction") or {})
+        creative_direction.update(
+            {
+                "workflow_lane": project.workflow_lane,
+                "hosted_planning_agents_allowed": False,
+                "production_orchestrator": "deterministic_python",
+            }
+        )
+        package["creative_direction"] = creative_direction
     phase.lifecycle_state = "qa_pending"
     qa = _qa_report(package, payload)
     _persist_phase_one_version(
@@ -1717,12 +1791,13 @@ def _append_version(
     if not clean_label:
         raise ProductionPhaseError("Iteration label is required.")
     clean_notes = (notes or "").strip()
+    phase_id = phase.id
 
-    def _insert_once() -> ProductionPhaseVersion:
-        previous = _latest_version(db, phase.id)
+    def _insert_once(target_phase: ProductionPhase) -> ProductionPhaseVersion:
+        previous = _latest_version(db, target_phase.id)
         next_version = 1 if previous is None else previous.version_number + 1
         row = ProductionPhaseVersion(
-            production_phase_id=phase.id,
+            production_phase_id=target_phase.id,
             version_number=next_version,
             lifecycle_state=lifecycle_state,
             completed=completed,
@@ -1739,17 +1814,26 @@ def _append_version(
         )
         db.add(row)
         db.flush()
-        phase.current_version_number = next_version
-        if phase.lifecycle_state == "not_started":
-            phase.lifecycle_state = lifecycle_state
+        target_phase.current_version_number = next_version
+        if target_phase.lifecycle_state == "not_started":
+            target_phase.lifecycle_state = lifecycle_state
         return row
 
     try:
-        version = _insert_once()
-    except IntegrityError:
+        version = _insert_once(phase)
+    except IntegrityError as exc:
         db.rollback()
-        # Retry once after a concurrent version-number collision.
-        version = _insert_once()
+        # Retry once after a concurrent version-number collision or after a
+        # rollback expired the in-memory phase object. Re-fetching the phase is
+        # required for SQLite because a rollback can invalidate phase rows that
+        # were created earlier in the same transaction.
+        refreshed_phase = db.get(ProductionPhase, phase_id)
+        if refreshed_phase is None:
+            raise ProductionPhaseError(
+                "Production phase disappeared while appending a version; reload the phase contract."
+            ) from exc
+        phase = refreshed_phase
+        version = _insert_once(phase)
 
     db.add(
         AuditLog(
@@ -1783,6 +1867,21 @@ def ensure_phase_baselines(
     phases = phases or ensure_contract(db, story, commit=False)
     created: list[ProductionPhaseVersion] = []
     for phase in phases:
+        attached_phase = db.get(ProductionPhase, phase.id)
+        if attached_phase is None:
+            # The phase list may have been produced before a transaction
+            # rollback. Rebuild the canonical contract and continue with the
+            # live row for the same phase number.
+            phases = ensure_contract(db, story, commit=False)
+            attached_phase = next(
+                (item for item in phases if item.phase_number == phase.phase_number),
+                None,
+            )
+            if attached_phase is None:
+                raise ProductionPhaseError(
+                    f"Phase {phase.phase_number} is missing from the contract."
+                )
+        phase = attached_phase
         if _version_count(db, phase.id) > 0:
             continue
         snapshot = build_phase_snapshot(db, story, phase.phase_number)

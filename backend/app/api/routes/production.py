@@ -39,7 +39,9 @@ router = APIRouter(prefix="/production", tags=["production"])
 
 
 def _error(exc: production_phases.ProductionPhaseError) -> HTTPException:
-    if isinstance(exc, production_phases.ProductionPhaseConflictError):
+    if str(exc).startswith("workflow_lane_mismatch:"):
+        code = status.HTTP_409_CONFLICT
+    elif isinstance(exc, production_phases.ProductionPhaseConflictError):
         code = status.HTTP_409_CONFLICT
     elif str(exc) in {
         "Story not found.",

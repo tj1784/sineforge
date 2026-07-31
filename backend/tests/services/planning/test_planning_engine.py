@@ -34,7 +34,6 @@ from backend.app.schemas.orchestration import (
 )
 from backend.app.schemas.proposals import (
     ProposalApplyRequest,
-    ProposalReviewRequest,
     StoryboardProposalPayload,
 )
 from backend.app.services import proposal_apply, proposal_service, storyboard_snapshot
@@ -551,17 +550,6 @@ def test_real_planning_proposal_reviews_applies_idempotently_and_enqueues_nothin
     assert proposal.payload_hash == proposal.content_hash
     assert proposal.input_context_hash == proposal.base_content_hash
 
-    with pytest.raises(proposal_service.ProposalStateError, match="reviewed"):
-        proposal_apply.apply_proposal(
-            db_session,
-            proposal.id,
-            ProposalApplyRequest(applied_by="planner"),
-        )
-    proposal_service.review_proposal(
-        db_session,
-        proposal.id,
-        ProposalReviewRequest(reviewed_by="planner", notes="Reviewed nested plan."),
-    )
     applied = proposal_apply.apply_proposal(
         db_session,
         proposal.id,
@@ -591,11 +579,6 @@ def test_real_planning_proposal_reviews_applies_idempotently_and_enqueues_nothin
     assert engine.start_run(second_run.id).status == RunStatus.completed.value
     second_proposal = engine.get_run_detail(second_run.id)["proposals"][0]
     second_payload = StoryboardProposalPayload.model_validate(second_proposal.payload)
-    proposal_service.review_proposal(
-        db_session,
-        second_proposal.id,
-        ProposalReviewRequest(reviewed_by="planner", notes="Reviewed replacement plan."),
-    )
     second_applied = proposal_apply.apply_proposal(
         db_session,
         second_proposal.id,
@@ -659,11 +642,6 @@ def test_proposal_apply_creates_truthful_draft_without_superseding_last_approval
     )
     assert engine.start_run(run.id).status == RunStatus.completed.value
     proposal = engine.get_run_detail(run.id)["proposals"][0]
-    proposal_service.review_proposal(
-        db_session,
-        proposal.id,
-        ProposalReviewRequest(reviewed_by="producer"),
-    )
     result = proposal_apply.apply_proposal(
         db_session,
         proposal.id,

@@ -22,6 +22,7 @@ from backend.app.schemas.production import PhaseApproveRequest, PhaseOneGenerati
 from backend.app.services import production_phases
 from backend.app.services.sulphur_storyboard_bootstrap import bootstrap_from_phase_one
 from backend.app.services.storyboard_settings import (
+    apply_workflow_lane_policy,
     default_settings_values,
     production_profile_settings_values,
 )
@@ -136,8 +137,53 @@ def _chapter_guidance_text(payload: ProjectWorkspaceCreate) -> str:
     return "\n".join(lines)
 
 
+def _planning_prompt_artifact(payload: ProjectWorkspaceCreate) -> dict:
+    """Build the canonical JSON prompt artifact retained with project policy."""
+
+    agentless = payload.workflow_lane.value == "agentless"
+    return {
+        "schema_version": payload.prompt_schema_version,
+        "artifact_format": payload.prompt_artifact_format,
+        "artifact_filename": "project-planning-prompt.json",
+        "workflow_lane": payload.workflow_lane.value,
+        "planning_agent": payload.planning_agent,
+        "planning_model_id": payload.planning_model_id,
+        "source": {
+            "mode": payload.source_mode,
+            "user_text": payload.base_story,
+        },
+        "project": {
+            "title": payload.name,
+            "description": payload.description,
+            "target_duration_sec": payload.target_duration_sec,
+            "audience": payload.audience,
+            "genre": payload.genre,
+            "tone": payload.tone,
+            "point_of_view": payload.point_of_view,
+            "visual_style": payload.visual_style,
+            "language": payload.language,
+        },
+        "chapters": [
+            item.model_dump(mode="json") for item in payload.chapter_intake
+        ],
+        "execution_policy": {
+            "hosted_agents_allowed": (
+                False if agentless else payload.prefer_hosted_providers
+            ),
+            "local_planning_runtime": "lm_studio",
+            "production_orchestrator": (
+                "deterministic_python"
+                if agentless
+                else payload.orchestration_mode
+            ),
+            "rendering_during_creation": False,
+        },
+    }
+
+
 def _new_settings(project_id, payload: ProjectWorkspaceCreate) -> ProjectStoryboardSettings:
-    values = default_settings_values()
+    agentless = payload.workflow_lane.value == "agentless"
+    values = default_settings_values(payload.workflow_lane)
     values.update(
         {
             "aspect_ratio": payload.aspect_ratio,
@@ -160,9 +206,33 @@ def _new_settings(project_id, payload: ProjectWorkspaceCreate) -> ProjectStorybo
             ),
         }
     )
+    prompt_artifact = _planning_prompt_artifact(payload)
+    prompt_artifact_bytes = json.dumps(
+        prompt_artifact,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
     values["prompting_policy_json"] = {
         **values["prompting_policy_json"],
         "orchestration_mode": payload.orchestration_mode,
+        "planning_agent": payload.planning_agent,
+        "planning_model_id": payload.planning_model_id,
+        "planning_mode": "local_lm_studio",
+        "local_planning_agent_required": agentless,
+        "hosted_planning_agents_allowed": (
+            False if agentless else payload.prefer_hosted_providers
+        ),
+        "prompt_artifact_format": payload.prompt_artifact_format,
+        "prompt_schema_version": payload.prompt_schema_version,
+        "prompt_artifact_filename": "project-planning-prompt.json",
+        "prompt_artifact_url": (
+            f"/projects/{project_id}/planning-prompt.json"
+        ),
+        "prompt_artifact_sha256": hashlib.sha256(
+            prompt_artifact_bytes
+        ).hexdigest(),
+        "prompt_artifact": prompt_artifact,
         "privacy_preference": payload.privacy_preference,
         "quality_preference": payload.quality_preference,
         "cost_sensitivity": payload.cost_sensitivity,
@@ -174,6 +244,7 @@ def _new_settings(project_id, payload: ProjectWorkspaceCreate) -> ProjectStorybo
         "auto_approve_phases_through": payload.auto_approve_phases_through,
     }
     values.update(production_profile_settings_values(payload.production_profile_key))
+    values = apply_workflow_lane_policy(values, payload.workflow_lane)
     return ProjectStoryboardSettings(project_id=project_id, **values)
 
 
@@ -204,7 +275,11 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
 
     try:
         workspace_title = _derived_title(payload.base_story) if payload.auto_title else payload.name
-        project = Project(name=workspace_title, description=payload.description)
+        project = Project(
+            name=workspace_title,
+            description=payload.description,
+            workflow_lane=payload.workflow_lane.value,
+        )
         db.add(project)
         db.flush()
 
@@ -223,6 +298,10 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
                 story.id,
                 PhaseOneGenerationInput(
                     original_prompt=payload.base_story,
+                    planning_agent=payload.planning_agent,
+                    planning_model_id=payload.planning_model_id,
+                    prompt_artifact_format=payload.prompt_artifact_format,
+                    prompt_schema_version=payload.prompt_schema_version,
                     target_duration_sec=payload.target_duration_sec,
                     audience=payload.audience,
                     genre=payload.genre,
@@ -247,6 +326,11 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
         if payload.bootstrap_phase_plan:
             if not isinstance(phase_one_package, dict):
                 raise RuntimeError("Phase plan bootstrap requires a generated Phase 1 package.")
+            agent_label = (
+                "Qwen3 4B Hivemind"
+                if payload.planning_agent == "qwen"
+                else "Sulphur 2 Base"
+            )
             bootstrap_from_phase_one(
                 db,
                 story,
@@ -255,20 +339,26 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
                 chapter_intake=[
                     item.model_dump(mode="json") for item in payload.chapter_intake
                 ],
-                created_by="sulphur_bootstrap",
+                created_by=f"{payload.planning_agent}_bootstrap",
             )
 
         if payload.auto_approve_phases_through:
+            agent_label = (
+                "Qwen3 4B Hivemind"
+                if payload.planning_agent == "qwen"
+                else "Sulphur 2 Base"
+            )
             for phase_number in range(1, payload.auto_approve_phases_through + 1):
                 production_phases.approve_phase(
                     db,
                     story.id,
                     phase_number,
                     PhaseApproveRequest(
-                        approved_by="Sulphur bootstrap",
+                        approved_by=f"{agent_label} local bootstrap",
                         notes=(
                             f"Auto-approved Phase {phase_number} as an initial local/private "
-                            "Sulphur planning baseline. User review and regeneration remain available."
+                            f"{agent_label} planning baseline. User review and regeneration "
+                            "remain available."
                         ),
                     ),
                     commit=False,

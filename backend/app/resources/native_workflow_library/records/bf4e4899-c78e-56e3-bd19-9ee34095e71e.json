@@ -1,0 +1,176 @@
+{
+  "schema": "sineforge.api-caller-workflow.v1",
+  "id": "bf4e4899-c78e-56e3-bd19-9ee34095e71e",
+  "name": "Paint Pixaroma Workflow",
+  "version": "1.0",
+  "description": "Paint Pixaroma Workflow is a paint & spatial tools workflow designed to prepare image guidance with interactive paint or spatial controls using the models configured in the graph. Its 2-node graph exposes 0 prompt/text field(s), 0 media input target(s), and 1 save/preview stage(s), while preserving the original editor-format graph for reference. The ComfyUI editor graph was converted to API format and is ready for live validation against the connected node and model registry.",
+  "category": "Image Editing & Composition",
+  "subcategory": "Paint & spatial tools",
+  "episode": "EP11",
+  "instructions": "1. Open the workflow and select Validate. SineForge will compare every node class and input against the currently connected ComfyUI instance without queueing it.\n2. Confirm that any model selectors in the editable inputs resolve to files available in the main ComfyUI installation.\n3. No required media file was detected in the converted graph; begin with the prompt and generation controls.\n4. Check image order, masks, crop/resize behavior, denoise strength, and edit prompt. Preview the mask or composite before spending time on the final sample.\n5. Save a copy before making structural changes. Use Editable inputs for normal parameters and Raw API JSON only when you need to inspect or change graph wiring.\n6. Validate again after every change. Queue one workflow only after validation passes; then inspect the returned output, logs, duration, dimensions, and media integrity.",
+  "tags": [
+    "EP11",
+    "Image Editing & Composition",
+    "Paint & spatial tools"
+  ],
+  "requirements": {
+    "custom_node_root": "C:\\ComfyUI\\LTX\\ComfyUI\\ComfyUI\\custom_nodes",
+    "custom_node_packs": [
+      "Pixaroma"
+    ],
+    "unresolved_node_classes": [],
+    "node_classes": [
+      "PixaromaPaint",
+      "PreviewImage"
+    ],
+    "model_files": [],
+    "media_inputs": [],
+    "prompt_field_count": 0,
+    "output_node_count": 1,
+    "documentation_notes": null
+  },
+  "workflow_status": "converted",
+  "repository_managed": true,
+  "is_overridden": false,
+  "source_kind": "repository_workflow_pack",
+  "source_id": "workflow-pack:ep11 workflows/ep11 workflows/paint pixaroma workflow.json",
+  "source_filename": "Paint Pixaroma Workflow.json",
+  "source_archive": "Ep11 Workflows.zip",
+  "source_entry": "Ep11 Workflows/Ep11 Workflows/Paint Pixaroma Workflow.json",
+  "source_workflow": {
+    "id": "80ceab5b-a0d7-438e-b586-d713da768a19",
+    "revision": 0,
+    "last_node_id": 6,
+    "last_link_id": 5,
+    "nodes": [
+      {
+        "id": 2,
+        "type": "PreviewImage",
+        "pos": [
+          881.7673567459316,
+          364.7295235888603
+        ],
+        "size": [
+          435.06181271771015,
+          477.7692603124358
+        ],
+        "flags": {},
+        "order": 1,
+        "mode": 0,
+        "inputs": [
+          {
+            "name": "images",
+            "type": "IMAGE",
+            "link": 5
+          }
+        ],
+        "outputs": [],
+        "properties": {
+          "cnr_id": "comfy-core",
+          "ver": "0.18.1",
+          "Node name for S&R": "PreviewImage"
+        },
+        "widgets_values": []
+      },
+      {
+        "id": 6,
+        "type": "PixaromaPaint",
+        "pos": [
+          468.9142878381616,
+          364.7295235888603
+        ],
+        "size": [
+          400,
+          310
+        ],
+        "flags": {},
+        "order": 0,
+        "mode": 0,
+        "inputs": [],
+        "outputs": [
+          {
+            "name": "IMAGE",
+            "type": "IMAGE",
+            "links": [
+              5
+            ]
+          },
+          {
+            "name": "WIDTH",
+            "type": "INT",
+            "links": null
+          },
+          {
+            "name": "HEIGHT",
+            "type": "INT",
+            "links": null
+          }
+        ],
+        "properties": {
+          "Node name for S&R": "PixaromaPaint"
+        },
+        "widgets_values": [
+          "{}",
+          null
+        ]
+      }
+    ],
+    "links": [
+      [
+        5,
+        6,
+        0,
+        2,
+        0,
+        "IMAGE"
+      ]
+    ],
+    "groups": [],
+    "config": {},
+    "extra": {
+      "ds": {
+        "scale": 1.3310000000000008,
+        "offset": [
+          -275.4443958745989,
+          -208.92091615524592
+        ]
+      },
+      "frontendVersion": "1.41.21",
+      "VHS_latentpreview": false,
+      "VHS_latentpreviewrate": 0,
+      "VHS_MetadataImage": true,
+      "VHS_KeepIntermediate": true
+    },
+    "version": 0.4
+  },
+  "source_workflow_sha256": "ccfc71e84f3902b944ccfe4ac5089e329016be734a8d285ce8caacf0c1cb8125",
+  "workflow": {
+    "2": {
+      "inputs": {
+        "images": [
+          "6",
+          0
+        ]
+      },
+      "class_type": "PreviewImage",
+      "_meta": {
+        "title": "Preview Image"
+      }
+    },
+    "6": {
+      "inputs": {
+        "Open Paint": "{}",
+        "PaintWidget": {
+          "paint_json": "{}"
+        }
+      },
+      "class_type": "PixaromaPaint",
+      "_meta": {
+        "title": "Paint Pixaroma"
+      }
+    }
+  },
+  "sha256": "1a774077ec6beacd9fe69a6c53fb7beda496090cce30c6b529c5b9e6ce0bdf4d",
+  "created_at": "2026-07-30T00:00:00+00:00",
+  "updated_at": "2026-07-30T00:00:00+00:00"
+}

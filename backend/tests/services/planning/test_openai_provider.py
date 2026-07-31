@@ -86,6 +86,25 @@ def _openai_success_body(payload: dict[str, Any], *, usage: dict[str, int] | Non
     return json.dumps(envelope).encode("utf-8")
 
 
+def _openai_text_body(content: str, *, usage: dict[str, int] | None = None) -> bytes:
+    envelope = {
+        "id": "chatcmpl-test",
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "message": {
+                    "role": "assistant",
+                    "content": content,
+                },
+            }
+        ],
+        "usage": usage
+        or {"prompt_tokens": 11, "completion_tokens": 22, "total_tokens": 33},
+    }
+    return json.dumps(envelope).encode("utf-8")
+
+
 def _mock_client(response: httpx.Response) -> MagicMock:
     client = MagicMock()
     client.post.return_value = response
@@ -157,14 +176,18 @@ def test_mock_remains_default_when_openai_not_configured() -> None:
     assert isinstance(provider, MockPlanningProvider)
 
 
-def test_registry_marks_stubs_not_implemented() -> None:
-    settings = Settings(openai_planning_enabled=False)
+def test_registry_marks_stubs_not_implemented(tmp_path) -> None:
+    settings = Settings(
+        openai_planning_enabled=False,
+        sulphur_planning_enabled=False,
+        qwen_model_path=tmp_path / "missing-qwen.gguf",
+    )
     status = {d.provider_identifier: d.availability_status for d in describe_providers(settings)}
     assert status["mock"] == ProviderAvailability.available
     assert status["openai"] == ProviderAvailability.not_configured
     assert status["anthropic"] == ProviderAvailability.not_implemented
     assert status["xai"] == ProviderAvailability.not_implemented
-    assert status["qwen"] == ProviderAvailability.not_implemented
+    assert status["qwen"] == ProviderAvailability.not_configured
     assert status["local_cli"] == ProviderAvailability.not_implemented
     assert status["custom"] == ProviderAvailability.not_implemented
 
@@ -456,3 +479,147 @@ def test_shot_list_validation_requires_positive_duration() -> None:
     assert result.status == "failed"
     assert result.error is not None
     assert result.error.category == FailureCategory.validation
+
+
+def test_prompt_package_request_compacts_previous_output_for_local_context() -> None:
+    provider = OpenAIPlanningProvider(api_key="sk-test-key-not-real")
+    long_text = "dense shot detail " * 400
+    previous_output = {
+        "shots": [
+            {
+                "order_index": 0,
+                "duration_sec": 8,
+                "title": "Opening beat",
+                "description": long_text,
+                "camera_movement": long_text,
+                "key_actions": [long_text, long_text],
+                "visual_cues": [long_text],
+            }
+        ],
+        "scenes": [{"scene_id": "scene-1", "title": "Scene", "description": long_text}],
+        "characters": [{"name": "Lead", "description": long_text}],
+        "task:shot_list": {"summary": long_text, "shots": [{"description": long_text}]},
+        "task:scene_breakdown": {"summary": long_text, "scenes": [{"description": long_text}]},
+    }
+
+    body = provider._build_request_body(
+        _request(
+            task_type=PlanningTaskType.prompt_package,
+            previous_output=previous_output,
+        ),
+        resolved_model="qwen3-4b",
+    )
+    user_payload = json.loads(body["messages"][1]["content"])
+    compact = user_payload["previous_output"]
+
+    assert set(compact) == {"shots", "scenes", "characters"}
+    assert compact["shots"][0]["description"] == long_text[:280]
+    assert not any(key.startswith("task:") for key in compact)
+    assert len(json.dumps(body)) < 12_000
+
+
+def test_prompt_package_accepts_plain_text_prompt_response() -> None:
+    prompt_text = "cinematic wide shot, natural light, full body framing, realistic motion"
+    req_obj = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    response = httpx.Response(200, content=_openai_text_body(prompt_text), request=req_obj)
+    client = _mock_client(response)
+    provider = _provider_with_client(client)
+
+    result = provider.invoke(
+        _request(
+            task_type=PlanningTaskType.prompt_package,
+            previous_output={
+                "shots": [
+                    {"order_index": 0, "title": "Opening"},
+                    {"order_index": 1, "title": "Second beat"},
+                ]
+            },
+        )
+    )
+
+    assert result.status == "succeeded"
+    assert result.finish_category == "plain_text_prompt_wrapped"
+    assert result.payload["prompt_packages"] == [
+        {
+            "shot_order_index": 0,
+            "image_prompt": prompt_text,
+            "video_prompt": prompt_text,
+            "source_format": "plain_text_response",
+            "shot_title": "Opening",
+        },
+        {
+            "shot_order_index": 1,
+            "image_prompt": prompt_text,
+            "video_prompt": prompt_text,
+            "source_format": "plain_text_response",
+            "shot_title": "Second beat",
+        },
+    ]
+
+
+def test_production_proposal_request_sends_digest_not_full_prompt_packages() -> None:
+    provider = OpenAIPlanningProvider(api_key="sk-test-key-not-real")
+    long_prompt = "very long prompt package detail " * 500
+    previous_output = {
+        "shots": [
+            {
+                "order_index": index,
+                "duration_sec": 8,
+                "title": f"Shot {index}",
+                "description": long_prompt,
+            }
+            for index in range(10)
+        ],
+        "prompt_packages": [
+            {
+                "shot_order_index": index,
+                "image_prompt": long_prompt,
+                "video_prompt": long_prompt,
+            }
+            for index in range(10)
+        ],
+        "task:prompt_package": {"prompt_packages": [{"image_prompt": long_prompt}]},
+    }
+
+    body = provider._build_request_body(
+        _request(
+            task_type=PlanningTaskType.production_proposal,
+            previous_output=previous_output,
+        ),
+        resolved_model="qwen3-4b",
+    )
+    user_payload = json.loads(body["messages"][1]["content"])
+    compact = user_payload["previous_output"]
+
+    assert compact["source_counts"]["shots"] == 10
+    assert compact["source_counts"]["prompt_packages"] == 10
+    assert "prompt_packages" not in compact
+    assert "prompt_package_coverage" in compact
+    assert long_prompt not in json.dumps(body)
+    assert len(json.dumps(body)) < 10_000
+
+
+def test_http_400_reports_provider_message() -> None:
+    req_obj = httpx.Request("POST", "http://127.0.0.1:1234/v1/chat/completions")
+    response = httpx.Response(
+        400,
+        content=json.dumps(
+            {
+                "error": (
+                    'Engine protocol predict request returned 400: '
+                    '{"error":{"message":"request (5376 tokens) exceeds the available context size (5120 tokens)"}}'
+                )
+            }
+        ).encode("utf-8"),
+        request=req_obj,
+    )
+    client = _mock_client(response)
+    provider = _provider_with_client(client)
+
+    result = provider.invoke(_request(task_type=PlanningTaskType.prompt_package))
+
+    assert result.status == "failed"
+    assert result.error is not None
+    assert result.error.category == FailureCategory.validation
+    assert "exceeds the available context size" in result.error.message
+    assert result.error.details["http_status"] == 400

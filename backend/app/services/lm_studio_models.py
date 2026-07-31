@@ -53,7 +53,7 @@ def _known_models(settings: Settings) -> tuple[_KnownModel, ...]:
         _KnownModel(
             model_id=settings.qwen_model_id,
             key=settings.qwen_model_id,
-            display_name="Qwen 3.6 40B · Deckard Heretic · Q4_K_S",
+            display_name="Qwen3 4B Hivemind · Heretic · Q4_K_M",
             path=settings.qwen_model_path,
             publisher="DavidAU",
         ),
@@ -107,11 +107,11 @@ def _write_selection(
 
 
 def get_active_lm_studio_model_id(settings: Settings | None = None) -> str:
-    """Return the persisted runtime selection or the configured Sulphur fallback."""
+    """Return the persisted runtime selection or the configured Qwen fallback."""
 
     cfg = settings or get_settings()
     selection = _read_selection(cfg)
-    return str(selection["model_id"]) if selection else cfg.sulphur_model_id
+    return str(selection["model_id"]) if selection else cfg.qwen_model_id
 
 
 def get_active_lm_studio_model_filename(settings: Settings | None = None) -> str:
@@ -125,7 +125,7 @@ def get_active_lm_studio_model_filename(settings: Settings | None = None) -> str
         for known in _known_models(cfg):
             if selected_id == known.model_id:
                 return known.path.name
-    return cfg.sulphur_model_path.name
+    return cfg.qwen_model_path.name
 
 
 class LMStudioUnavailableError(RuntimeError):
@@ -180,7 +180,7 @@ class LMStudioModelService:
                 quantization=(
                     "Q8_0"
                     if known.model_id == self.settings.sulphur_model_id
-                    else "Q4_K_S"
+                    else "Q4_K_M"
                 ),
                 size_bytes=known.path.stat().st_size if known.path.is_file() else None,
                 installed=known.path.is_file(),
@@ -311,7 +311,7 @@ class LMStudioModelService:
                 status="unavailable",
                 reachable=False,
                 active_model_id=active_model_id,
-                configured_model_id=self.settings.sulphur_model_id,
+                configured_model_id=self.settings.qwen_model_id,
                 models=fallback,
                 error=str(exc),
             )
@@ -349,7 +349,7 @@ class LMStudioModelService:
             status="ok",
             reachable=True,
             active_model_id=active_model_id,
-            configured_model_id=self.settings.sulphur_model_id,
+            configured_model_id=self.settings.qwen_model_id,
             models=combined,
         )
 
@@ -390,16 +390,11 @@ class LMStudioModelService:
             ),
             requested.loaded_instance_ids[0] if requested.loaded_instance_ids else None,
         )
-        known_model_ids = {known.model_id for known in _known_models(self.settings)}
         previous_models = [
             model
             for model in live_models
             if model.key != requested.key
             and model.loaded
-            and bool(
-                {model.key, model.model_id, *model.loaded_instance_ids}
-                & known_model_ids
-            )
         ]
         unloaded_previous: list[LMStudioModelRead] = []
         load_time_seconds: float | None = None

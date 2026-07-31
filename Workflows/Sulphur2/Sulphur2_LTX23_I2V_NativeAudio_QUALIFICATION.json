@@ -1,0 +1,57 @@
+{
+  "schema_version": "sineforge.workflow-qualification/v1",
+  "qualified_at": "2026-07-29",
+  "workflow": {
+    "name": "ltx-i2v",
+    "version": "1.0",
+    "path": "Workflows/Sulphur2/Sulphur2_LTX23_I2V_NativeAudio_API.json",
+    "canonical_sha256": "c928366ccf42a2d47a81a51c478079c385d1d6e72fe50ed8ff96d51c4dbb68bc",
+    "file_sha256": "c6a4427aea4ab43852f517af1ad3a6b26247d3fdab37edc38d118140ed8acc98",
+    "api_format": true,
+    "native_audio": true
+  },
+  "runtime": {
+    "comfyui_commit": "a8c44f9b2a0678ac4082e3529a3f43db7472acfe",
+    "video_model": "sulphur2BaseQuants_dev.safetensors",
+    "text_encoder": "gemma_3_12B_it_fp8_e4m3fn.safetensors",
+    "fps": 24
+  },
+  "qualification_runs": [
+    {
+      "gate": "8-second",
+      "prompt_id": "26f03ef1-6237-4916-96f9-848a707a3825",
+      "output": "cineforge/23e4f49a-4d70-400f-ad2b-d37baac75dfc/ltx_sequence/qualification_8s_00001_.mp4",
+      "duration_sec": 8.041667,
+      "frames": 193,
+      "resolution": "768x512",
+      "audio": "AAC 48kHz stereo",
+      "sha256": "f80572b737befa36df1b3a8373073d7fa3807a765a8cc5a6d6b0db45a721f415"
+    },
+    {
+      "gate": "15-second",
+      "prompt_id": "723b2249-0fa9-49ce-95af-e74a42e102e9",
+      "output": "cineforge/23e4f49a-4d70-400f-ad2b-d37baac75dfc/ltx_sequence/qualification_15s_00001_.mp4",
+      "duration_sec": 15.041667,
+      "frames": 361,
+      "resolution": "512x320",
+      "audio": "AAC 48kHz stereo",
+      "sha256": "3dd2fdc1d3baa2632bad910ef4da6e70354b64a55a426dbb397d92fcb8fe136f"
+    },
+    {
+      "gate": "two-row-last-frame-continuation",
+      "prompt_id": "b255a109-d31d-44e4-93f3-c4d5d9157bcb",
+      "output": "cineforge/23e4f49a-4d70-400f-ad2b-d37baac75dfc/ltx_sequence/qualification_continuation_row2_8s_00001_.mp4",
+      "duration_sec": 8.041667,
+      "frames": 193,
+      "resolution": "512x320",
+      "audio": "AAC 48kHz stereo",
+      "handoff_verified": true,
+      "sha256": "0aa40ac21b854959fe51ebcdd2ba847f73cd06e9443f0dc0429c6149069d5772"
+    }
+  ],
+  "result": {
+    "runtime_qualified": true,
+    "production_profile": "ltx_base@2",
+    "notes": "All three local gates completed. Preserve native audio during final LTX assembly; WAN Phase 8 is not part of this lane."
+  }
+}

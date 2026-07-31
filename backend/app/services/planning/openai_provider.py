@@ -52,6 +52,141 @@ _SYSTEM_RULES = (
 )
 
 
+def _trim_text(value: Any, limit: int) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return text[:limit]
+
+
+def _compact_value(
+    value: Any,
+    *,
+    string_limit: int = 260,
+    list_limit: int = 24,
+    depth: int = 0,
+) -> Any:
+    if value is None or isinstance(value, (bool, int, float)):
+        return value
+    if isinstance(value, str):
+        return value[:string_limit]
+    if depth >= 4:
+        return str(value)[:string_limit]
+    if isinstance(value, list):
+        return [
+            _compact_value(
+                item,
+                string_limit=string_limit,
+                list_limit=list_limit,
+                depth=depth + 1,
+            )
+            for item in value[:list_limit]
+        ]
+    if isinstance(value, dict):
+        compact: dict[str, Any] = {}
+        for key, child in value.items():
+            key_text = str(key)
+            if key_text.startswith("task:"):
+                continue
+            compact[key_text] = _compact_value(
+                child,
+                string_limit=string_limit,
+                list_limit=list_limit,
+                depth=depth + 1,
+            )
+        return compact
+    return str(value)[:string_limit]
+
+
+def _compact_items(
+    items: Any,
+    keys: tuple[str, ...],
+    *,
+    item_limit: int = 48,
+    string_limit: int = 260,
+) -> list[dict[str, Any]]:
+    compacted: list[dict[str, Any]] = []
+    source_items = (items or [])[:item_limit] if isinstance(items, list) else []
+    for item in source_items:
+        if not isinstance(item, dict):
+            continue
+        row: dict[str, Any] = {}
+        for key in keys:
+            if key not in item:
+                continue
+            value = _compact_value(
+                item.get(key),
+                string_limit=string_limit,
+                list_limit=10,
+                depth=0,
+            )
+            if value not in (None, "", [], {}):
+                row[key] = value
+        if row:
+            compacted.append(row)
+    return compacted
+
+
+def _plain_text_prompt_payload(
+    request: ProviderRequestContract,
+    content: str,
+) -> dict[str, Any] | None:
+    """Wrap useful plain prompt text for task phases where JSON is optional.
+
+    SineForge still needs structured outputs for hierarchy-producing phases
+    such as scenes and shots.  Prompt package generation is different: a local
+    model may return a perfectly usable prompt paragraph even when it ignores
+    JSON formatting.  Treat that as a soft-format issue instead of exhausting
+    repair attempts.
+    """
+
+    if request.task_type != PlanningTaskType.prompt_package:
+        return None
+
+    text = " ".join(str(content).strip().split())
+    if not text:
+        return None
+
+    image_prompt = text[:4000]
+    video_prompt = text[:4000]
+    prompt_packages: list[dict[str, Any]] = []
+
+    previous = request.previous_output if isinstance(request.previous_output, dict) else {}
+    shots = previous.get("shots") if isinstance(previous, dict) else None
+    if not isinstance(shots, list):
+        task_shots = previous.get("task:shot_list") if isinstance(previous, dict) else None
+        shots = task_shots.get("shots") if isinstance(task_shots, dict) else None
+    shot_rows = shots if isinstance(shots, list) and shots else [{}]
+
+    for index, shot in enumerate(shot_rows[:120]):
+        row: dict[str, Any] = {
+            "shot_order_index": index,
+            "image_prompt": image_prompt,
+            "video_prompt": video_prompt,
+            "source_format": "plain_text_response",
+        }
+        if isinstance(shot, dict):
+            if "order_index" in shot:
+                row["shot_order_index"] = shot.get("order_index")
+            title = _trim_text(shot.get("title"), 160)
+            if title:
+                row["shot_title"] = title
+        prompt_packages.append(row)
+
+    return {
+        "summary": (
+            "Provider returned plain prompt text; SineForge wrapped it into "
+            "prompt_packages for review."
+        ),
+        "prompt_packages": prompt_packages,
+        "warnings": [
+            "Prompt package was accepted from plain text instead of strict JSON.",
+        ],
+    }
+
+
 def _json_schema_for_task(task: PlanningTaskType) -> dict[str, Any]:
     """Minimal JSON Schema fragments for structured-output requests."""
     base_props: dict[str, Any]
@@ -167,21 +302,217 @@ def _json_schema_for_task(task: PlanningTaskType) -> dict[str, Any]:
 def _context_brief(request: ProviderRequestContract) -> dict[str, Any]:
     """Bounded context for the model — no secrets."""
     ctx = request.context
+    if request.task_type == PlanningTaskType.prompt_package:
+        base_story_limit = 900
+        synopsis_limit = 500
+        notes_limit = 400
+        character_limit = 12
+    elif request.task_type == PlanningTaskType.production_proposal:
+        base_story_limit = 1400
+        synopsis_limit = 700
+        notes_limit = 600
+        character_limit = 16
+    else:
+        base_story_limit = 4000
+        synopsis_limit = 1500
+        notes_limit = 1000
+        character_limit = 24
+
     return {
         "story_id": str(ctx.story_id),
         "title": ctx.title,
-        "base_story": ctx.base_story[:4000],
+        "base_story": ctx.base_story[:base_story_limit],
         "target_duration_sec": ctx.target_duration_sec,
         "logline": (ctx.logline or "")[:500] or None,
-        "synopsis": (ctx.synopsis or "")[:1500] or None,
+        "synopsis": (ctx.synopsis or "")[:synopsis_limit] or None,
         "audience": ctx.audience,
         "tone": ctx.tone,
         "genre": ctx.genre,
         "visual_style": ctx.visual_style,
         "point_of_view": ctx.point_of_view,
-        "production_notes": (ctx.production_notes or "")[:1000] or None,
-        "characters": (ctx.characters or [])[:24],
+        "production_notes": (ctx.production_notes or "")[:notes_limit] or None,
+        "characters": _compact_items(
+            ctx.characters,
+            (
+                "id",
+                "name",
+                "role",
+                "physical_description",
+                "speaking_style",
+                "consistency_prompt",
+            ),
+            item_limit=character_limit,
+            string_limit=220,
+        ),
     }
+
+
+def _previous_output_brief(request: ProviderRequestContract) -> dict[str, Any] | None:
+    """Compact prior task outputs so local LM Studio models stay under context."""
+    previous = request.previous_output
+    if not isinstance(previous, dict) or not previous:
+        return None
+
+    if request.task_type == PlanningTaskType.prompt_package:
+        brief: dict[str, Any] = {}
+        shots = previous.get("shots") or {}
+        if not shots and isinstance(previous.get("task:shot_list"), dict):
+            shots = previous["task:shot_list"].get("shots")
+        scenes = previous.get("scenes") or {}
+        if not scenes and isinstance(previous.get("task:scene_breakdown"), dict):
+            scenes = previous["task:scene_breakdown"].get("scenes")
+        characters = previous.get("characters") or {}
+        if not characters and isinstance(previous.get("task:character_bible"), dict):
+            characters = previous["task:character_bible"].get("characters")
+
+        brief["shots"] = _compact_items(
+            shots,
+            (
+                "shot_order_index",
+                "order_index",
+                "scene_order_index",
+                "scene_id",
+                "title",
+                "duration_sec",
+                "story_purpose",
+                "visual_description",
+                "description",
+                "camera_movement",
+                "key_actions",
+                "emotional_tone",
+                "visual_cues",
+                "location",
+                "characters",
+                "continuity_source_type",
+                "continuity_source_shot_client_id",
+            ),
+            item_limit=80,
+            string_limit=280,
+        )
+        if scenes:
+            brief["scenes"] = _compact_items(
+                scenes,
+                ("scene_id", "order_index", "title", "summary", "description", "location"),
+                item_limit=24,
+                string_limit=220,
+            )
+        if characters:
+            brief["characters"] = _compact_items(
+                characters,
+                ("id", "client_id", "name", "role", "description", "visual_cues", "key_traits"),
+                item_limit=24,
+                string_limit=180,
+            )
+        return {key: value for key, value in brief.items() if value not in (None, [], {})}
+
+    if request.task_type == PlanningTaskType.production_proposal:
+        shots = previous.get("shots") or []
+        prompt_packages = previous.get("prompt_packages") or []
+        scenes = previous.get("scenes") or []
+        characters = previous.get("characters") or []
+        narrations = previous.get("narrations") or []
+        continuity = previous.get("continuity") or []
+        recommendations = previous.get("recommendations") or []
+        prompt_package_rows = prompt_packages if isinstance(prompt_packages, list) else []
+        return {
+            "source_counts": {
+                "characters": len(characters) if isinstance(characters, list) else 0,
+                "scenes": len(scenes) if isinstance(scenes, list) else 0,
+                "shots": len(shots) if isinstance(shots, list) else 0,
+                "prompt_packages": len(prompt_package_rows),
+                "narrations": len(narrations) if isinstance(narrations, list) else 0,
+                "continuity": len(continuity) if isinstance(continuity, list) else 0,
+                "recommendations": (
+                    len(recommendations) if isinstance(recommendations, list) else 0
+                ),
+            },
+            "target_duration_sec": request.context.target_duration_sec,
+            "shot_duration_plan": _compact_items(
+                shots,
+                (
+                    "shot_order_index",
+                    "order_index",
+                    "scene_order_index",
+                    "title",
+                    "duration_sec",
+                ),
+                item_limit=120,
+                string_limit=120,
+            ),
+            "prompt_package_coverage": [
+                {
+                    "shot_order_index": index,
+                    "has_image_prompt": bool(
+                        isinstance(item, dict) and _trim_text(item.get("image_prompt"), 1)
+                    ),
+                    "has_video_prompt": bool(
+                        isinstance(item, dict) and _trim_text(item.get("video_prompt"), 1)
+                    ),
+                }
+                for index, item in enumerate(prompt_package_rows[:120])
+            ],
+            "warnings": _compact_value(previous.get("warnings") or [], string_limit=160, list_limit=12),
+        }
+
+    top_level_keys = (
+        "structure",
+        "chapters",
+        "characters",
+        "scenes",
+        "shots",
+        "narrations",
+        "prompt_packages",
+        "continuity",
+        "recommendations",
+        "warnings",
+    )
+    brief = {key: previous[key] for key in top_level_keys if key in previous}
+
+    return _compact_value(brief, string_limit=300, list_limit=48)
+
+
+def _task_instructions(task: PlanningTaskType, required: list[str]) -> str:
+    base = (
+        f"Produce the JSON payload for task_type={task.value}. "
+        f"Required top-level keys: {', '.join(required)}. "
+        "Do not include any forbidden keys."
+    )
+    if task == PlanningTaskType.production_proposal:
+        return (
+            f"{base} Return a compact final synthesis only: summary, target_duration_sec, "
+            "and shots. Do not repeat the full prior shot list, prompt packages, or long "
+            "scene text; the deterministic proposal builder will merge completed prior "
+            "task outputs. It is acceptable for shots to be an empty array when prior "
+            "shot coverage is present."
+        )
+    return base
+
+
+def _provider_http_error_message(raw_bytes: bytes, fallback: str) -> str:
+    try:
+        data = json.loads(raw_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return fallback
+
+    message = fallback
+    error = data.get("error") if isinstance(data, dict) else None
+    if isinstance(error, str):
+        message = error
+    elif isinstance(error, dict):
+        message = str(error.get("message") or error.get("code") or fallback)
+
+    marker = "returned 400: "
+    if marker in message:
+        nested_raw = message.split(marker, 1)[1].strip()
+        try:
+            nested = json.loads(nested_raw)
+        except json.JSONDecodeError:
+            nested = None
+        nested_error = nested.get("error") if isinstance(nested, dict) else None
+        if isinstance(nested_error, dict):
+            message = str(nested_error.get("message") or message)
+
+    return sanitize_message(message)[:300]
 
 
 def _failed(
@@ -372,11 +703,15 @@ class OpenAIPlanningProvider(PlanningProvider):
 
             if status_code == 400:
                 # Schema / request rejection — never retry.
+                provider_message = _provider_http_error_message(
+                    raw_bytes,
+                    "Planning provider rejected the request",
+                )
                 return _failed(
                     request,
                     category=FailureCategory.validation,
-                    message="OpenAI rejected the planning request (HTTP 400 schema/policy)",
-                    details={"http_status": 400},
+                    message=f"Planning provider rejected the request (HTTP 400): {provider_message}",
+                    details={"http_status": 400, "provider_message": provider_message},
                     usage={
                         "request_hash": req_hash,
                         "logical_model": request.logical_model.value,
@@ -422,6 +757,8 @@ class OpenAIPlanningProvider(PlanningProvider):
             if item and str(item).strip()
         ]
         user_payload = {
+            "schema_version": "sineforge.planning-provider-request/v1",
+            "prompt_artifact_format": "json",
             "task_type": request.task_type.value,
             "logical_model": request.logical_model.value,
             "required_keys": required,
@@ -440,14 +777,10 @@ class OpenAIPlanningProvider(PlanningProvider):
                     "command",
                 }
             },
-            "previous_output": request.previous_output,
+            "previous_output": _previous_output_brief(request),
             "repair_instructions": repair,
             "attempt_number": request.attempt_number,
-            "instructions": (
-                f"Produce the JSON payload for task_type={request.task_type.value}. "
-                f"Required top-level keys: {', '.join(required)}. "
-                "Do not include any forbidden keys."
-            ),
+            "instructions": _task_instructions(request.task_type, required),
         }
 
         schema = _json_schema_for_task(request.task_type)
@@ -455,7 +788,19 @@ class OpenAIPlanningProvider(PlanningProvider):
             "model": resolved_model,
             "temperature": 0.2,
             "messages": [
-                {"role": "system", "content": _SYSTEM_RULES},
+                {
+                    "role": "system",
+                    "content": json.dumps(
+                        {
+                            "schema_version": "sineforge.local-agent-system/v1",
+                            "agent_role": "planning_provider",
+                            "instructions": [_SYSTEM_RULES],
+                            "response_artifact_format": "json",
+                        },
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    ),
+                },
                 {
                     "role": "user",
                     "content": json.dumps(user_payload, ensure_ascii=False, separators=(",", ":")),
@@ -606,13 +951,18 @@ class OpenAIPlanningProvider(PlanningProvider):
         try:
             payload = json.loads(content)
         except json.JSONDecodeError:
-            return _failed(
-                request,
-                category=FailureCategory.validation,
-                message="OpenAI message content was not valid JSON",
-                usage={"request_hash": req_hash, "resolved_model": resolved_model},
-                finish_category="invalid_content_json",
-            )
+            payload = _plain_text_prompt_payload(request, content)
+            if payload is None:
+                return _failed(
+                    request,
+                    category=FailureCategory.validation,
+                    message="OpenAI message content was not valid JSON",
+                    usage={"request_hash": req_hash, "resolved_model": resolved_model},
+                    finish_category="invalid_content_json",
+                )
+            finish_category = "plain_text_prompt_wrapped"
+        else:
+            finish_category = str(first.get("finish_reason") or "stop")
 
         if not isinstance(payload, dict):
             return _failed(
@@ -640,7 +990,7 @@ class OpenAIPlanningProvider(PlanningProvider):
                 payload=payload,
                 warnings=[],
                 usage=usage,
-                finish_category=str(first.get("finish_reason") or "stop"),
+                finish_category=finish_category,
             )
         except Exception as exc:  # pydantic / forbidden-field validation
             return _failed(
@@ -678,7 +1028,7 @@ class OpenAIPlanningProvider(PlanningProvider):
 
 
 def build_openai_provider_from_settings(settings: Settings | None = None) -> OpenAIPlanningProvider | None:
-    """Return an OpenAI provider when configured; otherwise None (mock remains default)."""
+    """Return an OpenAI provider when configured; otherwise return ``None``."""
     cfg = settings or get_settings()
     if not cfg.openai_configured:
         return None

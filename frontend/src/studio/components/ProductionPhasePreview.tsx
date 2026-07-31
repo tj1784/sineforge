@@ -16,7 +16,7 @@ type PreviewProps = {
   workspace: SnapshotWorkspace | null
   historical: boolean
   incompleteReason?: string | null
-  productionProfileKey?: 'ltx_base@1' | 'wan_base@1'
+  productionProfileKey?: 'ltx_base@1' | 'ltx_base@2' | 'wan_base@1'
   stitchStage?: 'phase7_before_audio' | 'phase8_before_foley'
   onNavigate?: (page: PageId) => void
 }
@@ -105,7 +105,13 @@ function productionProfilePresentation(profileKey: string | undefined) {
   if (profileKey === 'wan_base@1') {
     return {
       label: 'WAN Base v1',
-      detail: 'Persisted selection · runtime qualification required',
+      detail: 'Persisted selection · on hold after failed dry run',
+    }
+  }
+  if (profileKey === 'ltx_base@2') {
+    return {
+      label: 'LTX Base v2',
+      detail: '8–15 second Sequence Sheet · runtime qualification required',
     }
   }
   if (profileKey === 'ltx_base@1') {

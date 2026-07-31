@@ -23,10 +23,20 @@ storage/headless_orchestrator/
 storage/local_jobs/
 storage/api_workflows/
 storage/api_workflow_archive/
+storage/native_api_runner/
 storage/planning_media/
 storage/projects/
 storage/runtime/
 storage/workflow_candidates/
+
+# Local SineForge project workspaces and generated project artifacts.
+# Keep examples/projects/ trackable as repository fixtures.
+/projects/
+/outputs/
+/logs/
+/storage/logs/
+/tmp_*/
+/tmp_*.json
 node_modules/
 .codex-service-logs/
 .pi-subagents/
@@ -53,3 +63,7 @@ ComfyUI/models/
 !storage/**/.gitkeep
 !storage/workflow_templates/**
 !storage/workflow_templates/example_smoke/**
+
+# Machine-specific absolute paths must remain local even though workflow
+# templates are intentionally trackable.
+/storage/workflow_templates/*/workflow_ui_local_paths.json

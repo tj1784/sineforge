@@ -5,7 +5,9 @@ from backend.app.services.production_profiles import (
     DEFAULT_PRODUCTION_PROFILE_REF,
     LEGACY_LTX_VIDEO_MODEL,
     LTX_BASE_PROFILE,
+    LTX_SEQUENCE_PROFILE,
     ProductionProfileError,
+    ProductionProfileOnHold,
     ProductionProfileQualificationRequired,
     UnknownProductionProfileError,
     WAN_BASE_PROFILE,
@@ -52,14 +54,21 @@ def test_wan_profile_is_visible_for_planning_but_not_selectable_for_execution() 
     assert resolve_production_profile("wan") is WAN_BASE_PROFILE
     assert WAN_BASE_PROFILE.ref == "wan_base@1"
     assert WAN_BASE_PROFILE.model_family == "wan"
-    assert WAN_BASE_PROFILE.status == "qualification_required"
+    assert WAN_BASE_PROFILE.status == "on_hold"
+    assert WAN_BASE_PROFILE.hold_reason == (
+        "Local WAN dry run did not complete successfully."
+    )
+    assert WAN_BASE_PROFILE.selectable_for_execution is False
     assert select_production_profile("wan", allow_unqualified=True) is WAN_BASE_PROFILE
     with pytest.raises(
-        ProductionProfileQualificationRequired,
-        match=r"wan_base@1 requires runtime qualification",
+        ProductionProfileOnHold,
+        match=r"wan_base@1 is on hold and cannot execute",
     ):
         select_production_profile("wan")
-    assert list_production_profiles(include_unqualified=False) == (LTX_BASE_PROFILE,)
+    assert list_production_profiles(include_unqualified=False) == (
+        LTX_BASE_PROFILE,
+        LTX_SEQUENCE_PROFILE,
+    )
 
 
 def test_profile_scoped_model_validation_preserves_ltx_and_blocks_draft_wan() -> None:
@@ -73,8 +82,8 @@ def test_profile_scoped_model_validation_preserves_ltx_and_blocks_draft_wan() ->
             production_profile="ltx_base@1",
         )
     with pytest.raises(
-        ProductionProfileQualificationRequired,
-        match=r"wan_base@1 requires runtime qualification",
+        ProductionProfileOnHold,
+        match=r"wan_base@1 is on hold and cannot execute",
     ):
         generation_model_contract.require_approved_video_model(
             "wan2.2-unqualified.safetensors",
@@ -115,6 +124,29 @@ def test_ltx_frame_and_duration_policy_matches_legacy_contract() -> None:
     policy.require_subscene_duration(8.0)
     with pytest.raises(ProductionProfileError, match="require a scene-specific reason"):
         policy.require_subscene_duration(5.0)
+
+
+def test_ltx_sequence_profile_is_versioned_and_runtime_qualified() -> None:
+    assert resolve_production_profile("ltx_sequence") is LTX_SEQUENCE_PROFILE
+    assert LTX_SEQUENCE_PROFILE.ref == "ltx_base@2"
+    assert LTX_SEQUENCE_PROFILE.model_family == "ltx"
+    assert LTX_SEQUENCE_PROFILE.status == "qualified"
+    assert LTX_SEQUENCE_PROFILE.execution_qualified is True
+    assert LTX_SEQUENCE_PROFILE.selectable_for_execution is True
+    assert LTX_SEQUENCE_PROFILE.approved_video_models == frozenset(
+        {"sulphur2BaseQuants_dev.safetensors"}
+    )
+    assert LTX_SEQUENCE_PROFILE.capabilities.native_audio == "supported"
+    assert LTX_SEQUENCE_PROFILE.capabilities.external_foley is False
+    assert LTX_SEQUENCE_PROFILE.frame_policy.min_segment_duration_sec == 8.0
+    assert LTX_SEQUENCE_PROFILE.frame_policy.max_segment_duration_sec == 15.0
+    LTX_SEQUENCE_PROFILE.frame_policy.require_subscene_duration(8.0)
+    LTX_SEQUENCE_PROFILE.frame_policy.require_subscene_duration(15.0)
+    with pytest.raises(ProductionProfileError, match="shorter than 8 seconds"):
+        LTX_SEQUENCE_PROFILE.frame_policy.require_subscene_duration(7.999)
+    with pytest.raises(ProductionProfileError, match="exceeds 15 seconds"):
+        LTX_SEQUENCE_PROFILE.frame_policy.require_subscene_duration(15.001)
+    assert select_production_profile("ltx_base@2") is LTX_SEQUENCE_PROFILE
 
 
 def test_wan_frame_and_logical_subscene_policy_is_explicit_and_bounded() -> None:
