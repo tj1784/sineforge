@@ -481,6 +481,184 @@ class CreativeReviewNote(UUIDMixin, TimestampMixin, Base):
     note: Mapped[str] = mapped_column(Text)
 
 
+class AgentSession(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "agent_sessions"
+    actor_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    title: Mapped[str | None] = mapped_column(Text)
+    provider: Mapped[str] = mapped_column(String(80), nullable=False, default="openai_compatible")
+    model: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="active")
+    metadata_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+    )
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'archived', 'canceled')",
+            name="ck_agent_sessions_status",
+        ),
+    )
+
+
+class AgentMessage(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "agent_messages"
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    context_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_context_snapshots.id", ondelete="SET NULL")
+    )
+    role: Mapped[str] = mapped_column(String(32), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="complete")
+    metadata_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('user', 'assistant', 'tool', 'system')",
+            name="ck_agent_messages_role",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'streaming', 'complete', 'failed', 'canceled')",
+            name="ck_agent_messages_status",
+        ),
+        Index("ix_agent_messages_session_created", "session_id", "created_at"),
+    )
+
+
+class AgentContextSnapshot(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "agent_context_snapshots"
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    actor_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    context_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    context_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    hydrated_summary_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    source_refs_json: Mapped[list] = mapped_column(json_type(), default=list, nullable=False)
+    redaction_report_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+
+
+class AgentToolCall(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "agent_tool_calls"
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    message_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_messages.id", ondelete="SET NULL")
+    )
+    context_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_context_snapshots.id", ondelete="SET NULL")
+    )
+    tool_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    tool_version: Mapped[str] = mapped_column(String(32), nullable=False)
+    risk_class: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="requested")
+    request_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    request_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    result_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    result_hash: Mapped[str | None] = mapped_column(String(64))
+    error_class: Mapped[str | None] = mapped_column(String(128))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint(
+            "risk_class IN ('read', 'low', 'medium', 'high', 'destructive')",
+            name="ck_agent_tool_calls_risk_class",
+        ),
+        CheckConstraint(
+            "status IN ('requested', 'validated', 'blocked', 'approval_required', "
+            "'running', 'succeeded', 'failed', 'canceled')",
+            name="ck_agent_tool_calls_status",
+        ),
+        Index("ix_agent_tool_calls_session_created", "session_id", "created_at"),
+    )
+
+
+class AgentProposal(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "agent_proposals"
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    tool_call_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_tool_calls.id", ondelete="SET NULL")
+    )
+    context_snapshot_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_context_snapshots.id", ondelete="SET NULL")
+    )
+    tool_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    proposal_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
+    target_version: Mapped[str | None] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending_approval")
+    arguments_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    validation_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    approval_required: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    approval_token_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+    approval_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    approved_by: Mapped[str | None] = mapped_column(String(200))
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rejected_by: Mapped[str | None] = mapped_column(String(200))
+    rejected_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending_approval', 'approved', 'rejected', 'executed', "
+            "'failed', 'stale', 'canceled')",
+            name="ck_agent_proposals_status",
+        ),
+        Index("ix_agent_proposals_session_status", "session_id", "status"),
+    )
+
+
+class AgentActionReceipt(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "agent_action_receipts"
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    proposal_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_proposals.id", ondelete="SET NULL"), index=True
+    )
+    action: Mapped[str] = mapped_column(String(128), nullable=False)
+    actor_id: Mapped[str] = mapped_column(String(200), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(80), nullable=False)
+    target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    target_version_before: Mapped[str | None] = mapped_column(String(128))
+    target_version_after: Mapped[str | None] = mapped_column(String(128))
+    result_resource_type: Mapped[str | None] = mapped_column(String(80))
+    result_resource_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="succeeded")
+    undo_status: Mapped[str] = mapped_column(String(32), nullable=False, default="available")
+    result_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    undo_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('succeeded', 'failed', 'partial')",
+            name="ck_agent_action_receipts_status",
+        ),
+        CheckConstraint(
+            "undo_status IN ('unavailable', 'available', 'completed', 'failed')",
+            name="ck_agent_action_receipts_undo_status",
+        ),
+    )
+
+
+class AgentAuditEvent(UUIDMixin, TimestampMixin, Base):
+    __tablename__ = "agent_audit_events"
+    session_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("agent_sessions.id", ondelete="SET NULL"), index=True
+    )
+    actor_id: Mapped[str | None] = mapped_column(String(200))
+    event_type: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    target_type: Mapped[str | None] = mapped_column(String(80))
+    target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    policy_decision: Mapped[str | None] = mapped_column(String(64))
+    details_json: Mapped[dict] = mapped_column(json_type(), default=dict, nullable=False)
+
+
 class CandidateScore(UUIDMixin, TimestampMixin, Base):
     __tablename__ = "candidate_scores"
     clip_iteration_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("clip_iterations.id"))

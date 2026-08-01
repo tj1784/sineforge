@@ -23,6 +23,7 @@ import {
 } from '../api/client'
 import { demoAggregate, demoReadiness } from './demoPhaseA'
 import { StudioContext, type LoadState, type StudioContextValue } from './StudioState'
+import { useRegisterOperatorContext } from '../operator/OperatorContext'
 
 function errorMessage(error: unknown, fallback: string): string {
   if (error instanceof Error && error.message) return error.message
@@ -422,6 +423,53 @@ export function StudioProvider({
     },
     [data, reload],
   )
+
+  const operatorContextPatch = useMemo(() => {
+    if (!data) {
+      return {
+        projectId,
+        recordType: storyId ? 'story' : 'project',
+        recordId: storyId || projectId,
+        recordVersion: null,
+        selectedRefs: storyId ? [{ type: 'story', id: storyId }] : [],
+        capabilities: ['context.get_current', 'context.refresh', 'project.get', 'record.get'],
+      }
+    }
+    const storyRef = {
+      type: 'story',
+      id: data.story.id,
+      version: data.content_hash,
+    }
+    if (selectedShot) {
+      return {
+        projectId: data.story.project_id,
+        projectVersion: data.revision,
+        recordType: 'shot',
+        recordId: selectedShot.id,
+        recordVersion: data.content_hash,
+        parentRefs: [storyRef],
+        selectedRefs: [
+          storyRef,
+          { type: 'shot', id: selectedShot.id, version: data.content_hash },
+        ],
+        activePanel: 'shot-inspector',
+        capabilities: ['context.get_current', 'context.refresh', 'project.get', 'record.get', 'review.add_note'],
+      }
+    }
+    return {
+      projectId: data.story.project_id,
+      projectVersion: data.revision,
+      recordType: 'story',
+      recordId: data.story.id,
+      recordVersion: data.content_hash,
+      parentRefs: [],
+      selectedRefs: [storyRef],
+      activePanel: null,
+      capabilities: ['context.get_current', 'context.refresh', 'project.get', 'record.get', 'review.add_note'],
+    }
+  }, [data, projectId, selectedShot, storyId])
+
+  useRegisterOperatorContext('studio-record', operatorContextPatch)
 
   const value = useMemo<StudioContextValue>(
     () => ({

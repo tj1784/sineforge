@@ -207,6 +207,16 @@ def get_project(project_id: UUID, db: Session = Depends(get_db)) -> ProjectRead:
     return project_to_response(project)
 
 
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_project(project_id: UUID, db: Session = Depends(get_db)) -> Response:
+    project = db.get(Project, project_id)
+    if project is None:
+        raise not_found("Project not found.")
+    db.delete(project)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.patch("/{project_id}/theme", response_model=ProjectRead)
 def update_project_theme(
     project_id: UUID,

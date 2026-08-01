@@ -142,6 +142,24 @@ class Settings(BaseSettings):
     sulphur_max_response_bytes: int = Field(default=1_048_576, ge=1024, le=8_388_608)
     sulphur_repair_instruction_limit: int = Field(default=12, ge=0, le=20)
 
+    # ------------------------------------------------------------------
+    # Contextual Operator agent through a local OpenAI-compatible provider.
+    # ------------------------------------------------------------------
+    # The default endpoint is LM Studio. The backend owns this connection;
+    # the browser never calls LM Studio directly.
+    ai_agent_enabled: bool = False
+    ai_provider: str = "openai_compatible"
+    ai_base_url: str = "http://127.0.0.1:1234/v1"
+    ai_model: str = DEFAULT_QWEN_MODEL_ID
+    ai_api_key: SecretStr = SecretStr("lm-studio")
+    ai_request_timeout_seconds: float = Field(default=120.0, ge=1.0, le=600.0)
+    ai_max_tool_steps: int = Field(default=12, ge=1, le=24)
+    ai_parallel_model_requests: int = Field(default=1, ge=1, le=1)
+    ai_max_context_bytes: int = Field(default=131_072, ge=4096, le=1_048_576)
+    ai_max_tool_result_bytes: int = Field(default=65_536, ge=1024, le=524_288)
+    ai_developer_workspace_enabled: bool = False
+    ai_developer_workspace_roots: list[Path] = Field(default_factory=lambda: [REPO_ROOT])
+
     @field_validator("storage_root", mode="before")
     @classmethod
     def resolve_storage_root(cls, value: str | Path) -> Path:
@@ -185,7 +203,7 @@ class Settings(BaseSettings):
             database_path = REPO_ROOT / database_path
         return f"{prefix}{database_path.resolve().as_posix()}"
 
-    @field_validator("openai_base_url", "sulphur_base_url")
+    @field_validator("openai_base_url", "sulphur_base_url", "ai_base_url")
     @classmethod
     def validate_provider_base_url(cls, value: str) -> str:
         cleaned = (value or "").strip().rstrip("/")
@@ -196,6 +214,14 @@ class Settings(BaseSettings):
         # Reject shell/executable path shapes — HTTP endpoints only.
         if cleaned.lower().startswith(("file:", "ftp:")):
             raise ValueError("provider base URL must be an http(s) URL")
+        return cleaned
+
+    @field_validator("ai_provider")
+    @classmethod
+    def validate_ai_provider(cls, value: str) -> str:
+        cleaned = (value or "").strip()
+        if cleaned != "openai_compatible":
+            raise ValueError("ai_provider currently supports openai_compatible only")
         return cleaned
 
     @field_validator("comfyui_base_url")
@@ -247,6 +273,7 @@ class Settings(BaseSettings):
         "openai_logical_model_sol",
         "sulphur_model_id",
         "qwen_model_id",
+        "ai_model",
     )
     @classmethod
     def validate_logical_model_id(cls, value: str) -> str:
@@ -278,6 +305,18 @@ class Settings(BaseSettings):
     @classmethod
     def resolve_local_model_path(cls, value: str | Path) -> Path:
         return Path(value).expanduser().resolve()
+
+    @field_validator("ai_developer_workspace_roots", mode="before")
+    @classmethod
+    def resolve_ai_workspace_roots(cls, value: list[str | Path] | str | Path) -> list[Path]:
+        raw_items = value if isinstance(value, list) else [value]
+        roots: list[Path] = []
+        for item in raw_items:
+            path = Path(item).expanduser()
+            if not path.is_absolute():
+                path = REPO_ROOT / path
+            roots.append(path.resolve())
+        return roots
 
     @property
     def openai_configured(self) -> bool:

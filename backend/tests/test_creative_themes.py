@@ -182,6 +182,20 @@ def test_project_creation_defaults_theme_and_update_only_changes_project_policy(
     assert project.theme_context_json["scripture_reference"] == "Luke 15:11-32"
 
 
+def test_project_can_be_deleted(client: TestClient, db_session: Session) -> None:
+    created = client.post(
+        "/projects",
+        json={"name": "Delete Me", "workflow_lane": "cineforge_studio"},
+    )
+    assert created.status_code == 201, created.text
+    project_id = created.json()["id"]
+
+    deleted = client.delete(f"/projects/{project_id}")
+    assert deleted.status_code == 204, deleted.text
+    assert db_session.get(Project, UUID(project_id)) is None
+    assert client.get(f"/projects/{project_id}").status_code == 404
+
+
 def test_unknown_theme_and_context_on_default_are_rejected(client: TestClient) -> None:
     unknown = client.post(
         "/projects",

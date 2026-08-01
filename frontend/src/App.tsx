@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ApiError, BackendUnavailableError, api, type Project } from './api/client'
 import { AppShell, type PageId, type ShellView } from './components/AppShell'
 import { requestAppNavigation } from './navigationGuard'
+import { OperatorContextProvider } from './operator/OperatorContext'
 import { Projects } from './pages/Projects'
 import { StoryboardStudio } from './pages/StoryboardStudio'
 import { ApiRunnerPage } from './studio/pages/ApiRunnerPage'
@@ -72,6 +73,14 @@ function normalizeBackendStatus(value: string | undefined): string {
   if (status === 'disabled') return 'disabled'
   if (status === 'checking' || status === 'loading') return 'checking'
   return 'unavailable'
+}
+
+function operatorId(prefix: string) {
+  const generated =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : Math.random().toString(36).slice(2)
+  return `${prefix}-${generated}`
 }
 
 function studioPath(projectId: string, page: PageId): string {
@@ -359,64 +368,115 @@ function App() {
     routeState.kind === 'studio' && activeProject?.id === routeState.projectId
       ? activeProject.workflow_lane
       : null
+  const currentPath = routePath(routeState)
+  const pageViewId = useMemo(() => operatorId('pageview'), [currentPath])
+  const operatorBaseContext = useMemo(
+    () => ({
+      contextVersion: 1,
+      capturedAt: new Date().toISOString(),
+      routeId:
+        routeState.kind === 'studio'
+          ? `studio.${routeState.page}`
+          : routeState.kind,
+      pathname: currentPath,
+      pageViewId,
+      pageTitle:
+        routeState.kind === 'studio'
+          ? `${activeProjectName} · ${activePage}`
+          : routeState.kind === 'engine'
+            ? 'Sineforge Engine'
+            : routeState.kind === 'new-project'
+              ? 'Create Project'
+              : 'Projects',
+      domain: routeState.kind === 'engine' ? 'engine' : routeState.kind === 'studio' ? 'studio' : 'workspace',
+      tenantId: 'local-workspace',
+      projectId: routeState.kind === 'studio' ? routeState.projectId : null,
+      projectVersion: activeProject?.created_at ?? null,
+      recordType: routeState.kind === 'studio' ? 'project' : null,
+      recordId: routeState.kind === 'studio' ? routeState.projectId : null,
+      recordVersion: activeProject?.created_at ?? null,
+      parentRefs: [],
+      selectedRefs:
+        routeState.kind === 'studio'
+          ? [{ type: 'project', id: routeState.projectId, version: activeProject?.created_at ?? null }]
+          : [],
+      activeTab: routeState.kind === 'studio' ? routeState.page : routeState.kind,
+      activePanel: null,
+      filters: {},
+      mode: 'view' as const,
+      dirty: false,
+      capabilities: ['context.get_current', 'context.refresh', 'project.search'],
+      correlationId: operatorId('operator-correlation'),
+    }),
+    [
+      activePage,
+      activeProject?.created_at,
+      activeProjectName,
+      currentPath,
+      pageViewId,
+      routeState,
+    ],
+  )
 
   return (
-    <AppShell
-      activePage={activePage}
-      backendStatus={backendStatus}
-      projectId={activeProjectId}
-      projectName={activeProjectName}
-      workflowLane={activeProjectWorkflowLane}
-      projectCount={projectCount}
-      view={shellView}
-      onNavigate={navigateStudio}
-      onOpenProjects={() => navigateTo({ kind: 'projects' })}
-      onCreateProject={() => startNewProject()}
-      onRefreshStatus={() => void refreshBackendStatus()}
-    >
-      {routeState.kind === 'projects' ? (
-        <Projects
-          key="projects-list"
-          mode="list"
-          currentProjectId={selectedProjectId}
-          onCreateNew={() => startNewProject()}
-          onContinueAgentless={(planningAgent) =>
-            startNewProject('agentless', planningAgent)
-          }
-          onOpenProject={openProject}
-          onOpenProjectPage={openProjectPage}
-          onProjectsLoaded={handleProjectsLoaded}
-          onNavigateStudio={(page) => {
-            if (!isRealProjectId(selectedProjectId)) {
-              if (page === 'api-runner') navigateTo({ kind: 'engine' })
-              return
+    <OperatorContextProvider baseContext={operatorBaseContext}>
+      <AppShell
+        activePage={activePage}
+        backendStatus={backendStatus}
+        projectId={activeProjectId}
+        projectName={activeProjectName}
+        workflowLane={activeProjectWorkflowLane}
+        projectCount={projectCount}
+        view={shellView}
+        onNavigate={navigateStudio}
+        onOpenProjects={() => navigateTo({ kind: 'projects' })}
+        onCreateProject={() => startNewProject()}
+        onRefreshStatus={() => void refreshBackendStatus()}
+      >
+        {routeState.kind === 'projects' ? (
+          <Projects
+            key="projects-list"
+            mode="list"
+            currentProjectId={selectedProjectId}
+            onCreateNew={() => startNewProject()}
+            onContinueAgentless={(planningAgent) =>
+              startNewProject('agentless', planningAgent)
             }
-            navigateTo({ kind: 'studio', projectId: selectedProjectId, page })
-          }}
-        />
-      ) : null}
-      {routeState.kind === 'new-project' ? (
-        <Projects
-          key="project-create"
-          mode="create"
-          initialWorkflowLane={newProjectWorkflowLane}
-          initialPlanningAgent={newProjectPlanningAgent}
-          onBackToProjects={() => navigateTo({ kind: 'projects' })}
-          onOpenProject={openProject}
-        />
-      ) : null}
-      {routeState.kind === 'studio' && isRealProjectId(routeState.projectId) ? (
-        <StoryboardStudio
-          key={routeState.projectId}
-          page={routeState.page}
-          projectId={routeState.projectId}
-          workflowLane={activeProjectWorkflowLane}
-          backendStatus={backendStatus}
-          onNavigate={navigateStudio}
-        />
-      ) : null}
-      {routeState.kind === 'engine' ? <ApiRunnerPage /> : null}
-    </AppShell>
+            onOpenProject={openProject}
+            onOpenProjectPage={openProjectPage}
+            onProjectsLoaded={handleProjectsLoaded}
+            onNavigateStudio={(page) => {
+              if (!isRealProjectId(selectedProjectId)) {
+                if (page === 'api-runner') navigateTo({ kind: 'engine' })
+                return
+              }
+              navigateTo({ kind: 'studio', projectId: selectedProjectId, page })
+            }}
+          />
+        ) : null}
+        {routeState.kind === 'new-project' ? (
+          <Projects
+            key="project-create"
+            mode="create"
+            initialWorkflowLane={newProjectWorkflowLane}
+            initialPlanningAgent={newProjectPlanningAgent}
+            onBackToProjects={() => navigateTo({ kind: 'projects' })}
+            onOpenProject={openProject}
+          />
+        ) : null}
+        {routeState.kind === 'studio' && isRealProjectId(routeState.projectId) ? (
+          <StoryboardStudio
+            key={routeState.projectId}
+            page={routeState.page}
+            projectId={routeState.projectId}
+            workflowLane={activeProjectWorkflowLane}
+            backendStatus={backendStatus}
+            onNavigate={navigateStudio}
+          />
+        ) : null}
+        {routeState.kind === 'engine' ? <ApiRunnerPage /> : null}
+      </AppShell>
+    </OperatorContextProvider>
   )
 }
 

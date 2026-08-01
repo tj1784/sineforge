@@ -2071,6 +2071,159 @@ export type ExportLinks = {
   render_package_available: boolean
 }
 
+export type AgentRef = {
+  type: string
+  id: string
+  version?: string | number | null
+}
+
+export type PageContextEnvelope = {
+  contextVersion: number
+  capturedAt: string
+  routeId: string
+  pathname: string
+  pageViewId: string
+  pageTitle: string
+  domain: string
+  tenantId?: string | null
+  projectId?: string | null
+  projectVersion?: string | number | null
+  recordType?: string | null
+  recordId?: string | null
+  recordVersion?: string | number | null
+  parentRefs?: AgentRef[]
+  selectedRefs?: AgentRef[]
+  activeTab?: string | null
+  activePanel?: string | null
+  filters?: Record<string, unknown>
+  mode?: 'view' | 'edit' | 'review' | 'compare'
+  dirty?: boolean
+  capabilities: string[]
+  correlationId: string
+}
+
+export type AgentSession = {
+  id: string
+  actor_id: string
+  title: string | null
+  provider: string
+  model: string | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export type AgentProviderHealth = {
+  enabled: boolean
+  provider: string
+  base_url: string
+  configured_model: string
+  reachable: boolean
+  status: string
+  model_count: number
+  active_model_id: string | null
+  error: string | null
+  capabilities: Record<string, boolean>
+}
+
+export type AgentToolActivity = {
+  id: string | null
+  name: string
+  status: string
+  risk_class: 'read' | 'low' | 'medium' | 'high' | 'destructive'
+  target: Record<string, unknown>
+  validation: Record<string, unknown>
+  result: Record<string, unknown>
+  error: string | null
+}
+
+export type AgentMessage = {
+  id: string
+  session_id: string
+  role: string
+  content: string
+  status: string
+  created_at: string
+  metadata: Record<string, unknown>
+}
+
+export type AgentContextSnapshot = {
+  id: string
+  context_hash: string
+  context: PageContextEnvelope
+  hydrated_summary: Record<string, unknown>
+  source_refs: Array<Record<string, unknown>>
+}
+
+export type AgentProposal = {
+  id: string
+  session_id: string
+  tool_name: string
+  proposal_hash: string
+  target_type: string
+  target_id: string | null
+  target_version: string | null
+  status:
+    | 'pending_approval'
+    | 'approved'
+    | 'rejected'
+    | 'executed'
+    | 'failed'
+    | 'stale'
+    | 'canceled'
+  arguments: Record<string, unknown>
+  validation: Record<string, unknown>
+  approval_required: boolean
+  approval_token: string | null
+  approval_expires_at: string | null
+  created_at: string
+}
+
+export type AgentActionReceipt = {
+  id: string
+  session_id: string
+  proposal_id: string | null
+  action: string
+  actor_id: string
+  target_type: string
+  target_id: string | null
+  target_version_before: string | null
+  target_version_after: string | null
+  result_resource_type: string | null
+  result_resource_id: string | null
+  status: string
+  undo_status: string
+  result: Record<string, unknown>
+  undo: Record<string, unknown>
+  created_at: string
+}
+
+export type AgentTurnResponse = {
+  session: AgentSession
+  user_message: AgentMessage
+  assistant_message: AgentMessage
+  context_snapshot: AgentContextSnapshot
+  provider_health: AgentProviderHealth
+  tool_activities: AgentToolActivity[]
+  proposals: AgentProposal[]
+  receipts: AgentActionReceipt[]
+}
+
+export type AgentToolDescriptor = {
+  name: string
+  version: string
+  description: string
+  input_schema: Record<string, unknown>
+  output_schema: Record<string, unknown>
+  required_permission: string
+  allowed_resource_scopes: string[]
+  risk_class: 'read' | 'low' | 'medium' | 'high' | 'destructive'
+  approval_required: boolean
+  idempotent: boolean
+  timeout_seconds: number
+  result_size_limit: number
+}
+
 export class ApiError extends Error {
   status: number
   detail: unknown
@@ -2230,6 +2383,58 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ model_id: modelId }),
     }),
+  createAgentSession: (payload: {
+    actor_id?: string
+    title?: string | null
+    context?: PageContextEnvelope | null
+  }) =>
+    request<AgentSession>('/agent/sessions', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  getAgentProviderHealth: () => request<AgentProviderHealth>('/agent/providers/health'),
+  listAgentTools: () => request<{ tools: AgentToolDescriptor[] }>('/agent/tools'),
+  sendAgentMessage: (
+    sessionId: string,
+    payload: {
+      actor_id?: string
+      content: string
+      context: PageContextEnvelope
+      idempotency_key?: string | null
+    },
+  ) =>
+    request<AgentTurnResponse>(`/agent/sessions/${encodeURIComponent(sessionId)}/messages`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  approveAgentProposal: (
+    proposalId: string,
+    payload: {
+      actor_id?: string
+      approval_token: string
+      idempotency_key: string
+    },
+  ) =>
+    request<AgentActionReceipt>(`/agent/proposals/${encodeURIComponent(proposalId)}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  rejectAgentProposal: (
+    proposalId: string,
+    payload: { actor_id?: string; reason: string },
+  ) =>
+    request<AgentProposal>(`/agent/proposals/${encodeURIComponent(proposalId)}/reject`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+  undoAgentAction: (
+    actionId: string,
+    payload: { actor_id?: string; reason?: string | null },
+  ) =>
+    request<AgentActionReceipt>(`/agent/actions/${encodeURIComponent(actionId)}/undo`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
   restartComfyUi: () =>
     request<ComfyRestartRequest>('/runtime/comfyui/restart', { method: 'POST' }),
   comfyRestartStatus: (restartId: string) =>
@@ -2251,6 +2456,8 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getProject: (projectId: string) => request<Project>(`/projects/${projectId}`),
+  deleteProject: (projectId: string) =>
+    request<void>(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' }),
   updateProjectTheme: (
     projectId: string,
     payload: { theme_id: CreativeThemeId; theme_context: BiblicalContext | null },

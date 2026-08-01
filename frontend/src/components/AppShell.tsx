@@ -6,6 +6,7 @@ import {
   subscribeShellTopbarActions,
   type ShellTopbarActions,
 } from './shellTopbarActions'
+import { OperatorChatLauncher } from '../operator/OperatorChat'
 
 export type PageId =
   | 'overview'
@@ -831,6 +832,7 @@ export function AppShell({
           {children}
         </main>
       </section>
+      <OperatorChatLauncher />
     </div>
   )
 }

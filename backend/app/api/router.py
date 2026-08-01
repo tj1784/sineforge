@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from backend.app.api.routes import (
+    agent,
     agentless_workflow,
     api_caller,
     audio,
@@ -29,6 +30,7 @@ from backend.app.api.routes import (
 
 
 api_router = APIRouter()
+api_router.include_router(agent.router)
 api_router.include_router(api_caller.router)
 api_router.include_router(native_api_runner.router)
 api_router.include_router(lm_studio.router)

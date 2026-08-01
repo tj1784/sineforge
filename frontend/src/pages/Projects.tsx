@@ -268,6 +268,19 @@ function ProjectList({
     setLoadVersion((current) => current + 1)
   }, [])
 
+  const deleteProject = useCallback(async (project: Project) => {
+    const confirmed = window.confirm(`Delete "${project.name}" and all of its project data?`)
+    if (!confirmed) return
+    setError(null)
+    try {
+      await api.deleteProject(project.id)
+      setSummaries((current) => current.filter((summary) => summary.project.id !== project.id))
+      setLoadVersion((current) => current + 1)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Unable to delete ${project.name}.`)
+    }
+  }, [])
+
   useEffect(() => {
     let active = true
     let retryTimer: number | undefined
@@ -451,6 +464,15 @@ function ProjectList({
                 <div className="project-card-body">
                   <div className="project-card-title">
                     <button type="button" onClick={open}><h2>{project.name}</h2><p>{project.description || 'A CineForge production plan.'}</p></button>
+                  </div>
+                  <div className="project-card-actions">
+                    <button
+                      type="button"
+                      className="secondary-button danger"
+                      onClick={() => void deleteProject(project)}
+                    >
+                      Delete
+                    </button>
                   </div>
                   <div className="project-meta">
                     <span className="project-workflow-lane">{projectWorkflowLaneLabel(project.workflow_lane)}</span>

@@ -211,6 +211,17 @@
   border-radius: 6px !important;
 }
 
+.project-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.project-card-actions .danger {
+  border-color: #5a3333;
+  color: #ef9b98;
+}
+
 .project-meta {
   display: flex;
   align-items: center;
