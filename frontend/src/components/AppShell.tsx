@@ -404,7 +404,7 @@ export function AppShell({
   }
 
   return (
-    <div className="app-shell">
+    <div className="app-shell top-nav-shell">
       <a className="skip-link sr-only" href="#main-content">
         Skip to main content
       </a>
@@ -700,6 +700,12 @@ export function AppShell({
       <section className="workspace">
         <header className="topbar">
           <div className="top-left">
+            <button type="button" className="top-brand" onClick={() => goWorkspace(onOpenProjects)}>
+              <span className="brand-mark" aria-hidden="true">
+                <Icon name="play" size={15} />
+              </span>
+              <span>CineForge Studio</span>
+            </button>
             <button
               type="button"
               className="mobile-menu"
@@ -710,6 +716,44 @@ export function AppShell({
             >
               <Icon name="menu" size={18} />
             </button>
+            <nav className="top-icon-nav" aria-label={isEngine ? 'Engine navigation' : 'Studio navigation'}>
+              <button
+                type="button"
+                className={view === 'projects' ? 'active' : ''}
+                aria-label="Projects"
+                title="Projects"
+                onClick={() => goWorkspace(onOpenProjects)}
+              >
+                <Icon name="folder" size={17} />
+                <span>{projectCount}</span>
+              </button>
+              {visibleNavItems.map((item) => {
+                const active = (isStudio || isEngine) && item.id === activePage
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={active ? 'active' : ''}
+                    aria-current={active ? 'page' : undefined}
+                    aria-label={isAgentless && item.id === 'sequence-sheet' ? 'Agentless scene reset' : item.label}
+                    title={isAgentless && item.id === 'sequence-sheet' ? 'Agentless scene reset' : item.label}
+                    onClick={() => goPage(item.id)}
+                  >
+                    <Icon name={item.icon} size={17} />
+                  </button>
+                )
+              })}
+              <button
+                type="button"
+                className={isStudio && activePage === 'settings' ? 'active' : ''}
+                disabled={!isStudio}
+                aria-label="Project settings"
+                title="Project settings"
+                onClick={() => goPage('settings')}
+              >
+                <Icon name="settings" size={17} />
+              </button>
+            </nav>
             {/* Sites topbar crumbs: Projects › Project › Page · PHASE A */}
             <div className="crumbs" aria-label="Breadcrumb">
               {view === 'projects' ? (

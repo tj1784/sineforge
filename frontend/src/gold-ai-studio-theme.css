@@ -647,6 +647,157 @@ select:focus-visible {
   background: #3a3b3e;
 }
 
+/* Top navigation shell: Studio pages use header icons instead of a left rail. */
+.app-shell.top-nav-shell {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell.top-nav-shell .sidebar,
+.app-shell.top-nav-shell .sidebar-scrim,
+.app-shell.top-nav-shell .mobile-menu {
+  display: none;
+}
+
+.app-shell.top-nav-shell .topbar {
+  min-height: 70px;
+  gap: 14px;
+  padding-left: 18px;
+}
+
+.app-shell.top-nav-shell .top-left {
+  min-width: 0;
+  flex: 1 1 auto;
+  gap: 12px;
+}
+
+.top-brand {
+  border: 0;
+  background: none;
+  color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  min-width: 190px;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.top-brand .brand-mark {
+  width: 30px;
+  height: 30px;
+}
+
+.top-icon-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: min(760px, 48vw);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(20, 22, 24, 0.78);
+  scrollbar-width: none;
+}
+
+.top-icon-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.top-icon-nav button {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  color: #9ca3ad;
+  background: transparent;
+  position: relative;
+}
+
+.top-icon-nav button:hover {
+  color: var(--text);
+  background: #24272a;
+}
+
+.top-icon-nav button.active {
+  color: #d8e7ff;
+  border-color: rgba(168, 199, 250, 0.38);
+  background: #1d2c42;
+  box-shadow: inset 0 -2px 0 var(--mint);
+}
+
+.top-icon-nav button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.top-icon-nav button span {
+  position: absolute;
+  right: -3px;
+  top: -5px;
+  min-width: 15px;
+  height: 15px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #30343a;
+  color: #c9cdd1;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.app-shell.top-nav-shell .crumbs {
+  flex: 1 1 auto;
+  min-width: 180px;
+}
+
+.app-shell.top-nav-shell .workspace {
+  min-width: 0;
+}
+
+@media (max-width: 1280px) {
+  .top-brand > span:last-child {
+    display: none;
+  }
+
+  .top-brand {
+    min-width: 30px;
+  }
+
+  .top-icon-nav {
+    max-width: 54vw;
+  }
+}
+
+@media (max-width: 900px) {
+  .app-shell.top-nav-shell {
+    display: grid;
+  }
+
+  .app-shell.top-nav-shell .topbar {
+    min-height: 96px;
+    flex-wrap: wrap;
+  }
+
+  .app-shell.top-nav-shell .top-left {
+    width: 100%;
+  }
+
+  .top-icon-nav {
+    order: 3;
+    width: 100%;
+    max-width: none;
+  }
+}
+
 .studio-build-button:disabled,
 .studio-runtime-actions button:disabled {
   cursor: wait;

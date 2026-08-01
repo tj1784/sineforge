@@ -147,7 +147,7 @@ class Settings(BaseSettings):
     # ------------------------------------------------------------------
     # The default endpoint is LM Studio. The backend owns this connection;
     # the browser never calls LM Studio directly.
-    ai_agent_enabled: bool = False
+    ai_agent_enabled: bool = True
     ai_provider: str = "openai_compatible"
     ai_base_url: str = "http://127.0.0.1:1234/v1"
     ai_model: str = DEFAULT_QWEN_MODEL_ID
