@@ -21,10 +21,9 @@ documented in `catalog.json` without fabricating a runnable entry.
 Repository records are immutable and authoritative. The native Runner merges
 them with the operator library under `storage/native_api_runner/`, but rejects
 update and archive requests for repository ids. Use **Save as copy** to create
-an editable operator-owned workflow. The original editor graph can be opened
-directly in the active ComfyUI canvas through the bundled loopback-only
-workflow bridge; this handoff never submits the graph to ComfyUI’s prompt
-queue.
+an editable operator-owned workflow. The original editor graph can be copied or
+downloaded as raw JSON for archival or conversion, while all supported editing,
+validation, and execution remains in the Sineforge Engine workspace.
 
 ## Rebuild
 

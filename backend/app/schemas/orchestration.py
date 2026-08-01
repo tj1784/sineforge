@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -137,6 +137,10 @@ class CreateOrchestrationRunRequest(BaseModel):
     time_budget_sec: int = Field(default=300, ge=30, le=3600)
     transport_retry_limit: int = Field(default=2, ge=0, le=5)
     idempotency_key: str | None = Field(default=None, min_length=8, max_length=128)
+    planning_instruction: str | None = Field(default=None, max_length=4000)
+    proposal_type: Literal["storyboard_full_plan", "storyboard_revision"] = (
+        "storyboard_full_plan"
+    )
     task_types: list[PlanningTaskType] | None = None
 
     @field_validator("manual_routes")

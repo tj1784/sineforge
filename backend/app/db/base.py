@@ -64,11 +64,32 @@ class Project(UUIDMixin, TimestampMixin, Base):
         server_default="cineforge_studio",
         nullable=False,
     )
+    theme_id: Mapped[str] = mapped_column(
+        String(32),
+        default="default",
+        server_default="default",
+        nullable=False,
+    )
+    theme_version: Mapped[str] = mapped_column(
+        String(32),
+        default="1.0.0",
+        server_default="1.0.0",
+        nullable=False,
+    )
+    theme_context_json: Mapped[dict] = mapped_column(
+        json_type(),
+        default=dict,
+        nullable=False,
+    )
     campaigns: Mapped[list["Campaign"]] = relationship(back_populates="project")
     __table_args__ = (
         CheckConstraint(
             "workflow_lane IN ('cineforge_studio', 'agentless')",
             name="ck_projects_workflow_lane",
+        ),
+        CheckConstraint(
+            "theme_id IN ('default', 'greek_mythology', 'biblical')",
+            name="ck_projects_theme_id",
         ),
     )
 

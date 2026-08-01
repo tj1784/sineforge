@@ -11,7 +11,6 @@ import {
 import {
   api,
   nativeApiRunnerOutputUrl,
-  nativeApiRunnerWorkflowOpenUrl,
   type ApiCallerEditableField,
   type ApiCallerWorkflowNode,
   type NativeApiRunnerAnalysis,
@@ -33,6 +32,7 @@ type EditorMode = 'inputs' | 'json'
 type ConfirmAction =
   | { kind: 'remove' }
   | { kind: 'free-memory' }
+  | { kind: 'stop-job'; job: RunnerActivity }
   | null
 type PendingReplacement =
   | { kind: 'workflow'; workflowId: string }
@@ -100,7 +100,7 @@ function unwrapGraph(value: unknown): WorkflowGraph {
   const graph = candidate as Record<string, unknown>
   if (Array.isArray(graph.nodes) || Array.isArray(graph.links)) {
     throw new Error(
-      'Visual workflow JSON is not executable here. Export with ComfyUI “Save (API Format)”.',
+      'Visual workflow JSON is not executable here. Load an API-format prompt graph instead.',
     )
   }
   if (!Object.keys(graph).length) {
@@ -113,7 +113,7 @@ function unwrapGraph(value: unknown): WorkflowGraph {
     const node = rawNode as Record<string, unknown>
     if (typeof node.class_type !== 'string' || !node.class_type.trim()) {
       throw new Error(
-        `Node ${nodeId} has no class_type. Export with ComfyUI “Save (API Format)”.`,
+        `Node ${nodeId} has no class_type. Load an API-format prompt graph instead.`,
       )
     }
     if (!node.inputs || typeof node.inputs !== 'object' || Array.isArray(node.inputs)) {
@@ -255,11 +255,15 @@ function RuntimeStrip({
   refreshing,
   onRefresh,
   onFreeMemory,
+  onStart,
+  onRestart,
 }: {
   runtime: NativeApiRunnerRuntime | null
   refreshing: boolean
   onRefresh: () => void
   onFreeMemory: () => void
+  onStart: () => void
+  onRestart: () => void
 }) {
   const ready = Boolean(runtime?.ok)
   const hasQueuedPrompt = Boolean(
@@ -273,7 +277,7 @@ function RuntimeStrip({
       <div>
         <span>Native execution target</span>
         <b>{ready ? 'ComfyUI ready' : 'ComfyUI unavailable'}</b>
-        <small>{runtime?.comfyUrl ?? 'http://127.0.0.1:8888'} · direct CineForge connection</small>
+        <small>{runtime?.comfyUrl ?? 'http://127.0.0.1:8190'} · Sineforge-owned engine</small>
       </div>
       <dl>
         <div>
@@ -293,6 +297,21 @@ function RuntimeStrip({
         {ready ? 'Direct · local' : 'Offline'}
       </span>
       <div className="native-runner-runtime-actions">
+        {!ready ? (
+          <button type="button" className="btn quiet" disabled={refreshing} onClick={onStart}>
+            Start engine
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn quiet"
+            disabled={refreshing || hasQueuedPrompt}
+            title={hasQueuedPrompt ? 'Restart is available after the ComfyUI queue is empty' : undefined}
+            onClick={onRestart}
+          >
+            Restart engine
+          </button>
+        )}
         <button type="button" className="btn quiet" disabled={refreshing} onClick={onRefresh}>
           {refreshing ? 'Checking…' : 'Refresh'}
         </button>
@@ -696,6 +715,11 @@ export function ApiRunnerPage() {
     runRequestRef.current = null
   }, [])
 
+  const currentGraphForAction = useCallback((): WorkflowGraph => {
+    if (!rawDirty) return working
+    return cloneGraph(unwrapGraph(JSON.parse(rawJson) as unknown))
+  }, [rawDirty, rawJson, working])
+
   const stageGraph = useCallback(
     (
       graph: WorkflowGraph,
@@ -751,7 +775,7 @@ export function ApiRunnerPage() {
           nextSourceFilename: file.name,
           markDirty: true,
         })
-        setNotice(`${file.name} is staged. Validate it, then save it to the shared library.`)
+        setNotice(`${file.name} is staged. Save, edit, validate, or run whenever you are ready.`)
         appendLog(`Loaded operator JSON ${file.name}; no workflow was queued.`)
       } catch (caught) {
         setError(caught instanceof Error ? caught.message : 'The workflow JSON is invalid.')
@@ -901,19 +925,25 @@ export function ApiRunnerPage() {
     setError(null)
     setNotice(null)
     try {
-      const snapshot = currentSnapshot
-      const result = await api.analyzeNativeApiRunnerWorkflow(working)
+      const workflowToValidate = currentGraphForAction()
+      const result = await api.analyzeNativeApiRunnerWorkflow(workflowToValidate)
+      const snapshot = graphSnapshot(workflowToValidate)
+      if (rawDirty) {
+        setWorking(cloneGraph(workflowToValidate))
+        setRawJson(JSON.stringify(workflowToValidate, null, 2))
+        setRawDirty(false)
+      }
       setAnalysis(result)
       setValidatedSnapshot(snapshot)
       setNotice(
         result.queueable
           ? `Live validation passed: ${result.nodeCount} nodes, ${result.outputNodes.length} outputs.`
-          : `Validation found ${result.errorCount} blocking issue${result.errorCount === 1 ? '' : 's'}.`,
+          : `Validation found ${result.errorCount} blocking issue${result.errorCount === 1 ? '' : 's'}. Create an editable copy or update the Raw API JSON, then validate again.`,
       )
       appendLog(
         result.queueable
           ? `Validated ${result.workflowSha256.slice(0, 12)}… against live ComfyUI.`
-          : `Validation blocked by ${result.errorCount} issue(s).`,
+          : `Validation blocked by ${result.errorCount} issue(s); no workflow was submitted.`,
       )
     } catch (caught) {
       resetValidation()
@@ -926,6 +956,13 @@ export function ApiRunnerPage() {
   const saveWorkflow = async () => {
     if (!Object.keys(working).length || repositoryReadOnly) return
     const submittedDraft = draftRef.current
+    let workflowToSave: WorkflowGraph
+    try {
+      workflowToSave = currentGraphForAction()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Raw workflow JSON is invalid.')
+      return
+    }
     const normalizedTags = tags
       .split(',')
       .map((tag) => tag.trim())
@@ -945,7 +982,7 @@ export function ApiRunnerPage() {
             instructions,
             tags: normalizedTags,
             requirements: selected.requirements,
-            workflow: working,
+            workflow: workflowToSave,
           })
         : await api.createNativeApiRunnerWorkflow({
             name,
@@ -957,7 +994,7 @@ export function ApiRunnerPage() {
             instructions,
             tags: normalizedTags,
             source_filename: sourceFilename,
-            workflow: working,
+            workflow: workflowToSave,
           })
       setSelected(saved)
       const latestDraft = draftRef.current
@@ -975,8 +1012,8 @@ export function ApiRunnerPage() {
         latestDraft.rawJson === submittedDraft.rawJson &&
         latestDraft.rawDirty === submittedDraft.rawDirty
       if (draftUnchanged) {
-        setWorking(cloneGraph(saved.workflow))
-        setRawJson(JSON.stringify(saved.workflow, null, 2))
+        setWorking(cloneGraph(workflowToSave))
+        setRawJson(JSON.stringify(workflowToSave, null, 2))
         setDirty(false)
         setRawDirty(false)
       } else {
@@ -1007,8 +1044,32 @@ export function ApiRunnerPage() {
     setNotice('Working copy detached. Save to add it as a new library workflow.')
   }
 
+  const switchToInputs = () => {
+    if (!rawDirty) {
+      setMode('inputs')
+      return
+    }
+    try {
+      const graph = currentGraphForAction()
+      setWorking(graph)
+      setRawJson(JSON.stringify(graph, null, 2))
+      setRawDirty(false)
+      setMode('inputs')
+      setError(null)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Raw workflow JSON is invalid.')
+    }
+  }
+
   const downloadJson = () => {
-    const blob = new Blob([`${JSON.stringify(working, null, 2)}\n`], {
+    let workflowToDownload: WorkflowGraph
+    try {
+      workflowToDownload = currentGraphForAction()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Raw workflow JSON is invalid.')
+      return
+    }
+    const blob = new Blob([`${JSON.stringify(workflowToDownload, null, 2)}\n`], {
       type: 'application/json',
     })
     const url = URL.createObjectURL(blob)
@@ -1092,12 +1153,19 @@ export function ApiRunnerPage() {
   }
 
   const run = async () => {
-    if (!analysis?.queueable || validatedSnapshot !== currentSnapshot) return
+    if (!canRun || !analysis?.queueable) return
+    let workflowToSubmit: WorkflowGraph
+    try {
+      workflowToSubmit = currentGraphForAction()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Raw workflow JSON is invalid.')
+      return
+    }
     const request =
-      runRequestRef.current?.snapshot === currentSnapshot
+      runRequestRef.current?.snapshot === graphSnapshot(workflowToSubmit)
         ? runRequestRef.current
         : {
-            snapshot: currentSnapshot,
+            snapshot: graphSnapshot(workflowToSubmit),
             idempotencyKey: makeIdempotencyKey(),
           }
     runRequestRef.current = request
@@ -1106,12 +1174,17 @@ export function ApiRunnerPage() {
     setNotice(null)
     try {
       const result = await api.runNativeApiRunnerWorkflow({
-        workflow: working,
+        workflow: workflowToSubmit,
         workflow_name: name || 'CineForge native workflow',
         workflow_sha256: analysis.workflowSha256,
         confirmation: true,
         idempotency_key: request.idempotencyKey,
       })
+      if (rawDirty) {
+        setWorking(workflowToSubmit)
+        setRawJson(JSON.stringify(workflowToSubmit, null, 2))
+        setRawDirty(false)
+      }
       runRequestRef.current = null
       const activity: RunnerActivity = {
         promptId: result.prompt_id,
@@ -1190,6 +1263,36 @@ export function ApiRunnerPage() {
     }
   }
 
+  const startManagedEngine = async () => {
+    setAction('starting-engine')
+    setError(null)
+    try {
+      const result = await api.startEngine()
+      setNotice(result.message)
+      appendLog(result.message)
+      window.setTimeout(() => void refreshRuntime(true), 1_500)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to start the bundled engine.')
+    } finally {
+      setAction('')
+    }
+  }
+
+  const restartManagedEngine = async () => {
+    setAction('restarting-engine')
+    setError(null)
+    try {
+      const result = await api.restartComfyUi()
+      setNotice(result.message)
+      appendLog(result.message)
+      window.setTimeout(() => void refreshRuntime(true), 2_000)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to restart the bundled engine.')
+    } finally {
+      setAction('')
+    }
+  }
+
   const hasWorkflow = Object.keys(working).length > 0
 
   return (
@@ -1208,7 +1311,7 @@ export function ApiRunnerPage() {
           <h1>CineForge API Runner</h1>
           <p>
             Load, save, inspect, edit, validate, and run API-format workflows without leaving
-            CineForge. The standalone ComfyAPI Runner remains separate and unchanged.
+            CineForge. Sineforge owns the BlokeyUI process, queue, outputs, and lifecycle.
           </p>
         </div>
         <div className="page-actions">
@@ -1236,6 +1339,8 @@ export function ApiRunnerPage() {
         refreshing={action === 'refreshing-runtime' || action === 'freeing-memory'}
         onRefresh={() => void refreshRuntime()}
         onFreeMemory={() => setConfirmAction({ kind: 'free-memory' })}
+        onStart={() => void startManagedEngine()}
+        onRestart={() => void restartManagedEngine()}
       />
 
       {error ? <ErrorState detail={error} onRetry={() => void loadInitial()} /> : null}
@@ -1250,7 +1355,7 @@ export function ApiRunnerPage() {
       ) : null}
       {loading ? <LoadingState title="Opening the native API Runner…" /> : null}
 
-      {!loading ? (
+      {!loading && (!error || workflows.length > 0 || hasWorkflow) ? (
         <div className={`native-runner-shell ${hasWorkflow ? 'has-workflow' : ''}`}>
           <aside className="panel native-runner-library">
             <header>
@@ -1385,9 +1490,9 @@ export function ApiRunnerPage() {
                       {analysis ? (
                         <span
                           className="status-pill"
-                          data-status={analysis.queueable ? 'ready' : 'blocked'}
+                          data-status={analysis.queueable ? 'ready' : 'review'}
                         >
-                          {analysis.queueable ? 'Validated' : 'Blocked'}
+                          {analysis.queueable ? 'Validated' : 'Issues found'}
                         </span>
                       ) : null}
                     </div>
@@ -1399,8 +1504,9 @@ export function ApiRunnerPage() {
                       <div>
                         <b>Protected repository workflow</b>
                         <p>
-                          This imported original cannot be edited or archived. Load it in ComfyUI,
-                          or use Save as copy to create an editable operator workflow.
+                          This bundled original cannot be edited or archived. Use Save as copy to
+                          create an editable operator workflow, then change its inputs or Raw API JSON
+                          entirely inside Sineforge.
                         </p>
                       </div>
                     </div>
@@ -1505,9 +1611,7 @@ export function ApiRunnerPage() {
                         type="button"
                         className={mode === 'inputs' ? 'active' : ''}
                         aria-pressed={mode === 'inputs'}
-                        disabled={rawDirty}
-                        title={rawDirty ? 'Apply or correct the raw JSON before leaving this editor' : undefined}
-                        onClick={() => setMode('inputs')}
+                        onClick={switchToInputs}
                       >
                         Editable inputs
                       </button>
@@ -1655,7 +1759,7 @@ export function ApiRunnerPage() {
                       <button
                         type="button"
                         className="btn quiet"
-                        disabled={Boolean(action) || rawDirty}
+                        disabled={Boolean(action)}
                         onClick={downloadJson}
                       >
                         Download JSON
@@ -1669,36 +1773,6 @@ export function ApiRunnerPage() {
                         >
                           Original workflow
                         </button>
-                      ) : null}
-                      {selected?.repository_managed && selected.source_workflow ? (
-                        <a
-                          className="btn native-runner-comfy-load"
-                          href={nativeApiRunnerWorkflowOpenUrl(selected.id)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-disabled={Boolean(action) || !runtime?.ok}
-                          tabIndex={Boolean(action) || !runtime?.ok ? -1 : undefined}
-                          title={
-                            runtime?.ok
-                              ? 'Open the original editable graph in the active ComfyUI instance'
-                              : 'Start or reconnect ComfyUI first'
-                          }
-                          onClick={(event) => {
-                            if (action || !runtime?.ok) {
-                              event.preventDefault()
-                              return
-                            }
-                            setError(null)
-                            setNotice(
-                              `${selected.name} is opening on the ComfyUI canvas. Nothing was queued.`,
-                            )
-                            appendLog(
-                              `Sent ${selected.name} to the ComfyUI canvas without queueing it.`,
-                            )
-                          }}
-                        >
-                          Load in ComfyUI
-                        </a>
                       ) : null}
                     </div>
                     <div>
@@ -1717,7 +1791,6 @@ export function ApiRunnerPage() {
                         className="btn primary"
                         disabled={
                           Boolean(action) ||
-                          rawDirty ||
                           repositoryReadOnly ||
                           !name.trim() ||
                           (!dirty && Boolean(selected))
@@ -1782,14 +1855,15 @@ export function ApiRunnerPage() {
                       <h3>Requirements</h3>
                       {selected?.requirements.unresolved_node_classes?.length ? (
                         <div className="native-runner-requirement-alert">
-                          <b>Resolve custom nodes before running</b>
+                          <b>Resolve missing nodes in an editable copy</b>
                           <span>
                             {selected.requirements.unresolved_node_classes.join(', ')}
                           </span>
                         </div>
                       ) : (
                         <p>
-                          Validate against the connected ComfyUI install before queueing.
+                          Create an editable copy when changes are needed, then validate its exact API
+                          graph before queueing.
                         </p>
                       )}
                       {selected?.requirements.model_files?.length ? (
@@ -1813,7 +1887,7 @@ export function ApiRunnerPage() {
                     <div className="native-runner-guide-section">
                       <h3>How to use</h3>
                       <ol>
-                        {(instructions || '1. Validate the workflow, edit its inputs, and run one job.')
+                        {(instructions || '1. Use Save as copy for a protected bundled workflow.\n2. Edit its inputs or Raw API JSON in Sineforge.\n3. Validate the exact graph before running one job.')
                           .split('\n')
                           .map((step) => step.replace(/^\d+\.\s*/, '').trim())
                           .filter(Boolean)
@@ -1870,12 +1944,12 @@ export function ApiRunnerPage() {
                         className="native-runner-validation"
                         data-pass={analysis.queueable}
                       >
-                        <span aria-hidden="true">{analysis.queueable ? '✓' : '!'}</span>
+                        <span aria-hidden="true">{analysis.queueable ? '✓' : 'i'}</span>
                         <div>
                           <b>
                             {analysis.queueable
                               ? 'Live validation passed'
-                              : `${analysis.errorCount} blocking issue${analysis.errorCount === 1 ? '' : 's'}`}
+                              : `${analysis.errorCount} run issue${analysis.errorCount === 1 ? '' : 's'}`}
                           </b>
                           <small>
                             {analysis.warningCount} warning{analysis.warningCount === 1 ? '' : 's'} ·
@@ -1889,7 +1963,7 @@ export function ApiRunnerPage() {
                         <span aria-hidden="true">◇</span>
                         <div>
                           <b>Validation required</b>
-                          <small>Checked against the connected ComfyUI node registry.</small>
+                          <small>The exact API graph must pass against the ready local engine.</small>
                         </div>
                       </div>
                     )}
@@ -1915,7 +1989,7 @@ export function ApiRunnerPage() {
                       <button
                         type="button"
                         className="btn secondary"
-                        disabled={Boolean(action) || rawDirty || !runtime?.ok}
+                        disabled={Boolean(action) || !runtime?.ok}
                         onClick={() => void validate()}
                       >
                         {action === 'validating' ? 'Validating…' : 'Validate live'}
@@ -1926,8 +2000,8 @@ export function ApiRunnerPage() {
                         disabled={!canRun}
                         title={
                           canRun
-                            ? 'Queue this exact validated graph'
-                            : 'Validate the current JSON against a ready ComfyUI runtime first'
+                            ? 'Queue this exact validated graph in the local engine'
+                            : 'Connect the engine and validate the current API graph first'
                         }
                         onClick={() => void run()}
                       >
@@ -1935,8 +2009,8 @@ export function ApiRunnerPage() {
                       </button>
                     </div>
                     <p className="native-runner-run-note">
-                      Every click submits exactly one validated graph. Editing any input invalidates
-                      the prior check.
+                      Every click submits exactly one validated graph. Editing any input or Raw API JSON
+                      invalidates the prior check.
                     </p>
                   </section>
 
@@ -2025,7 +2099,7 @@ export function ApiRunnerPage() {
                       </div>
                     ) : (
                       <p className="native-runner-muted">
-                        Validate to inspect model and resource selectors.
+                        Validate when you want SineForge to inspect model and resource selectors.
                       </p>
                     )}
                   </section>
@@ -2077,9 +2151,20 @@ export function ApiRunnerPage() {
                           Cancel
                         </button>
                       ) : job.state === 'running' ? (
-                        <small title="Active ComfyUI interruption is global and is intentionally not exposed here.">
-                          Active in ComfyUI
-                        </small>
+                        runtime?.capabilities.interruptActive ? (
+                          <button
+                            type="button"
+                            className="btn danger"
+                            disabled={Boolean(action)}
+                            onClick={() => setConfirmAction({ kind: 'stop-job', job })}
+                          >
+                            Stop
+                          </button>
+                        ) : (
+                          <small title="The connected engine does not allow active interruption.">
+                            Active in local engine
+                          </small>
+                        )
                       ) : null}
                     </header>
                     {job.outputs.length ? (
@@ -2156,8 +2241,8 @@ export function ApiRunnerPage() {
             <span className="eyebrow">NEW WORKING COPY</span>
             <h2 id="paste-json-title">Paste API workflow JSON</h2>
             <p>
-              This creates an unsaved draft only. Visual workflow JSON is rejected; use ComfyUI
-              Dev Mode → Save (API Format).
+              This creates an unsaved draft only. Sineforge accepts executable API-format prompt
+              graphs; visual editor-format workflow JSON is rejected.
             </p>
             <textarea
               className="mono"
@@ -2227,12 +2312,16 @@ export function ApiRunnerPage() {
             <h2 id="confirm-action-title">
               {confirmAction.kind === 'remove'
                 ? `Archive ${selected?.name ?? 'workflow'}?`
-                : 'Unload models and free VRAM?'}
+                : confirmAction.kind === 'stop-job'
+                  ? `Stop ${confirmAction.job.workflowName}?`
+                  : 'Unload models and free VRAM?'}
             </h2>
             <p>
               {confirmAction.kind === 'remove'
                 ? 'The record leaves the active library but remains recoverable in CineForge’s archive.'
-                : 'ComfyUI will unload active models only when its running and pending queues are both empty. No workflow files are changed.'}
+                : confirmAction.kind === 'stop-job'
+                  ? 'This prompt was submitted by the Sineforge native Runner. Stopping it interrupts the active local-engine execution; other queued prompts remain queued.'
+                  : 'ComfyUI will unload active models only when its running and pending queues are both empty. No workflow files are changed.'}
             </p>
             <div className="modal-actions">
               <button type="button" className="btn secondary" onClick={() => setConfirmAction(null)}>
@@ -2240,17 +2329,25 @@ export function ApiRunnerPage() {
               </button>
               <button
                 type="button"
-                className={confirmAction.kind === 'remove' ? 'btn danger' : 'btn primary'}
+                className={
+                  confirmAction.kind === 'remove' || confirmAction.kind === 'stop-job'
+                    ? 'btn danger'
+                    : 'btn primary'
+                }
                 onClick={() => {
                   if (confirmAction.kind === 'remove') void removeWorkflow()
-                  else {
+                  else if (confirmAction.kind === 'stop-job') {
+                    void cancelJob(confirmAction.job, true)
+                  } else {
                     void freeMemory()
                   }
                 }}
               >
                 {confirmAction.kind === 'remove'
                   ? 'Archive workflow'
-                  : 'Unload & free VRAM'}
+                  : confirmAction.kind === 'stop-job'
+                    ? 'Stop running prompt'
+                    : 'Unload & free VRAM'}
               </button>
             </div>
           </section>

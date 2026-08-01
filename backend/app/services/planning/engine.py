@@ -451,6 +451,11 @@ class PlanningEngine:
         routing_snapshot["base_content_hash"] = base_content_hash
         routing_snapshot["persisted_task_assignments"] = stored_route_evidence
         routing_snapshot["requested_mode"] = request.routing_mode.value
+        routing_snapshot["proposal_type"] = request.proposal_type
+        if request.planning_instruction:
+            routing_snapshot["provider_constraints"] = {
+                "iteration_instruction": request.planning_instruction,
+            }
         if request.idempotency_key:
             routing_snapshot["client_idempotency_key"] = request.idempotency_key
 
@@ -1387,10 +1392,22 @@ class PlanningEngine:
             (production or {}).get("summary")
             or f"Planning proposal for {context.title}"
         ).strip()[:2000]
+        try:
+            proposal_type = ProposalType(
+                str(
+                    (run.routing_snapshot_json or {}).get("proposal_type")
+                    or ProposalType.storyboard_full_plan.value
+                )
+            )
+        except ValueError as exc:
+            raise PlanningError(
+                PlanningErrorCode.VALIDATION_FAILED,
+                "Planning run contains an unsupported proposal type",
+            ) from exc
         validation = proposal_service.validate_create_request(
             self.repo.db,
             ProposalCreateRequest(
-                proposal_type=ProposalType.storyboard_full_plan.value,
+                proposal_type=proposal_type.value,
                 summary=summary,
                 payload=payload,
                 story_id=run.story_id,
@@ -1408,7 +1425,7 @@ class PlanningEngine:
         content_hash = validation.content_hash or proposal_content_hash(payload)
 
         record = self.repo.create_proposal(
-            proposal_type=ProposalType.storyboard_full_plan.value,
+            proposal_type=proposal_type.value,
             payload=payload,
             story_id=run.story_id,
             orchestration_run_id=run.id,

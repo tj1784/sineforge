@@ -176,6 +176,93 @@
   color: #9ebbd0;
 }
 
+.theme-fieldset {
+  min-width: 0;
+  margin: 18px 0;
+  padding: 17px;
+  border: 1px solid #30343a;
+  border-radius: 11px;
+  background: #181a1c;
+}
+
+.theme-fieldset > legend {
+  padding: 0 8px;
+  color: #d8dce0;
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.theme-fieldset > legend em {
+  margin-left: 7px;
+  color: #8eb0c4;
+  font-size: 7px;
+  font-style: normal;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.theme-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.theme-card {
+  display: grid;
+  grid-template-columns: 17px minmax(0, 1fr);
+  gap: 9px;
+  min-height: 88px;
+  align-content: center;
+  padding: 12px;
+  border: 1px solid #30343a;
+  border-radius: 9px;
+  background: #1d2022;
+  cursor: pointer;
+}
+
+.theme-card:hover { border-color: #4b5965; }
+.theme-card:has(input:checked) {
+  border-color: #527b9b;
+  background: #192833;
+  box-shadow: inset 0 0 0 1px rgb(168 199 250 / 10%);
+}
+.theme-card:has(input:focus-visible) { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px rgb(168 199 250 / 65%); }
+.theme-card input { width: 15px; height: 15px; margin: 1px 0 0; accent-color: #a8c7fa; }
+.theme-card b, .theme-card small { display: block; }
+.theme-card b { color: #eef0f2; font-size: 9px; line-height: 1.35; }
+.theme-card small { margin-top: 5px; color: #858a92; font-size: 8px; line-height: 1.45; }
+
+.biblical-context {
+  margin-top: 14px;
+  padding: 15px;
+  border: 1px solid #3b4650;
+  border-radius: 9px;
+  background: #151a1e;
+}
+.biblical-context > header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.biblical-context > header span { color: #8eb0c4; font-size: 7px; font-weight: 800; letter-spacing: .1em; }
+.biblical-context > header h3 { margin: 4px 0 0; color: #e5e8eb; font-size: 12px; }
+.biblical-context > header small { color: #b7a47b; font-size: 8px; }
+.biblical-context > p { margin: 8px 0 13px; color: #858a92; font-size: 8px; line-height: 1.5; }
+.biblical-context-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.biblical-context-grid label { color: #cfd3d5; font-size: 8px; font-weight: 700; }
+.biblical-context-grid label em { float: right; color: #76818a; font-size: 7px; font-style: normal; text-transform: uppercase; }
+.biblical-context-grid input, .biblical-context-grid select {
+  display: block;
+  width: 100%;
+  min-height: 36px;
+  margin-top: 6px;
+  border: 1px solid #363a40;
+  border-radius: 7px;
+  background: #202326;
+  color: #e4e6e8;
+  padding: 8px 9px;
+  font-size: 8px;
+}
+
+.project-theme-settings { max-width: 920px; }
+.project-theme-settings .theme-fieldset { margin: 2px 0 0; }
+
 @media (max-width: 620px) {
   .workflow-lane-options {
     grid-template-columns: 1fr;
@@ -185,4 +272,10 @@
   .studio-composer .workflow-lane-card {
     min-height: 74px;
   }
+
+  .theme-options, .biblical-context-grid { grid-template-columns: 1fr; }
+}
+
+@media (min-width: 621px) and (max-width: 980px) {
+  .theme-options { grid-template-columns: 1fr; }
 }

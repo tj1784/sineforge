@@ -1,0 +1,526 @@
+{
+  "1": {
+    "inputs": {
+      "image": "example.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "1 · Initial or canonical image"
+    }
+  },
+  "26": {
+    "inputs": {
+      "image": "Krea2_00006_.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "1B · Ingredients / identity reference sheet"
+    }
+  },
+  "32": {
+    "inputs": {
+      "loop_count": 4
+    },
+    "class_type": "SineForgeContinuationLoopCount",
+    "_meta": {
+      "title": "2 · Loop count · 0 = until interrupted"
+    }
+  },
+  "2": {
+    "inputs": {
+      "total": [
+        "32",
+        0
+      ],
+      "initial_value1": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "easy forLoopStart",
+    "_meta": {
+      "title": "2B · Automated continuation loop engine"
+    }
+  },
+  "3": {
+    "inputs": {
+      "model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+      "variation_mode": "new variation every run",
+      "seed": 20260731,
+      "scene_or_subject": "The subject and environment shown in the starting image, preserved as the visual source of truth.",
+      "next_event": "Advance the scene by one clear, visually coherent event while preserving everything not explicitly changed.",
+      "audio_mode": "automatic from scene",
+      "dialogue_json": "[]",
+      "continuity_mode": "lossless_loop",
+      "duration_seconds": 8,
+      "visual_constraints_text": "Use the supplied image as the last accepted frame and visual source of truth.\nPreserve subject identity and count, object design, location, composition, palette, lighting logic, lens character, and visual style unless the next-cycle goal explicitly changes one of them.\nCreate a clean new still for the next cycle without carrying forward compression artifacts, burned-in text, watermarks, or accidental defects.",
+      "continuation_request_json": "{\n  \"project_brief\": \"Build a reusable sequence of visually continuous image-to-video cycles from the most recent accepted frame. The source can be people, objects, places, products, environments, abstract imagery, or any other visual subject.\",\n  \"next_cycle_goal\": \"Advance the current subject, discussion, topic, action, or visual idea by one clear beat while preserving everything that is not explicitly meant to change.\",\n  \"continuity_mode\": \"lossless_loop\",\n  \"dialogue_or_audio_direction\": \"Continue established dialogue or audio only when the project context calls for it; otherwise use coherent ambient sound and do not invent speech.\",\n  \"visual_constraints\": [\n    \"Use the supplied image as the last accepted frame and visual source of truth.\",\n    \"Preserve subject identity and count, object design, location, composition, palette, lighting logic, lens character, and visual style unless the next-cycle goal explicitly changes one of them.\",\n    \"Create a clean new still for the next cycle without carrying forward compression artifacts, burned-in text, watermarks, or accidental defects.\"\n  ],\n  \"duration_seconds\": 8\n}",
+      "recent_cycles_json": "[]",
+      "temperature": 0.85,
+      "top_p": 0.95,
+      "max_tokens": 1800,
+      "timeout_seconds": 900,
+      "image": [
+        "2",
+        2
+      ],
+      "reference_image": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "SineForgeLTXGeneralContinuationPlanner",
+    "_meta": {
+      "title": "3 · General scene/story continuation JSON"
+    }
+  },
+  "4": {
+    "inputs": {
+      "unet_name": "krea2TurboOfficialComfy_krea2RawInt8Convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "4 · Existing-library Krea 2 model"
+    }
+  },
+  "5": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "5 · Krea 2 Qwen3-VL encoder"
+    }
+  },
+  "6": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "6 · Krea 2 VAE"
+    }
+  },
+  "8": {
+    "inputs": {
+      "text": [
+        "3",
+        1
+      ],
+      "clip": [
+        "5",
+        0
+      ],
+      "image1": [
+        "2",
+        2
+      ],
+      "image1_tokens": "normal",
+      "image2": [
+        "26",
+        0
+      ],
+      "image2_tokens": "high"
+    },
+    "class_type": "Krea2EncodeRebalance",
+    "_meta": {
+      "title": "8 · Krea prompt + current-frame/reference conditioning"
+    }
+  },
+  "9": {
+    "inputs": {
+      "conditioning": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "9 · Krea negative conditioning"
+    }
+  },
+  "10": {
+    "inputs": {
+      "width": 768,
+      "height": 448,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "10 · Krea anchor latent · 768×448"
+    }
+  },
+  "11": {
+    "inputs": {
+      "seed": [
+        "3",
+        5
+      ],
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "er_sde",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": [
+        "4",
+        0
+      ],
+      "positive": [
+        "8",
+        0
+      ],
+      "negative": [
+        "9",
+        0
+      ],
+      "latent_image": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "11 · Existing-library Krea 2 sampler"
+    }
+  },
+  "12": {
+    "inputs": {
+      "samples": [
+        "11",
+        0
+      ],
+      "vae": [
+        "6",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "12 · Decode fresh Krea 2 anchor"
+    }
+  },
+  "13": {
+    "inputs": {
+      "string_a": [
+        "3",
+        8
+      ],
+      "string_b": "_KREA2_ANCHOR",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "13 · Anchor filename"
+    }
+  },
+  "14": {
+    "inputs": {
+      "images": [
+        "12",
+        0
+      ],
+      "filename_prefix": [
+        "13",
+        0
+      ],
+      "format": {
+        "format": "png",
+        "bit_depth": "16-bit",
+        "input_color_space": "sRGB"
+      }
+    },
+    "class_type": "SaveImageAdvanced",
+    "_meta": {
+      "title": "14 · Save 16-bit PNG · passthrough triggers LTX"
+    }
+  },
+  "24": {
+    "inputs": {
+      "empty_cache": true,
+      "gc_collect": true,
+      "unload_all_models": true,
+      "image_pass": [
+        "14",
+        0
+      ]
+    },
+    "class_type": "VRAM_Debug",
+    "_meta": {
+      "title": "14B · Unload Krea before LTX · image passthrough"
+    }
+  },
+  "27": {
+    "inputs": {
+      "ckpt_name": "sulphur2Base_distilled.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "14C · Load LTX model for reference override"
+    }
+  },
+  "28": {
+    "inputs": {
+      "model": [
+        "27",
+        0
+      ],
+      "lora_name": "LTX\\2.3\\Official\\IC-LoRA\\Ingredients\\ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors",
+      "strength_model": 1.0
+    },
+    "class_type": "LTXICLoRALoaderModelOnly",
+    "_meta": {
+      "title": "14D · Apply official Ingredients IC-LoRA"
+    }
+  },
+  "29": {
+    "inputs": {
+      "model": [
+        "28",
+        0
+      ],
+      "zero_ref_timesteps": false,
+      "verbose": false
+    },
+    "class_type": "LTXReferenceEnable",
+    "_meta": {
+      "title": "14E · Enable LTX reference-token injection"
+    }
+  },
+  "30": {
+    "inputs": {
+      "vae_name": "LTX23_video_vae_bf16.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "14F · LTX reference-conditioning VAE"
+    }
+  },
+  "31": {
+    "inputs": {
+      "model": [
+        "29",
+        0
+      ],
+      "vae": [
+        "30",
+        0
+      ],
+      "image": [
+        "26",
+        0
+      ],
+      "strength": 0.75,
+      "position_mode": "reference",
+      "verbose": false
+    },
+    "class_type": "LTXReferenceConditioning",
+    "_meta": {
+      "title": "14G · Attach reference sheet to patched LTX model"
+    }
+  },
+  "15": {
+    "inputs": {
+      "mode": "▶️ image_to_video",
+      "positive_prompt": [
+        "3",
+        2
+      ],
+      "negative_prompt": [
+        "3",
+        3
+      ],
+      "base_model": "sulphur2Base_distilled.safetensors",
+      "clip_1": "gemma_3_12B_it_fp8_e4m3fn.safetensors",
+      "clip_2": "ltx-2.3_text_projection_bf16.safetensors",
+      "vae": "LTX23_video_vae_bf16.safetensors",
+      "audio_vae": "LTX23_audio_vae_bf16.safetensors",
+      "upscale_model": "ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+      "video_size": "Custom",
+      "ratio": "16:9",
+      "ratio_from_image": false,
+      "custom_width": 768,
+      "custom_height": 448,
+      "frame_rate": 24,
+      "seconds": [
+        "3",
+        7
+      ],
+      "seed": [
+        "3",
+        6
+      ],
+      "sigma_preset": "12 steps",
+      "image": [
+        "24",
+        1
+      ],
+      "override_audio": false,
+      "lora_1": "None",
+      "lora_1_strength": 0.0,
+      "lora_2": "None",
+      "lora_2_strength": 0.0,
+      "lora_3": "None",
+      "lora_3_strength": 0.0,
+      "custom_sigmas_pass1": "1.0, 0.995833, 0.991667, 0.9875, 0.983333, 0.979167, 0.975, 0.93125, 0.847917, 0.725, 0.522917, 0.28125, 0.0",
+      "sigmas_pass2": "0.85, 0.725, 0.6, 0.4219, 0.0",
+      "cfg": 1.0,
+      "sampler_pass1": "euler_ancestral_cfg_pp",
+      "sampler_pass2": "euler_cfg_pp",
+      "weight_dtype": "default",
+      "model_override": [
+        "31",
+        0
+      ]
+    },
+    "class_type": "LTXVSulphurAllInOne",
+    "_meta": {
+      "title": "15 · LTX-2.3 from saved Krea anchor + reference override"
+    }
+  },
+  "16": {
+    "inputs": {
+      "images": [
+        "15",
+        0
+      ],
+      "frame_rate": [
+        "15",
+        2
+      ],
+      "loop_count": 0,
+      "filename_prefix": [
+        "3",
+        8
+      ],
+      "format": "video/ffv1-mkv",
+      "level": "3",
+      "coder": "1",
+      "context": "1",
+      "gop_size": 1,
+      "slices": "16",
+      "slicecrc": "1",
+      "pix_fmt": "rgba64le",
+      "save_metadata": true,
+      "trim_to_audio": false,
+      "pingpong": false,
+      "save_output": true,
+      "audio": [
+        "15",
+        1
+      ]
+    },
+    "class_type": "VHS_VideoCombine",
+    "_meta": {
+      "title": "16 · Lossless FFV1 + FLAC master"
+    }
+  },
+  "17": {
+    "inputs": {
+      "text": [
+        "3",
+        0
+      ],
+      "filename_prefix": [
+        "3",
+        8
+      ],
+      "format": "json"
+    },
+    "class_type": "SaveText",
+    "_meta": {
+      "title": "17 · Save complete prompt JSON"
+    }
+  },
+  "18": {
+    "inputs": {
+      "image": [
+        "15",
+        0
+      ],
+      "batch_index": -1,
+      "length": 1
+    },
+    "class_type": "ImageFromBatch",
+    "_meta": {
+      "title": "18 · True final tensor frame"
+    }
+  },
+  "19": {
+    "inputs": {
+      "string_a": [
+        "3",
+        8
+      ],
+      "string_b": "_FINAL_FRAME",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "19 · Final-frame filename"
+    }
+  },
+  "20": {
+    "inputs": {
+      "images": [
+        "18",
+        0
+      ],
+      "filename_prefix": [
+        "19",
+        0
+      ],
+      "format": {
+        "format": "png",
+        "bit_depth": "16-bit",
+        "input_color_space": "sRGB"
+      }
+    },
+    "class_type": "SaveImageAdvanced",
+    "_meta": {
+      "title": "20 · Save 16-bit final frame · loop state"
+    }
+  },
+  "21": {
+    "inputs": {
+      "text": [
+        "3",
+        9
+      ]
+    },
+    "class_type": "ShowText|pysssss",
+    "_meta": {
+      "title": "21 · Planner status · seeds · hashes"
+    }
+  },
+  "22": {
+    "inputs": {
+      "flow": [
+        "2",
+        0
+      ],
+      "initial_value1": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "easy forLoopEnd",
+    "_meta": {
+      "title": "22 · Continue from saved final-frame tensor"
+    }
+  },
+  "23": {
+    "inputs": {
+      "images": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "23 · Final continuation frame"
+    }
+  }
+}

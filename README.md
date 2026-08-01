@@ -1,141 +1,170 @@
-# CineForge
+# CineForge / Sineforge
 
-CineForge is a local AI video-generation orchestration platform. It is designed to be the deterministic execution layer around an isolated ComfyUI runtime, durable backend-owned queues, manifest-validated workflow templates, reproducible provenance, GPU telemetry, and FFmpeg validation/assembly primitives.
+CineForge is a local AI-video production application with one user-facing
+Sineforge interface and one privately owned ComfyUI engine. The engine source is
+the separate `BlokeyUI` tree; Sineforge owns its lifecycle, validation, queue,
+inputs, outputs, and operator controls.
 
-## Current Status
+## Unified application status
 
-This repository includes **Storyboard Phase A**, a planning-only foundation that ends with an approved, editable production plan.
+The active runtime is now a single supervised application:
 
-What works now:
+```text
+Sineforge React UI (:5174)
+        |
+        v
+Sineforge FastAPI (:8010)
+        |
+        +-- native workflow validation/submission/output tracking
+        |
+        +-- owned BlokeyUI ComfyUI 0.29.2 subprocess (:8190)
+```
 
-- FastAPI backend scaffold.
-- Configuration loading from `.env`.
-- Health endpoints for app, ComfyUI reachability, GPU telemetry, and FFmpeg availability.
-- SQLAlchemy schema foundation aligned to the research packet.
-- Queue state machine primitives.
-- Workflow manifest validation and immutable snapshot writing.
-- Path safety helpers.
-- Offline-safe ComfyUI client wrapper.
-- `nvidia-smi` parser for benchmark telemetry.
-- FFmpeg/ffprobe validation primitives.
-- Non-executing AI/autonomy schemas and validators.
-- Pytest coverage for the Sprint 1A primitives.
-- Persisted `Project -> Story -> Chapter -> Scene -> Shot` planning hierarchy.
-- Storyboard readiness checks, duration rollups, immutable approval versions, JSON and CSV planning exports.
-- Storyboard Studio frontend views for planning, assets, routing, workflows, exports, and settings.
+What works:
 
-What does not work yet:
+- The Projects and Studio UI are the only supported frontend.
+- FastAPI starts, probes, restarts, stops, and reaps the BlokeyUI engine.
+- The engine is bound to `127.0.0.1:8190`; the UI does not send the operator to
+  the ComfyUI canvas.
+- The native API Runner loads, edits, validates, saves, queues, monitors,
+  interrupts, and previews API-format ComfyUI workflows inside Sineforge.
+- Phase 7 submits image-to-video prompts directly to ComfyUI; no service on
+  port 8022 is involved.
+- Engine readiness proves the ComfyUI system endpoint, the Sineforge bridge
+  identity, and the required LTX/Krea/VHS/easy-use text nodes.
+- Normal stop and restart operations refuse to interrupt active or pending
+  renders. Explicit force is a separate control.
+- Engine data is isolated under `storage/inputs`, `storage/outputs`, and
+  `storage/runtime/comfyui`.
+- The engine process tree is attached to a kill-on-close Windows Job Object and
+  a cross-process owner lock.
+- Existing project planning, storyboard, workflow-manifest, local-model,
+  provenance, GPU telemetry, and FFmpeg features remain available.
 
-- No real video generation.
-- No model downloads.
-- No ComfyUI installation or mutation.
-- No autonomous production execution.
-- No GPU queue worker yet.
-- No image/video generation is triggered by Storyboard Phase A approval.
-- Project, campaign, and job APIs are validation stubs, not fully DB-backed.
+Current workstation dependency boundary:
 
-## Local Setup
+- Core source: `BlokeyUI/ComfyUI` (ComfyUI 0.29.2).
+- Dependency runtime: `C:\ComfyUI\LTX\ComfyUI\python_embeded\python.exe`
+  (Python 3.11.9, Torch/CUDA stack proven with the installed LTX nodes).
+- Curated custom-node source:
+  `C:\ComfyUI\LTX\ComfyUI\ComfyUI\custom_nodes`.
+- Integrated Sineforge model library:
+  `BlokeyUI/ComfyUI/models`. The managed engine loads this checkout-local
+  inventory as its default model root; the older shared model library is not
+  part of the core managed-engine registry.
+
+BlokeyUI's bundled Python 3.13 environment cannot load a material part of the
+current LTX node stack. The launcher therefore uses the proven Python 3.11
+dependency environment while the source bootstrap guarantees that all ComfyUI
+core imports resolve from BlokeyUI 0.29.2. This is one engine process, not two
+ComfyUI services. A future distributable should copy/freeze that dependency
+runtime beside BlokeyUI instead of referencing the existing LTX installation.
+
+The BlokeyUI repository remains a separate nested Git tree. Runtime integration
+does not combine or rewrite the two repositories' histories.
+
+## Start the complete app
+
+From the Sineforge repository root:
+
+```powershell
+.\start-cineforge.cmd
+```
+
+The trusted launcher:
+
+1. Starts or verifies the local LM Studio/Sulphur planning service.
+2. Starts FastAPI; FastAPI is the sole owner of the BlokeyUI engine child.
+3. Waits for engine identity and required-node readiness.
+4. Starts or reuses the Vite frontend.
+5. Opens `/projects` after the unified application is ready.
+6. Continuously probes FastAPI and Vite, replacing an exited or repeatedly
+   unresponsive owned process with capped backoff while the other service stays up.
+7. Lets FastAPI automatically recover a confirmed-dead BlokeyUI child; explicit
+   Stop and shutdown cancel recovery so the engine cannot resurrect itself.
+8. Stops only the process trees it owns on Ctrl+C.
+
+Useful options:
+
+```powershell
+.\start-cineforge.cmd --check
+.\start-cineforge.cmd --no-browser
+```
+
+`--check` validates the Sineforge services plus the configured BlokeyUI source,
+Python compatibility runtime, bootstrap, path configuration, and curated
+custom-node root. Logs are written under:
+
+```text
+storage/runtime/supervisor/logs/
+storage/runtime/comfyui/logs/
+```
+
+Manual `uvicorn` startup is intentionally diagnostic-only unless the launcher
+sets the process-scoped `CINEFORGE_COMFYUI_BACKEND_MANAGED=true` flag. This
+prevents tests or an incidental backend process from claiming the GPU engine.
+Keep the launcher running for the session: it is the watchdog and records live
+PIDs, restart counts, liveness failures, and backoff state in
+`storage/runtime/supervisor/cineforge-services.json`.
+
+## Engine configuration
+
+The relevant local settings are:
+
+```text
+CINEFORGE_COMFYUI_AUTOSTART=true
+CINEFORGE_COMFYUI_BASE_URL=http://127.0.0.1:8190
+CINEFORGE_COMFYUI_WORKING_DIR=./BlokeyUI
+CINEFORGE_COMFYUI_PYTHON_EXECUTABLE=C:\ComfyUI\LTX\ComfyUI\python_embeded\python.exe
+CINEFORGE_COMFYUI_MAIN_PATH=./BlokeyUI/ComfyUI/main.py
+CINEFORGE_COMFYUI_BOOTSTRAP_PATH=./scripts/run_blokeyui_engine.py
+CINEFORGE_COMFYUI_CUSTOM_NODES_DIR=C:\ComfyUI\LTX\ComfyUI\ComfyUI\custom_nodes
+CINEFORGE_COMFYUI_SINEFORGE_PATHS_CONFIG=./ComfyUI/sineforge_engine_paths.yaml
+```
+
+Executable and path settings are local administrator configuration. API input,
+project text, AI output, and workflow JSON cannot supply a command or executable
+path. The engine origin must be an explicit non-privileged loopback HTTP port.
+Lifecycle POSTs reject cross-site browser requests.
+
+The old external ComfyAPI Runner on `127.0.0.1:8022` is not required or started.
+An older independently running ComfyUI on port 8889 is outside this app and is
+neither stopped nor reused.
+
+## Workflow boundary
+
+Sineforge is the frontend for curated production workflows and API-format JSON.
+It does not expose arbitrary visual graph authoring as part of the unified UI.
+Repository workflows are validated against their saved snapshot and the live
+engine before queueing. The submitted SHA-256 is carried through the native
+runner contract. UI-graph JSON and executable API JSON remain distinct formats.
+
+The engine starts offline with Manager excluded and a versioned custom-node
+allowlist. It never performs package or model installation during startup.
+Known optional packs that mutate the source tree or expose broken optional
+nodes are not loaded unless they are deliberately repaired and admitted.
+
+## Development setup and verification
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python -m pip install -e .[dev]
 Copy-Item .env.example .env
 .\.venv\Scripts\python scripts\create_db.py
-.\.venv\Scripts\python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8010
-```
-
-### One-command supervised startup
-
-Start the complete local stack from the repository root:
-
-```powershell
-.\start-cineforge.cmd
-```
-
-The trusted launcher starts or reuses the local Sulphur model API, the FastAPI
-backend, and the Vite frontend in that order. It never starts ComfyUI. It
-opens Sineforge in the default browser after all readiness checks pass, writes
-logs and owned process metadata under `storage/runtime/supervisor/`, and stops
-only persistent child processes it started when you press Ctrl+C. Run
-`.\start-cineforge.cmd --check` for a read-only configuration and readiness
-check, or add `--no-browser` to suppress the browser tab. The default startup
-destination is the Sulphur-backed Projects home at `/projects`.
-
-ComfyUI auto-start is disabled through `CINEFORGE_COMFYUI_AUTOSTART=false`.
-Administrator overrides are supported through `CINEFORGE_COMFYUI_WORKING_DIR`,
-`CINEFORGE_COMFYUI_LAUNCHER`, `CINEFORGE_COMFY_API_RUNNER_WORKING_DIR`,
-`CINEFORGE_COMFY_API_RUNNER_LAUNCHER`, `CINEFORGE_LMS_EXECUTABLE`,
-`CINEFORGE_PYTHON_EXECUTABLE`, and `CINEFORGE_NPM_EXECUTABLE`. These values are
-local configuration only; no API request, story text, AI proposal, or prompt can
-supply an executable path or shell command.
-Readiness URLs are restricted to loopback HTTP origins, shell metacharacters are rejected
-from command paths, ports and timeouts are range-checked, and a singleton lock prevents
-competing supervisors. Logs rotate at 10 MiB per stream.
-
-### Manual ComfyUI contract
-
-Starting CineForge must not start ComfyUI. ComfyUI remains an isolated,
-operator-started process; CineForge must not import it in-process, launch it
-implicitly, or treat a listening port alone as generation readiness.
-
-The runtime integration must:
-
-1. Keep `CINEFORGE_COMFYUI_AUTOSTART=false` on the primary workstation.
-2. Never launch `C:\ComfyUI\LTX\ComfyUI`, BlokeyUI, or any other ComfyUI installation as part of CineForge startup.
-3. Treat `http://127.0.0.1:8888` as normally offline. The operator alone decides when to start a ComfyUI runtime.
-4. When the operator has deliberately started a runtime, require both the ComfyUI root endpoint and `/object_info` before reporting it ready.
-5. Fail honestly when ComfyUI is offline: keep planning available, block image/video generation, and show the runtime-readiness blocker.
-6. Never install, update, download models, mutate custom nodes, or weaken host security as part of startup.
-
-Manual runtime availability does not by itself enable generation. Image
-generation additionally requires an enabled backend worker/submission path, a
-validated workflow manifest compatible with live `/object_info`, registered
-model evidence, output collection, and provenance persistence. Video generation
-remains a separately gated phase.
-
-### Local planning models and ComfyAPI Runner
-
-The primary workstation launcher recognizes the local
-`sulphur_prompt_enhancer_model-q8_0.gguf` and Qwen 3.6 40B Q4_K_S GGUF, starts
-LM Studio's loopback API on `127.0.0.1:1234`, and loads the saved SineForge
-planning-model selection with full GPU offload. The Studio top bar and Local AI
-panel expose the same model toggle. A switch unloads only the prior SineForge
-planning model from memory before loading its replacement; it never downloads,
-moves, or deletes either GGUF. The choice is stored under the ignored local
-`storage/runtime/` directory and is restored on the next supervised startup.
-
-The selected local model has the highest automatic planning priority, so script
-structure, story planning, shot planning, and prompt-package tasks use it unless
-a story has an explicit manual provider assignment. Phase 1 also requests a
-structured local script enhancement and retains the deterministic source-faithful
-package if the model response does not pass the existing QA contract.
-
-The Projects homepage composer sends one complete creative message to the local
-Sulphur model. Sulphur extracts a validated title, runtime, audience, genre,
-tone, point of view, visual style, language, format, and production constraints;
-the original message is also preserved verbatim as the story source. Only after
-that intake passes validation does Sineforge call its existing atomic workspace
-creator and run Phase 1. The Phase 1 package records
-`ceil(target_duration_sec / 8)` planned scenes, equalizes their durations to the
-requested total, and requires every generated clip to remain between 6 and 10
-seconds.
-
-ComfyAPI Runner is supervised at `http://127.0.0.1:8022`. Sineforge exposes its
-health in `/health/comfy-api-runner` and `/runtime/status`, provides quick-open
-buttons on the Projects home and Runtime page, and includes a bounded backend
-client for workflow analysis, controlled submission, job status, and an
-explicit user-triggered ComfyUI restart. Restart progress is proxied through
-`/runtime/comfyui/restart`; the runner does not bypass Sineforge's workflow
-validation or public-submission gates.
-
-Run tests:
-
-```powershell
 .\.venv\Scripts\python -m pytest
+
+Set-Location frontend
+npm install
+npm test -- --run
+npm run build
 ```
 
-## Key Architecture Docs
+Detailed runtime and compatibility evidence is in
+`docs/UNIFIED_BLOKEYUI_ENGINE.md`.
 
+## Key architecture documents
+
+- `docs/UNIFIED_BLOKEYUI_ENGINE.md`
 - `Architecture/ARCHITECTURE_BLUEPRINT.md`
 - `MVP/MVP_ARCHITECTURE.md`
 - `API/BACKEND_API_FLOW.md`
@@ -143,15 +172,12 @@ Run tests:
 - `Workflows/WORKFLOW_JSON_MUTATION_STRATEGY.md`
 - `ComfyUI/HEADLESS_COMFYUI_API.md`
 - `Database/POSTGRES_SCHEMA.sql`
-- `Benchmarks/BENCHMARK_PROTOCOL.md`
 - `FFmpeg/FFMPEG_STRATEGY_COMMAND_LIBRARY.md`
-- `Orchestration/OPTIONAL_AI_ORCHESTRATION_LAYER.md`
-- `Orchestration/AUTONOMOUS_PRODUCTION_ARCHITECTURE.md`
-- `docs/SPRINT_1A_STATUS.md`
 
-## Safety Boundary
+## Safety boundary
 
-CineForge is intended to remain the deterministic execution engine. AI modules are advisory only in Sprint 1A and cannot directly mutate workflow JSON, queue state, database records, model registries, ComfyUI submissions, asset paths, or FFmpeg commands.
-
-See `docs/STORYBOARD_PHASE_A_SPEC.md` for the planning boundary and `docs/PRODUCT_VISION.md` for current product direction. Older sprint documents are historical implementation records, not product direction.
-
+Sineforge remains the deterministic control plane. AI-generated content cannot
+select executables, bypass workflow validation, mutate the engine installation,
+or directly invoke lifecycle commands. Public prompt submission remains
+disabled. Destructive engine lifecycle actions are explicit, loopback-only,
+queue-aware, and process-owner checked.

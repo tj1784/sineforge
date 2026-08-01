@@ -1,5 +1,7 @@
-from pydantic import BaseModel, Field
+from typing import Literal
 from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class PhaseSevenVideoQueueRequest(BaseModel):
@@ -13,7 +15,12 @@ class PhaseSevenVideoQueueRequest(BaseModel):
 class PhaseSevenVideoQueuedJob(BaseModel):
     shot_id: UUID
     starting_image_asset_id: UUID
-    runner_job_id: str
+    engine: Literal["comfyui"] = "comfyui"
+    comfy_prompt_id: str
+    runner_job_id: str = Field(
+        description="Deprecated compatibility alias for comfy_prompt_id.",
+        deprecated=True,
+    )
     shot_code: str
     prompt: str
     negative_prompt: str
@@ -28,7 +35,12 @@ class PhaseSevenVideoQueueResponse(BaseModel):
     blocked_count: int = 0
     required_count: int
     message: str
-    runner_url: str
+    engine: Literal["comfyui"] = "comfyui"
+    comfyui_url: str
+    runner_url: str = Field(
+        description="Deprecated compatibility alias for comfyui_url.",
+        deprecated=True,
+    )
     workflow_label: str
     jobs: list[PhaseSevenVideoQueuedJob] = Field(default_factory=list)
     blockers: list[str] = Field(default_factory=list)

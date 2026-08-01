@@ -99,13 +99,15 @@ describe('ProductionPhasePreview historical settings isolation', () => {
       queued_count: 1,
       blocked_count: 0,
       required_count: 1,
-      message: 'Queued 1 Phase 7 video prompt in ComfyAPI Runner.',
-      runner_url: 'http://127.0.0.1:8022',
+      message: 'Queued 1 Phase 7 video prompt in the Sineforge engine.',
+      engine: 'comfyui',
+      comfyui_url: 'http://127.0.0.1:8190',
       workflow_label: 'CineForge Phase 7 WAN 2.1 LightX2V I2V 480p',
       jobs: [{
         shot_id: 'shot-1',
         starting_image_asset_id: 'asset-start-1',
-        runner_job_id: 'runner-job-1',
+        engine: 'comfyui',
+        comfy_prompt_id: 'comfy-prompt-1',
         shot_code: 'S01A',
         prompt: 'Video prompt',
         negative_prompt: 'Negative prompt',
@@ -165,6 +167,6 @@ describe('ProductionPhasePreview historical settings isolation', () => {
         requested_by: 'CineForge Phase 7 video handoff',
       }),
     ))
-    expect(await screen.findByText(/Open ComfyAPI Runner to watch 1 job/i)).toBeTruthy()
+    expect(await screen.findByText(/Track it in the Engine workspace/i)).toBeTruthy()
   })
 })

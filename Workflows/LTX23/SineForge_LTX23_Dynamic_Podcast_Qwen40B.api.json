@@ -26,7 +26,7 @@
     },
     "class_type": "SineForgeLTXPodcastPlanner",
     "_meta": {
-      "title": "2 · Local Qwen 3.6 40B · strict JSON + unload"
+      "title": "2 · Select local prompt model · strict JSON + unload"
     }
   },
   "3": {

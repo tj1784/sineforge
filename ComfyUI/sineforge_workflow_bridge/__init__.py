@@ -17,15 +17,43 @@ from typing import Any
 from aiohttp import web
 from server import PromptServer
 
+from .continuation_planner import (
+    SineForgeContinuationLoopCount,
+    SineForgeLTXGeneralContinuationPlanner,
+    SineForgeLTXKreaContinuationPlanner,
+)
+from .character_ingredients_planner import (
+    SineForgeKrea2CharacterIngredientsPlanner,
+)
 from .podcast_planner import SineForgeLTXPodcastPlanner
 
 
 WEB_DIRECTORY = "./js"
 NODE_CLASS_MAPPINGS: dict[str, Any] = {
+    "SineForgeKrea2CharacterIngredientsPlanner": (
+        SineForgeKrea2CharacterIngredientsPlanner
+    ),
+    "SineForgeContinuationLoopCount": SineForgeContinuationLoopCount,
+    "SineForgeLTXGeneralContinuationPlanner": (
+        SineForgeLTXGeneralContinuationPlanner
+    ),
+    "SineForgeLTXKreaContinuationPlanner": SineForgeLTXKreaContinuationPlanner,
     "SineForgeLTXPodcastPlanner": SineForgeLTXPodcastPlanner,
 }
 NODE_DISPLAY_NAME_MAPPINGS: dict[str, str] = {
-    "SineForgeLTXPodcastPlanner": "SineForge · Local Qwen Podcast JSON",
+    "SineForgeKrea2CharacterIngredientsPlanner": (
+        "SineForge · Selectable Local Model · Krea 2 Character Ingredients JSON"
+    ),
+    "SineForgeContinuationLoopCount": (
+        "SineForge · Continuation Loop Count · 0 = Continuous"
+    ),
+    "SineForgeLTXGeneralContinuationPlanner": (
+        "SineForge · Local Model General Continuation JSON"
+    ),
+    "SineForgeLTXKreaContinuationPlanner": (
+        "SineForge · Local Model Krea 2 Continuation JSON"
+    ),
+    "SineForgeLTXPodcastPlanner": "SineForge · Local Podcast JSON Planner",
 }
 
 _TRANSFER_TTL_SECONDS = 300
@@ -85,6 +113,16 @@ async def sineforge_workflow_transfer_status(request: web.Request) -> web.Respon
     with _transfer_lock:
         _prune_expired(now)
         pending_transfers = len(_transfers)
+    # This is intentionally evaluated at request time, after ComfyUI has loaded
+    # every custom node.  It gives the owning Sineforge process a cheap,
+    # identity-bound readiness check without serializing the multi-megabyte
+    # /object_info response on every poll.
+    import nodes as comfy_nodes
+
+    requested_nodes = list(dict.fromkeys(request.query.getall("required", [])))
+    required_nodes = {
+        name: name in comfy_nodes.NODE_CLASS_MAPPINGS for name in requested_nodes
+    }
     return web.json_response(
         {
             "ok": True,
@@ -93,6 +131,7 @@ async def sineforge_workflow_transfer_status(request: web.Request) -> web.Respon
             "ttl_seconds": _TRANSFER_TTL_SECONDS,
             "pending_transfers": pending_transfers,
             "nodes": sorted(NODE_CLASS_MAPPINGS),
+            "required_nodes": required_nodes,
         }
     )
 

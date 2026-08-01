@@ -14,6 +14,12 @@ MODULE_PATH = (
     / "sineforge_workflow_bridge"
     / "podcast_planner.py"
 )
+GEOPOLITICS_EXAMPLE_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "Workflows"
+    / "LTX23"
+    / "SineForge_LTX23_Podcast_Geopolitics_To_Everyday.prompt.json"
+)
 SPEC = importlib.util.spec_from_file_location(
     "sineforge_podcast_planner_test_module",
     MODULE_PATH,
@@ -49,7 +55,7 @@ def _valid_result() -> dict[str, str]:
 
 def _generate_kwargs() -> dict:
     return {
-        "model": "requested-qwen",
+        "model": "requested-local",
         "variation_mode": "replay visible seed",
         "seed": 42,
         "topic_request_json": planner._canonical_json(_request()),
@@ -74,16 +80,126 @@ def _chat_response(result: dict[str, str] | None = None) -> dict:
     }
 
 
-def test_prompt_contract_is_strict_json_and_uses_requested_qwen_model() -> None:
+def _patch_local_package(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        planner,
+        "_resolve_local_model_package",
+        lambda model: {
+            "model": model,
+            "root": r"C:\trusted\models",
+            "files": [
+                {
+                    "relative_path": "model.gguf",
+                    "role": "model",
+                    "size_bytes": 1,
+                }
+            ],
+        },
+    )
+
+
+def test_prompt_contract_is_strict_json_and_uses_qwen_as_default_only() -> None:
     contract = planner._load_contract()
 
     assert contract["schema_version"].endswith("/v1")
     assert contract["planner_model"].startswith("qwen3.6-40b-")
+    assert contract["trusted_lm_studio_model_root"] == (
+        r"C:\Users\Blokey\.lmstudio\models"
+    )
+    assert "trusted_planner_models" not in contract
+    assert contract["planner_model_policy"]["selection"] == (
+        "all_executable_gguf_packages_under_local_root"
+    )
+    assert contract["planner_model_policy"]["default_only"] == (
+        contract["planner_model"]
+    )
     assert contract["response_schema"]["additionalProperties"] is False
     assert set(contract["response_schema"]["required"]) == set(
         contract["response_schema"]["properties"]
     )
     assert contract["default_request"]["duration_seconds"] == 8
+
+
+def test_model_dropdown_inventory_is_local_and_default_first() -> None:
+    inputs = planner.SineForgeLTXPodcastPlanner.INPUT_TYPES()
+    options = inputs["required"]["model"][0]
+    packages = planner._discover_local_model_packages()
+    root = Path(r"C:\Users\Blokey\.lmstudio\models").resolve()
+
+    assert options == list(planner._selectable_model_keys())
+    assert options[0] == planner._load_contract()["planner_model"]
+    assert set(options) == set(packages)
+    assert "text-embedding-nomic-embed-text-v1.5" not in options
+    for package in packages.values():
+        assert Path(package["root"]).resolve() == root
+        assert package["executable_model_files"]
+        assert all(
+            not Path(item).name.casefold().startswith("mmproj")
+            for item in package["executable_model_files"]
+        )
+
+
+@pytest.mark.parametrize("supports_vision", [True, False])
+def test_image_is_sent_only_to_vision_models_and_provenance_records_omission(
+    monkeypatch: pytest.MonkeyPatch,
+    supports_vision: bool,
+) -> None:
+    _patch_local_package(monkeypatch)
+    monkeypatch.setattr(
+        planner,
+        "_resolve_model_entry",
+        lambda model: (
+            {
+                "key": model,
+                "type": "llm",
+                "format": "gguf",
+                "capabilities": {"vision": supports_vision},
+            },
+            model,
+        ),
+    )
+    monkeypatch.setattr(planner, "_image_data_url", lambda image: "data:image/jpeg;base64,eA==")
+    monkeypatch.setattr(planner, "_image_tensor_sha256", lambda image: "abc123")
+    monkeypatch.setattr(planner, "_release_comfy_models", lambda: None)
+    monkeypatch.setattr(
+        planner,
+        "_unload_loaded_lm_studio_models",
+        lambda *, except_model=None: None,
+    )
+    payloads: list[dict] = []
+    monkeypatch.setattr(
+        planner,
+        "_http_json",
+        lambda *args, **kwargs: (
+            payloads.append(kwargs["payload"]) or _chat_response(_valid_result())
+        ),
+    )
+    monkeypatch.setattr(planner, "_unload_all_lm_studio_models", lambda: None)
+    kwargs = _generate_kwargs()
+    kwargs["image"] = object()
+
+    record = json.loads(planner.SineForgeLTXPodcastPlanner().generate(**kwargs)[0])
+    content = payloads[0]["messages"][1]["content"]
+
+    assert isinstance(content, list) is supports_vision
+    assert record["source_image"]["sent_to_planner"] is supports_vision
+    assert record["source_image"]["selected_model_advertises_vision"] is supports_vision
+    assert record["source_image"]["omission_reason"] == (
+        None
+        if supports_vision
+        else "selected_local_model_does_not_advertise_vision"
+    )
+
+
+def test_geopolitics_example_is_json_and_requires_fictional_opinion() -> None:
+    request = json.loads(GEOPOLITICS_EXAMPLE_PATH.read_text(encoding="utf-8"))
+
+    assert request["schema_version"].endswith("/v1")
+    assert "Iran" in request["primary_topic_brief"]
+    assert "Russia" in request["primary_topic_brief"]
+    assert "unrelated" in request["pivot_topic_brief"]
+    assert "fictional opinion" in request["factuality_policy"]
+    assert request["source_notes"] == []
 
 
 def test_validated_result_builds_timed_prompt_with_exact_dialogue() -> None:
@@ -141,6 +257,20 @@ def test_planner_enforces_schema_lengths_and_source_bound_notes() -> None:
     )["factuality_mode"] == "source_bound"
 
 
+def test_recent_topics_accepts_array_jsonl_and_rejects_trailing_text() -> None:
+    assert planner._parse_json_list("", label="recent_topics_json") == []
+    assert planner._parse_json_list(
+        '["one"]\n["two", "three"]\n{"topic": "four"}',
+        label="recent_topics_json",
+    ) == ["one", "two", "three", {"topic": "four"}]
+
+    with pytest.raises(ValueError, match="recent_topics_json must be valid JSON"):
+        planner._parse_json_list(
+            '["one"]\nnot-json',
+            label="recent_topics_json",
+        )
+
+
 def test_variation_mode_controls_cache_identity() -> None:
     fresh = planner.SineForgeLTXPodcastPlanner.IS_CHANGED(
         variation_mode="new variation every run",
@@ -151,7 +281,7 @@ def test_variation_mode_controls_cache_identity() -> None:
     replay_one = planner.SineForgeLTXPodcastPlanner.IS_CHANGED(
         variation_mode="replay visible seed",
         seed=42,
-        model="qwen",
+        model="local-model",
         topic_request_json="{}",
         recent_topics_json="[]",
         temperature=0.9,
@@ -161,7 +291,7 @@ def test_variation_mode_controls_cache_identity() -> None:
     replay_two = planner.SineForgeLTXPodcastPlanner.IS_CHANGED(
         variation_mode="replay visible seed",
         seed=42,
-        model="qwen",
+        model="local-model",
         topic_request_json="{}",
         recent_topics_json="[]",
         temperature=0.9,
@@ -183,7 +313,7 @@ def test_duration_and_speaker_assignment_fail_closed() -> None:
         "MAN_B": "camera-left",
     }
     validation = planner.SineForgeLTXPodcastPlanner.VALIDATE_INPUTS(
-        model="qwen",
+        model="local-model",
         variation_mode="new variation every run",
         topic_request_json=planner._canonical_json(request),
         recent_topics_json="[]",
@@ -197,10 +327,19 @@ def test_generate_resolves_exact_model_and_cleans_all_lm_models(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     events: list[str] = []
+    _patch_local_package(monkeypatch)
     monkeypatch.setattr(
         planner,
         "_resolve_model_entry",
-        lambda model: ({"key": "resolved-qwen"}, "resolved-qwen"),
+        lambda model: (
+            {
+                "key": model,
+                "type": "llm",
+                "format": "gguf",
+                "capabilities": {"vision": False},
+            },
+            model,
+        ),
     )
     monkeypatch.setattr(
         planner,
@@ -231,18 +370,21 @@ def test_generate_resolves_exact_model_and_cleans_all_lm_models(
 
     assert events == [
         "release-comfy",
-        "preflight:resolved-qwen",
-        "chat:resolved-qwen",
+        "preflight:requested-local",
+        "chat:requested-local",
         "unload-all",
     ]
-    assert record["planner"]["requested_model"] == "requested-qwen"
-    assert record["planner"]["model"] == "resolved-qwen"
+    assert record["planner"]["requested_model"] == "requested-local"
+    assert record["planner"]["model"] == "requested-local"
     assert record["planner"]["all_lm_studio_models_unloaded_before_ltx"] is True
     assert record["request"] == _request()
     assert record["recent_topics"] == ["old topic"]
     assert record["source_image"] == {
         "attached": False,
         "tensor_sha256": None,
+        "sent_to_planner": False,
+        "selected_model_advertises_vision": False,
+        "omission_reason": None,
     }
 
 
@@ -251,10 +393,19 @@ def test_generate_retries_invalid_json_once(
 ) -> None:
     payloads: list[dict] = []
     responses = iter([_chat_response(), _chat_response(_valid_result())])
+    _patch_local_package(monkeypatch)
     monkeypatch.setattr(
         planner,
         "_resolve_model_entry",
-        lambda model: ({"key": model}, model),
+        lambda model: (
+            {
+                "key": model,
+                "type": "llm",
+                "format": "gguf",
+                "capabilities": {"vision": False},
+            },
+            model,
+        ),
     )
     monkeypatch.setattr(planner, "_release_comfy_models", lambda: None)
     monkeypatch.setattr(
@@ -287,10 +438,19 @@ def test_generate_failure_still_cleans_all_lm_models(
     failure_stage: str,
 ) -> None:
     cleanup_calls: list[str] = []
+    _patch_local_package(monkeypatch)
     monkeypatch.setattr(
         planner,
         "_resolve_model_entry",
-        lambda model: ({"key": model}, model),
+        lambda model: (
+            {
+                "key": model,
+                "type": "llm",
+                "format": "gguf",
+                "capabilities": {"vision": False},
+            },
+            model,
+        ),
     )
     monkeypatch.setattr(planner, "_release_comfy_models", lambda: None)
 
@@ -330,6 +490,7 @@ def test_generate_fails_closed_for_unknown_model_or_cleanup_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     cleanup_calls: list[str] = []
+    _patch_local_package(monkeypatch)
     monkeypatch.setattr(planner, "_model_entries", lambda: [])
     monkeypatch.setattr(
         planner,
@@ -337,14 +498,22 @@ def test_generate_fails_closed_for_unknown_model_or_cleanup_failure(
         lambda: cleanup_calls.append("unknown-model-cleanup"),
     )
 
-    with pytest.raises(RuntimeError, match="exact requested model key"):
+    with pytest.raises(RuntimeError, match="does not expose the selected local"):
         planner.SineForgeLTXPodcastPlanner().generate(**_generate_kwargs())
     assert cleanup_calls == ["unknown-model-cleanup"]
 
     monkeypatch.setattr(
         planner,
         "_resolve_model_entry",
-        lambda model: ({"key": model}, model),
+        lambda model: (
+            {
+                "key": model,
+                "type": "llm",
+                "format": "gguf",
+                "capabilities": {"vision": False},
+            },
+            model,
+        ),
     )
     monkeypatch.setattr(planner, "_release_comfy_models", lambda: None)
     monkeypatch.setattr(
@@ -365,3 +534,14 @@ def test_generate_fails_closed_for_unknown_model_or_cleanup_failure(
 
     with pytest.raises(RuntimeError, match="cleanup failed.*still loaded"):
         planner.SineForgeLTXPodcastPlanner().generate(**_generate_kwargs())
+
+
+def test_validate_inputs_rejects_model_outside_local_inventory() -> None:
+    validation = planner.SineForgeLTXPodcastPlanner.VALIDATE_INPUTS(
+        model="some-model-outside-the-local-root",
+        variation_mode="new variation every run",
+        topic_request_json=planner._canonical_json(_request()),
+        recent_topics_json="[]",
+    )
+
+    assert "is not an executable GGUF package beneath" in validation

@@ -11,6 +11,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_STORAGE_ROOT = (REPO_ROOT / "storage").resolve()
 DEFAULT_DATABASE_URL = f"sqlite:///{(DEFAULT_STORAGE_ROOT / 'cineforge_local.db').as_posix()}"
+DEFAULT_COMFYUI_WORKING_DIR = (REPO_ROOT / "BlokeyUI").resolve()
+DEFAULT_COMFYUI_PYTHON_EXECUTABLE = (
+    DEFAULT_COMFYUI_WORKING_DIR / "python_embeded" / "python.exe"
+)
+DEFAULT_COMFYUI_MAIN_PATH = DEFAULT_COMFYUI_WORKING_DIR / "ComfyUI" / "main.py"
+DEFAULT_COMFYUI_BOOTSTRAP_PATH = REPO_ROOT / "scripts" / "run_blokeyui_engine.py"
+DEFAULT_COMFYUI_CUSTOM_NODES_DIR = (
+    DEFAULT_COMFYUI_WORKING_DIR / "ComfyUI" / "custom_nodes"
+)
+DEFAULT_COMFYUI_SINEFORGE_PATHS_CONFIG = (
+    REPO_ROOT / "ComfyUI" / "sineforge_engine_paths.yaml"
+)
 DEFAULT_SULPHUR_MODEL_PATH = (
     Path.home()
     / ".lmstudio"
@@ -45,8 +57,41 @@ class Settings(BaseSettings):
     env: str = "local"
     log_level: str = "INFO"
     database_url: str = DEFAULT_DATABASE_URL
-    comfyui_base_url: AnyHttpUrl = "http://127.0.0.1:8888"
-    comfy_api_runner_base_url: AnyHttpUrl = "http://127.0.0.1:8022"
+    comfyui_autostart: bool = False
+    # The workstation launcher sets this process-only flag. Keeping it separate
+    # from autostart prevents tests or a manually launched Uvicorn process from
+    # unexpectedly starting the GPU engine just because .env enables it.
+    comfyui_backend_managed: bool = False
+    comfyui_base_url: AnyHttpUrl = "http://127.0.0.1:8190"
+    comfyui_working_dir: Path = Field(default=DEFAULT_COMFYUI_WORKING_DIR)
+    comfyui_python_executable: Path = Field(
+        default=DEFAULT_COMFYUI_PYTHON_EXECUTABLE
+    )
+    comfyui_main_path: Path = Field(default=DEFAULT_COMFYUI_MAIN_PATH)
+    comfyui_bootstrap_path: Path = Field(default=DEFAULT_COMFYUI_BOOTSTRAP_PATH)
+    comfyui_custom_nodes_dir: Path = Field(default=DEFAULT_COMFYUI_CUSTOM_NODES_DIR)
+    comfyui_sineforge_paths_config: Path = Field(
+        default=DEFAULT_COMFYUI_SINEFORGE_PATHS_CONFIG
+    )
+    comfyui_input_dir: Path = Field(default=DEFAULT_STORAGE_ROOT / "inputs")
+    comfyui_output_dir: Path = Field(default=DEFAULT_STORAGE_ROOT / "outputs")
+    comfyui_temp_dir: Path = Field(
+        default=DEFAULT_STORAGE_ROOT / "runtime" / "comfyui" / "temp"
+    )
+    comfyui_user_dir: Path = Field(
+        default=DEFAULT_STORAGE_ROOT / "runtime" / "comfyui" / "user"
+    )
+    comfyui_startup_timeout_sec: float = Field(default=240.0, ge=10.0, le=600.0)
+    comfyui_required_nodes: tuple[str, ...] = (
+        "SineForgeLTXKreaContinuationPlanner",
+        "LTXVSulphurAllInOne",
+        "Krea2EncodeRebalance",
+        "VHS_VideoCombine",
+        "easy forLoopStart",
+        "easy forLoopEnd",
+        "SaveText",
+        "ShowText|pysssss",
+    )
     storage_root: Path = Field(default=DEFAULT_STORAGE_ROOT)
     allow_absolute_input_paths: bool = False
     queue_worker_enabled: bool = False
@@ -105,6 +150,26 @@ class Settings(BaseSettings):
             path = REPO_ROOT / path
         return path.resolve()
 
+    @field_validator(
+        "comfyui_working_dir",
+        "comfyui_python_executable",
+        "comfyui_main_path",
+        "comfyui_bootstrap_path",
+        "comfyui_custom_nodes_dir",
+        "comfyui_sineforge_paths_config",
+        "comfyui_input_dir",
+        "comfyui_output_dir",
+        "comfyui_temp_dir",
+        "comfyui_user_dir",
+        mode="before",
+    )
+    @classmethod
+    def resolve_comfyui_path(cls, value: str | Path) -> Path:
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            path = REPO_ROOT / path
+        return path.resolve()
+
     @field_validator("database_url", mode="before")
     @classmethod
     def resolve_sqlite_database_url(cls, value: str) -> str:
@@ -132,6 +197,30 @@ class Settings(BaseSettings):
         if cleaned.lower().startswith(("file:", "ftp:")):
             raise ValueError("provider base URL must be an http(s) URL")
         return cleaned
+
+    @field_validator("comfyui_base_url")
+    @classmethod
+    def validate_comfyui_loopback_url(cls, value: AnyHttpUrl) -> AnyHttpUrl:
+        parsed = urlsplit(str(value))
+        try:
+            is_loopback = ip_address(parsed.hostname or "").is_loopback
+        except ValueError:
+            is_loopback = (parsed.hostname or "").casefold() == "localhost"
+        if (
+            parsed.scheme != "http"
+            or not is_loopback
+            or parsed.port is None
+            or parsed.port < 1024
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+            or parsed.path not in {"", "/"}
+        ):
+            raise ValueError(
+                "comfyui_base_url must remain an HTTP loopback origin URL with an explicit non-privileged port"
+            )
+        return value
 
     @field_validator("sulphur_base_url")
     @classmethod

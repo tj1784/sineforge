@@ -1,15 +1,15 @@
 {
   "schema": "sineforge.repository-workflow-catalog/v1",
-  "generated_at": "2026-07-30T12:00:00-07:00",
-  "workflow_count": 172,
+  "generated_at": "2026-07-31T03:00:00-07:00",
+  "workflow_count": 174,
   "category_counts": {
-    "Image Editing & Composition": 44,
+    "Image Editing & Composition": 45,
     "Image Generation": 43,
     "Prompting & Language": 18,
     "Speech, Audio & Music": 18,
     "Upscaling & Restoration": 10,
     "Utilities & Workflow Tools": 17,
-    "Video & Animation": 22
+    "Video & Animation": 23
   },
   "episode_counts": {
     "EP02": 3,
@@ -38,7 +38,7 @@
     "EP28": 4
   },
   "status_counts": {
-    "converted": 130,
+    "converted": 132,
     "requires_custom_nodes": 42
   },
   "support_assets": [
@@ -2099,15 +2099,39 @@
     },
     {
       "id": "99af69c4-93a7-5dea-b498-dfeb071b523b",
-      "name": "LTX-2.3 Dynamic Podcast — Local Qwen JSON + Native Audio",
+      "name": "LTX-2.3 Dynamic Podcast — Selectable Local Model + Native Audio",
       "category": "Video & Animation",
       "subcategory": "LTX-2.3 · Dynamic podcasts",
       "episode": null,
       "workflow_status": "converted",
       "source_archive": null,
       "source_entry": "Workflows/LTX23/SineForge_LTX23_Dynamic_Podcast_Qwen40B.workflow.json",
-      "sha256": "70a3c41a9aa98982abdd96e30645515e5b0bc37162b33a34b993dd3efc16bb99",
-      "source_workflow_sha256": "fca249d0b738c7d0ba29f6b7d9233e0c8dbff4268b7a1962f216d48d10f06f82"
+      "sha256": "32c0bfa971cfcb432ee7a911554850d09ff9b6a46a9ad9444b3d5ad9fcffc58f",
+      "source_workflow_sha256": "698738811f47ad1f1bd166cc57600d3a67dc842a97285e18876bfbd4eee8d710"
+    },
+    {
+      "id": "95682418-d6a6-501a-82dc-f6d465a564c3",
+      "name": "LTX-2.3 + Krea 2 General Continuation Loop — Local GGUF JSON",
+      "category": "Video & Animation",
+      "subcategory": "LTX-2.3 · Automated continuation",
+      "episode": null,
+      "workflow_status": "converted",
+      "source_archive": null,
+      "source_entry": "Workflows/LTX23/SineForge_LTX23_Krea2_Lossless_Continuation_Loop.workflow.json",
+      "sha256": "541ec16bb23ed48c80a93017dcb31801460e555a53824877da5d39af77bab213",
+      "source_workflow_sha256": "8dda6200ca0197db1dfca91467593824d7a950af2acc1a0ee2d53ec954ad1079"
+    },
+    {
+      "id": "52cb4eac-d03b-5b1f-ab36-bd4a45c82ae7",
+      "name": "Krea 2 Character Ingredients Sheet — Selectable Local Model",
+      "category": "Image Editing & Composition",
+      "subcategory": "Character reference sheets",
+      "episode": null,
+      "workflow_status": "converted",
+      "source_archive": null,
+      "source_entry": "Workflows/LTX23/SineForge_Krea2_Character_Ingredients.workflow.json",
+      "sha256": "43ce5f40876150297e6a14ee646a1d0831c565cb8fd4cce228414e2171aa9405",
+      "source_workflow_sha256": "780c735f80ecbc54b9054f849a62c0e2a3f65802f0c41b1400fdd0ba3da9d095"
     }
   ],
   "archive_notes": {

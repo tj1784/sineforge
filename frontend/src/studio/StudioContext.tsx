@@ -10,6 +10,7 @@ import type { PageId } from '../components/AppShell'
 import type { ProjectWorkflowLane } from '../workflowLanes'
 import {
   ApiError,
+  BackendUnavailableError,
   api,
   normalizePhaseASnapshot,
   type Readiness,
@@ -57,6 +58,12 @@ export function StudioProvider({
   const [selectedShot, setSelectedShot] = useState<Shot | null>(null)
   const [animaticOpen, setAnimaticOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [projectLoadVersion, setProjectLoadVersion] = useState(0)
+  const backendUnavailable = backendStatus === 'unavailable'
+
+  const retryProjectLoad = useCallback(async () => {
+    setProjectLoadVersion((current) => current + 1)
+  }, [])
 
   const reload = useCallback(async (id = storyId) => {
     if (!id) {
@@ -111,9 +118,10 @@ export function StudioProvider({
   }, [isDemoProject, storyId])
 
   useEffect(() => {
-    if (isDemoProject) return
+    if (isDemoProject || backendUnavailable) return
 
     let active = true
+    let retryTimer: number | undefined
     const loadSelectedProject = async () => {
       setBusy(true)
       setLoadState('loading')
@@ -149,6 +157,12 @@ export function StudioProvider({
         setError(text)
         setLoadState('error')
         setMessage(text)
+        if (err instanceof BackendUnavailableError) {
+          retryTimer = window.setTimeout(
+            () => setProjectLoadVersion((current) => current + 1),
+            2_000,
+          )
+        }
       } finally {
         if (active) setBusy(false)
       }
@@ -157,8 +171,9 @@ export function StudioProvider({
     void loadSelectedProject()
     return () => {
       active = false
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
     }
-  }, [isDemoProject, selectedProjectId])
+  }, [backendUnavailable, isDemoProject, projectLoadVersion, selectedProjectId])
 
   const createStory = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -428,6 +443,7 @@ export function StudioProvider({
       animaticOpen,
       setAnimaticOpen,
       busy,
+      retryProjectLoad,
       reload,
       createStory,
       loadExistingStory,
@@ -454,6 +470,7 @@ export function StudioProvider({
       selectedShot,
       animaticOpen,
       busy,
+      retryProjectLoad,
       reload,
       createStory,
       loadExistingStory,

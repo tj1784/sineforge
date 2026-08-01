@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import {
   api,
   type SulphurProjectWorkspace,
@@ -57,14 +57,42 @@ export function StudioHomeHero({
   const [restarting, setRestarting] = useState(false)
   const [freeingVram, setFreeingVram] = useState(false)
   const [runtimeMessage, setRuntimeMessage] = useState(
-    'ComfyUI and API Runner are available as local tools.',
+    'Checking the bundled BlokeyUI engine…',
   )
+  const [engineReady, setEngineReady] = useState(false)
+  const runtimeRequest = useRef(0)
   const creationAttempt = useRef({
     prompt: '',
     planningAgent: null as PlanningAgent | null,
     planningModelId: null as string | null,
     idempotencyKey: '',
   })
+
+  useEffect(() => {
+    const requestId = ++runtimeRequest.current
+    api
+      .engineStatus()
+      .then((engine) => {
+        if (requestId !== runtimeRequest.current) return
+        setEngineReady(engine.ready)
+        setRuntimeMessage(
+          engine.ready
+            ? 'Bundled BlokeyUI engine ready inside Sineforge.'
+            : engine.last_error ?? `Bundled engine ${engine.status}.`,
+        )
+      })
+      .catch((error: unknown) => {
+        if (requestId === runtimeRequest.current) {
+          setEngineReady(false)
+          setRuntimeMessage(
+            error instanceof Error ? error.message : 'Bundled engine status is unavailable.',
+          )
+        }
+      })
+    return () => {
+      runtimeRequest.current += 1
+    }
+  }, [])
 
   const idempotencyKeyFor = (
     value: string,
@@ -146,32 +174,65 @@ export function StudioHomeHero({
   }
 
   const restartComfyUi = async () => {
+    const requestId = ++runtimeRequest.current
     setRestarting(true)
-    setRuntimeMessage('Scheduling the ComfyUI restart through API Runner…')
+    setRuntimeMessage(
+      engineReady
+        ? 'Scheduling a restart of the bundled engine…'
+        : 'Starting the bundled engine…',
+    )
     try {
+      if (!engineReady) {
+        const start = await api.startEngine()
+        if (requestId !== runtimeRequest.current) return
+        setRuntimeMessage(start.message)
+        for (let attempt = 0; attempt < RESTART_POLL_LIMIT; attempt += 1) {
+          const status = await api.engineStatus()
+          if (requestId !== runtimeRequest.current) return
+          if (status.ready) {
+            setEngineReady(true)
+            setRuntimeMessage('The bundled BlokeyUI engine is ready.')
+            onNotify?.('Bundled engine started successfully')
+            return
+          }
+          if (status.status === 'failed' || status.status === 'conflict') {
+            throw new Error(status.last_error ?? `Engine ${status.status}.`)
+          }
+          await wait(RESTART_POLL_INTERVAL_MS)
+          if (requestId !== runtimeRequest.current) return
+        }
+        throw new Error('ComfyUI startup is taking longer than three minutes.')
+      }
+
       const request = await api.restartComfyUi()
+      if (requestId !== runtimeRequest.current) return
       setRuntimeMessage(request.message)
       for (let attempt = 0; attempt < RESTART_POLL_LIMIT; attempt += 1) {
         const result = await api.comfyRestartStatus(request.restart_id)
+        if (requestId !== runtimeRequest.current) return
         setRuntimeMessage(result.message || `ComfyUI restart: ${result.status}`)
         if (result.complete) {
-          setRuntimeMessage('ComfyUI restarted successfully with CUDA device 0.')
-          onNotify?.('ComfyUI restarted successfully')
+          setEngineReady(true)
+          setRuntimeMessage('The bundled ComfyUI engine restarted successfully.')
+          onNotify?.('Bundled engine restarted successfully')
           return
         }
         if (result.failed) {
           throw new Error(result.message || 'ComfyUI restart failed.')
         }
         await wait(RESTART_POLL_INTERVAL_MS)
+        if (requestId !== runtimeRequest.current) return
       }
       throw new Error('ComfyUI restart is taking longer than three minutes.')
     } catch (error) {
+      if (requestId !== runtimeRequest.current) return
+      setEngineReady(engineReady)
       const message =
         error instanceof Error ? error.message : 'Unable to restart ComfyUI.'
       setRuntimeMessage(message)
       onNotify?.(message)
     } finally {
-      setRestarting(false)
+      if (requestId === runtimeRequest.current) setRestarting(false)
     }
   }
 
@@ -186,19 +247,22 @@ export function StudioHomeHero({
     )
     if (!confirmed) return
 
+    const requestId = ++runtimeRequest.current
     setFreeingVram(true)
     setRuntimeMessage('Checking ComfyUI queue before freeing VRAM…')
     try {
       await api.freeNativeApiRunnerMemory()
+      if (requestId !== runtimeRequest.current) return
       setRuntimeMessage('ComfyUI cached models were unloaded and VRAM was freed.')
       onNotify?.('ComfyUI VRAM freed')
     } catch (error) {
+      if (requestId !== runtimeRequest.current) return
       const message =
         error instanceof Error ? error.message : 'Unable to free VRAM.'
       setRuntimeMessage(message)
       onNotify?.(message)
     } finally {
-      setFreeingVram(false)
+      if (requestId === runtimeRequest.current) setFreeingVram(false)
     }
   }
 
@@ -332,17 +396,20 @@ export function StudioHomeHero({
           <i />
           {runtimeMessage}
         </span>
-        <button type="button" onClick={() => void freeVram()} disabled={freeingVram || restarting}>
+        <button type="button" onClick={() => void freeVram()} disabled={!engineReady || freeingVram || restarting}>
           {freeingVram ? '♨ Freeing VRAM…' : '♨ Free VRAM'}
         </button>
-        <a href="http://127.0.0.1:8022" target="_blank" rel="noreferrer">
-          ◇ Open API Runner
-        </a>
-        <a href="http://127.0.0.1:8888" target="_blank" rel="noreferrer">
-          ▧ Open ComfyUI
-        </a>
-        <button type="button" onClick={() => void restartComfyUi()} disabled={restarting}>
-          {restarting ? '↻ Restarting ComfyUI…' : '↻ Restart ComfyUI'}
+        <button type="button" onClick={() => onNavigateStudio('api-runner')}>
+          ◇ Open Engine
+        </button>
+        <button type="button" onClick={() => void restartComfyUi()} disabled={restarting || freeingVram}>
+          {restarting
+            ? engineReady
+              ? '↻ Restarting engine…'
+              : '↻ Starting engine…'
+            : engineReady
+              ? '↻ Restart engine'
+              : '▶ Start engine'}
         </button>
       </div>
       <nav className="studio-suggestion-row" aria-label="Production workspace shortcuts">

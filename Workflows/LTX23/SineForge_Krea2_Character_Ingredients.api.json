@@ -1,0 +1,579 @@
+{
+  "1": {
+    "inputs": {
+      "model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+      "variation_mode": "new variation every run",
+      "seed": 20260731,
+      "character_profile_json": "{\n  \"schema_version\": \"sineforge.character-profile/v1\",\n  \"character_id\": \"character_001\",\n  \"character_name\": \"Alex Rowan\",\n  \"character_kind\": \"fictional adult human\",\n  \"identity_brief\": \"A composed adult presenter with a distinctive oval face and calm, approachable presence.\",\n  \"age_presentation\": \"approximately 35 years old\",\n  \"face_identity\": \"oval face, balanced cheekbones, straight nose, softly defined jaw, medium brown eyes, natural brows\",\n  \"hair\": \"short dark brown textured hair with a neat side part\",\n  \"complexion\": \"medium warm complexion with realistic pores and subtle natural variation\",\n  \"body_build\": \"average-height balanced build with natural adult proportions\",\n  \"wardrobe\": [\n    \"charcoal tailored jacket\",\n    \"soft blue open-collar shirt\",\n    \"dark neutral trousers\",\n    \"plain dark shoes\"\n  ],\n  \"accessories\": [\n    \"small matte silver wristwatch\"\n  ],\n  \"identity_locks\": [\n    \"same face shape and facial proportions in every view\",\n    \"same age, hairline, hairstyle, complexion, wardrobe, and accessories\",\n    \"natural anatomy and realistic skin texture\"\n  ],\n  \"visual_style\": \"high-resolution photorealistic studio character reference photography\",\n  \"background\": \"clean seamless warm-gray studio background with no visible horizon\",\n  \"avoid\": [\n    \"identity drift\",\n    \"beautification that changes facial proportions\",\n    \"text, labels, logos, watermarks, borders, or extra people\"\n  ]\n}",
+      "temperature": 0.55,
+      "top_p": 0.9,
+      "max_tokens": 2600,
+      "timeout_seconds": 900,
+      "reference_image": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "SineForgeKrea2CharacterIngredientsPlanner",
+    "_meta": {
+      "title": "1 · Selectable local-model JSON character-sheet planner"
+    }
+  },
+  "2": {
+    "inputs": {
+      "image": "example.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "2 · Primary face / identity reference"
+    }
+  },
+  "6": {
+    "inputs": {
+      "unet_name": "krea2TurboOfficialComfy_krea2RawInt8Convrot.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "6 · Local Krea 2 model"
+    }
+  },
+  "7": {
+    "inputs": {
+      "clip_name": "qwen3vl_4b_fp8_scaled.safetensors",
+      "type": "krea2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "7 · Local Krea 2 Qwen3-VL encoder"
+    }
+  },
+  "8": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "8 · Local Krea 2 VAE"
+    }
+  },
+  "10": {
+    "inputs": {
+      "text": [
+        "1",
+        1
+      ],
+      "clip": [
+        "7",
+        0
+      ],
+      "image1": [
+        "2",
+        0
+      ],
+      "image1_tokens": "max",
+      "image2": [
+        "2",
+        0
+      ],
+      "image2_tokens": "high",
+      "image3": [
+        "2",
+        0
+      ],
+      "image3_tokens": "high",
+      "image4": [
+        "2",
+        0
+      ],
+      "image4_tokens": "normal"
+    },
+    "class_type": "Krea2EncodeRebalance",
+    "_meta": {
+      "title": "10 · Front face · four-reference conditioning"
+    }
+  },
+  "11": {
+    "inputs": {
+      "conditioning": [
+        "10",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "11 · Front face negative"
+    }
+  },
+  "12": {
+    "inputs": {
+      "width": 768,
+      "height": 768,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "12 · Front face latent · 768×768"
+    }
+  },
+  "13": {
+    "inputs": {
+      "seed": [
+        "1",
+        5
+      ],
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "er_sde",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": [
+        "6",
+        0
+      ],
+      "positive": [
+        "10",
+        0
+      ],
+      "negative": [
+        "11",
+        0
+      ],
+      "latent_image": [
+        "12",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "13 · Independent Front face sampler"
+    }
+  },
+  "14": {
+    "inputs": {
+      "samples": [
+        "13",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "14 · Decode Front face"
+    }
+  },
+  "20": {
+    "inputs": {
+      "text": [
+        "1",
+        2
+      ],
+      "clip": [
+        "7",
+        0
+      ],
+      "image1": [
+        "2",
+        0
+      ],
+      "image1_tokens": "max",
+      "image2": [
+        "2",
+        0
+      ],
+      "image2_tokens": "high",
+      "image3": [
+        "2",
+        0
+      ],
+      "image3_tokens": "high",
+      "image4": [
+        "2",
+        0
+      ],
+      "image4_tokens": "normal"
+    },
+    "class_type": "Krea2EncodeRebalance",
+    "_meta": {
+      "title": "20 · Three-quarter face · four-reference conditioning"
+    }
+  },
+  "21": {
+    "inputs": {
+      "conditioning": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "21 · Three-quarter face negative"
+    }
+  },
+  "22": {
+    "inputs": {
+      "width": 768,
+      "height": 768,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "22 · Three-quarter face latent · 768×768"
+    }
+  },
+  "23": {
+    "inputs": {
+      "seed": [
+        "1",
+        6
+      ],
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "er_sde",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": [
+        "6",
+        0
+      ],
+      "positive": [
+        "20",
+        0
+      ],
+      "negative": [
+        "21",
+        0
+      ],
+      "latent_image": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "23 · Independent Three-quarter face sampler"
+    }
+  },
+  "24": {
+    "inputs": {
+      "samples": [
+        "23",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "24 · Decode Three-quarter face"
+    }
+  },
+  "30": {
+    "inputs": {
+      "text": [
+        "1",
+        3
+      ],
+      "clip": [
+        "7",
+        0
+      ],
+      "image1": [
+        "2",
+        0
+      ],
+      "image1_tokens": "max",
+      "image2": [
+        "2",
+        0
+      ],
+      "image2_tokens": "high",
+      "image3": [
+        "2",
+        0
+      ],
+      "image3_tokens": "high",
+      "image4": [
+        "2",
+        0
+      ],
+      "image4_tokens": "normal"
+    },
+    "class_type": "Krea2EncodeRebalance",
+    "_meta": {
+      "title": "30 · Side profile · four-reference conditioning"
+    }
+  },
+  "31": {
+    "inputs": {
+      "conditioning": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "31 · Side profile negative"
+    }
+  },
+  "32": {
+    "inputs": {
+      "width": 768,
+      "height": 768,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "32 · Side profile latent · 768×768"
+    }
+  },
+  "33": {
+    "inputs": {
+      "seed": [
+        "1",
+        7
+      ],
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "er_sde",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": [
+        "6",
+        0
+      ],
+      "positive": [
+        "30",
+        0
+      ],
+      "negative": [
+        "31",
+        0
+      ],
+      "latent_image": [
+        "32",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "33 · Independent Side profile sampler"
+    }
+  },
+  "34": {
+    "inputs": {
+      "samples": [
+        "33",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "34 · Decode Side profile"
+    }
+  },
+  "40": {
+    "inputs": {
+      "text": [
+        "1",
+        4
+      ],
+      "clip": [
+        "7",
+        0
+      ],
+      "image1": [
+        "2",
+        0
+      ],
+      "image1_tokens": "max",
+      "image2": [
+        "2",
+        0
+      ],
+      "image2_tokens": "high",
+      "image3": [
+        "2",
+        0
+      ],
+      "image3_tokens": "high",
+      "image4": [
+        "2",
+        0
+      ],
+      "image4_tokens": "normal"
+    },
+    "class_type": "Krea2EncodeRebalance",
+    "_meta": {
+      "title": "40 · Body turnaround · four-reference conditioning"
+    }
+  },
+  "41": {
+    "inputs": {
+      "conditioning": [
+        "40",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "41 · Body turnaround negative"
+    }
+  },
+  "42": {
+    "inputs": {
+      "width": 1024,
+      "height": 576,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "42 · Body turnaround latent · 1024×576"
+    }
+  },
+  "43": {
+    "inputs": {
+      "seed": [
+        "1",
+        8
+      ],
+      "steps": 8,
+      "cfg": 1.0,
+      "sampler_name": "er_sde",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": [
+        "6",
+        0
+      ],
+      "positive": [
+        "40",
+        0
+      ],
+      "negative": [
+        "41",
+        0
+      ],
+      "latent_image": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "43 · Independent Body turnaround sampler"
+    }
+  },
+  "44": {
+    "inputs": {
+      "samples": [
+        "43",
+        0
+      ],
+      "vae": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "44 · Decode Body turnaround"
+    }
+  },
+  "50": {
+    "inputs": {
+      "image_count": 4,
+      "layout": "wide_bottom",
+      "output_width": 768,
+      "output_height": 448,
+      "columns": 0,
+      "gutter": 4,
+      "outer_padding": 4,
+      "corner_radius": 0,
+      "fit_mode": "contain_pad",
+      "batch_mode": "first_image_only",
+      "background_color": "#000000",
+      "cell_background_color": "#000000",
+      "image1": [
+        "14",
+        0
+      ],
+      "image2": [
+        "24",
+        0
+      ],
+      "image3": [
+        "34",
+        0
+      ],
+      "image4": [
+        "44",
+        0
+      ]
+    },
+    "class_type": "VRGDG_LTXICIngredientsGrid",
+    "_meta": {
+      "title": "50 · LTX Ingredients sheet · wide bottom · no labels"
+    }
+  },
+  "51": {
+    "inputs": {
+      "images": [
+        "50",
+        0
+      ],
+      "filename_prefix": [
+        "1",
+        9
+      ],
+      "format": {
+        "format": "png",
+        "bit_depth": "16-bit",
+        "input_color_space": "sRGB"
+      }
+    },
+    "class_type": "SaveImageAdvanced",
+    "_meta": {
+      "title": "51 · Save 16-bit PNG Ingredients sheet"
+    }
+  },
+  "52": {
+    "inputs": {
+      "text": [
+        "1",
+        0
+      ],
+      "filename_prefix": [
+        "1",
+        9
+      ],
+      "format": "json"
+    },
+    "class_type": "SaveText",
+    "_meta": {
+      "title": "52 · Save complete planner prompt JSON"
+    }
+  },
+  "53": {
+    "inputs": {
+      "images": [
+        "51",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "53 · Preview final Ingredients sheet"
+    }
+  }
+}

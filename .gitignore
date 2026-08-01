@@ -60,6 +60,11 @@ Models/local/
 LoRAs/local/
 ComfyUI/models/
 
+# BlokeyUI is an independently versioned engine checkout. Its ComfyUI core is
+# pinned and published from the BlokeyUI repository instead of being embedded
+# accidentally in the Sineforge Git history.
+/BlokeyUI/
+
 !storage/**/.gitkeep
 !storage/workflow_templates/**
 !storage/workflow_templates/example_smoke/**

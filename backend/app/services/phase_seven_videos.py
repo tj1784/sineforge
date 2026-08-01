@@ -1,8 +1,9 @@
-"""Phase 7 local video queue handoff through ComfyAPI Runner.
+"""Phase 7 local video submission through the bundled ComfyUI engine.
 
 This service does not perform audio, stitching, FFmpeg muxing, or picture lock.
 It submits one local image-to-video job per approved starting image to the
-trusted ComfyAPI Runner, then records the batch in the audit log.
+configured ComfyUI ``/prompt`` endpoint, then records the batch in the audit
+log. The engine's input directory is SineForge-managed storage.
 """
 
 from __future__ import annotations
@@ -35,6 +36,8 @@ from backend.app.schemas.project_workflows import (
     is_cineforge_studio_workflow_lane,
 )
 from backend.app.services import reference_assets
+from backend.app.services.comfy.engine import comfy_prompt_submission_guard
+from backend.app.services.themes import compile_project_theme_prompts
 
 
 class PhaseSevenVideoError(ValueError):
@@ -74,7 +77,6 @@ DEFAULT_PHASE7_VIDEO_WORKFLOW_PATHS = (
     / "handoff_workflows"
     / "cineforge-phase7-wan21-lightx2v-i2v480p.api.json",
 )
-DEFAULT_COMFY_INPUT_DIR = Path(r"C:\ComfyUI\LTX\ComfyUI\ComfyUI\input")
 DEFAULT_VIDEO_FPS = 16.0
 DEFAULT_VIDEO_NEGATIVE_PROMPT = (
     "static frozen frame, identity drift, different person, changed age, changed hair, "
@@ -178,13 +180,13 @@ def _copy_starting_image_to_comfy_input(
     story: Story,
     shot_code: str,
     asset: PlanningMediaAsset,
-    input_dir: Path = DEFAULT_COMFY_INPUT_DIR,
+    input_dir: Path | None = None,
 ) -> str:
+    input_root = Path(input_dir or get_settings().comfyui_input_dir).resolve()
     source_path = reference_assets.resolve_managed_path(asset)
     extension = source_path.suffix.lower() or ".png"
     relative_name = Path("cineforge") / str(story.project_id) / "phase7" / f"{_slug(shot_code).lower()}_{asset.id}{extension}"
-    destination = (input_dir / relative_name).resolve()
-    input_root = input_dir.resolve()
+    destination = (input_root / relative_name).resolve()
     try:
         destination.relative_to(input_root)
     except ValueError as exc:
@@ -273,32 +275,51 @@ def _patch_video_workflow(
     return patched
 
 
-def _post_runner_job(
+def _post_comfy_prompt(
     workflow: Mapping[str, Any],
     *,
-    workflow_name: str,
-    input_dir: Path = DEFAULT_COMFY_INPUT_DIR,
+    client_id: str,
+    comfyui_url: str | None = None,
 ) -> str:
-    runner_url = str(get_settings().comfy_api_runner_base_url).rstrip("/")
+    engine_url = (
+        comfyui_url or str(get_settings().comfyui_base_url)
+    ).rstrip("/")
     payload = {
-        "workflow": workflow,
-        "workflowName": workflow_name,
-        "comfyUrl": str(get_settings().comfyui_base_url).rstrip("/"),
-        "inputDir": str(input_dir),
-        "queueCount": 1,
-        "runMode": "direct",
-        "mergeMovie": False,
-        "varySeed": False,
-        "saveLatents": False,
+        "prompt": dict(workflow),
+        "client_id": client_id,
     }
-    with httpx.Client(timeout=httpx.Timeout(30.0, connect=5.0)) as client:
-        response = client.post(f"{runner_url}/api/run", json=payload)
-        response.raise_for_status()
-        data = response.json()
-    job_id = data.get("jobId")
-    if not isinstance(job_id, str) or not job_id:
-        raise PhaseSevenVideoError(f"ComfyAPI Runner did not return a jobId: {data}")
-    return job_id
+    try:
+        with httpx.Client(
+            base_url=engine_url,
+            timeout=httpx.Timeout(30.0, connect=5.0),
+        ) as client:
+            with comfy_prompt_submission_guard():
+                response = client.post("/prompt", json=payload)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPStatusError as exc:
+        try:
+            detail = exc.response.json()
+        except ValueError:
+            detail = exc.response.text[:2000]
+        raise PhaseSevenVideoError(
+            f"ComfyUI rejected the Phase 7 prompt: {detail}"
+        ) from exc
+    except httpx.HTTPError as exc:
+        raise PhaseSevenVideoError(
+            f"ComfyUI is unavailable at {engine_url}: {exc}"
+        ) from exc
+    except ValueError as exc:
+        raise PhaseSevenVideoError(
+            "ComfyUI returned an invalid JSON response for the Phase 7 prompt."
+        ) from exc
+
+    prompt_id = data.get("prompt_id") if isinstance(data, dict) else None
+    if not isinstance(prompt_id, str) or not prompt_id.strip():
+        raise PhaseSevenVideoError(
+            f"ComfyUI did not return a prompt_id: {data}"
+        )
+    return prompt_id
 
 
 def queue_story_videos(
@@ -313,6 +334,12 @@ def queue_story_videos(
 ) -> dict[str, Any]:
     story = _story(db, story_id)
     _require_legacy_video_lane(db, story)
+    project = db.get(Project, story.project_id)
+    if project is None:
+        raise PhaseSevenVideoError("Project not found for this story.")
+    settings = get_settings()
+    comfyui_url = str(settings.comfyui_base_url).rstrip("/")
+    comfyui_input_dir = settings.comfyui_input_dir
     rows = _shot_rows(db, story_id)
     if not rows:
         raise PhaseSevenVideoError("Phase 7 has no shots to queue.")
@@ -339,7 +366,11 @@ def queue_story_videos(
             "blocked_count": len(blockers),
             "required_count": len(rows),
             "message": "Video queue blocked until every planned shot has an approved starting image.",
-            "runner_url": str(get_settings().comfy_api_runner_base_url).rstrip("/"),
+            "engine": "comfyui",
+            "comfyui_url": comfyui_url,
+            # Deprecated compatibility alias. Phase 7 no longer uses an
+            # external Runner; this points at the actual engine instead.
+            "runner_url": comfyui_url,
             "workflow_label": workflow_label or DEFAULT_PHASE7_WORKFLOW_LABEL,
             "jobs": [],
             "blockers": blockers,
@@ -347,6 +378,7 @@ def queue_story_videos(
 
     base_workflow = _load_workflow(workflow_api_json)
     base_seed = seed if seed is not None else secrets.randbits(31)
+    client_id = f"sineforge-phase7-{secrets.token_hex(16)}"
     jobs: list[dict[str, Any]] = []
     for index, (_chapter, scene, shot, scene_number, shot_number, asset) in enumerate(eligible):
         shot_code = _shot_code(scene_number, shot_number, shot)
@@ -356,7 +388,20 @@ def queue_story_videos(
         positive_prompt, negative_prompt = _build_video_prompt(
             story, scene, shot, shot_code, asset, package
         )
-        input_image = _copy_starting_image_to_comfy_input(story, shot_code, asset)
+        resolved_theme = compile_project_theme_prompts(
+            project,
+            positive_prompt=positive_prompt,
+            negative_prompt=negative_prompt,
+            medium="video",
+        )
+        positive_prompt = resolved_theme.positive_prompt
+        negative_prompt = resolved_theme.negative_prompt
+        input_image = _copy_starting_image_to_comfy_input(
+            story,
+            shot_code,
+            asset,
+            input_dir=comfyui_input_dir,
+        )
         output_prefix = f"cineforge\\{story.project_id}\\phase7\\{_slug(shot_code).lower()}_video"
         patched = _patch_video_workflow(
             base_workflow,
@@ -367,18 +412,29 @@ def queue_story_videos(
             frame_count=frame_count,
             output_prefix=output_prefix,
         )
-        runner_job_id = _post_runner_job(
+        comfy_prompt_id = _post_comfy_prompt(
             patched,
-            workflow_name=f"{shot_code} {shot.title}",
+            client_id=client_id,
+            comfyui_url=comfyui_url,
         )
         jobs.append(
             {
                 "shot_id": shot.id,
                 "starting_image_asset_id": asset.id,
-                "runner_job_id": runner_job_id,
+                "engine": "comfyui",
+                "comfy_prompt_id": comfy_prompt_id,
+                # Deprecated compatibility alias for older clients.
+                "runner_job_id": comfy_prompt_id,
                 "shot_code": shot_code,
                 "prompt": positive_prompt,
                 "negative_prompt": negative_prompt,
+                "theme_id": resolved_theme.resolved_theme_id,
+                "theme_version": resolved_theme.theme_version,
+                "theme_context": resolved_theme.context,
+                "theme_snapshot": resolved_theme.snapshot,
+                "theme_snapshot_sha256": resolved_theme.snapshot_sha256,
+                "positive_prompt_sha256": resolved_theme.positive_prompt_sha256,
+                "negative_prompt_sha256": resolved_theme.negative_prompt_sha256,
                 "seed": chosen_seed,
                 "frame_count": frame_count,
                 "input_image": input_image,
@@ -397,11 +453,17 @@ def queue_story_videos(
                 "requested_by": requested_by,
                 "queued_count": len(jobs),
                 "base_seed": base_seed,
-                "runner_url": str(get_settings().comfy_api_runner_base_url).rstrip("/"),
+                "engine": "comfyui",
+                "comfyui_url": comfyui_url,
+                "comfy_client_id": client_id,
+                # Deprecated compatibility aliases retained in historical
+                # audit payloads while clients migrate to ComfyUI terms.
+                "runner_url": comfyui_url,
                 "workflow_label": workflow_label or DEFAULT_PHASE7_WORKFLOW_LABEL,
                 "workflow_source": workflow_source
                 or ("uploaded_api_json" if workflow_api_json is not None else DEFAULT_PHASE7_WORKFLOW_SOURCE),
-                "runner_job_ids": [item["runner_job_id"] for item in jobs],
+                "comfy_prompt_ids": [item["comfy_prompt_id"] for item in jobs],
+                "runner_job_ids": [item["comfy_prompt_id"] for item in jobs],
             },
         )
     )
@@ -410,8 +472,11 @@ def queue_story_videos(
         "queued_count": len(jobs),
         "blocked_count": 0,
         "required_count": len(rows),
-        "message": f"Queued {len(jobs)} Phase 7 video prompt{'' if len(jobs) == 1 else 's'} in ComfyAPI Runner.",
-        "runner_url": str(get_settings().comfy_api_runner_base_url).rstrip("/"),
+        "message": f"Queued {len(jobs)} Phase 7 video prompt{'' if len(jobs) == 1 else 's'} directly in ComfyUI.",
+        "engine": "comfyui",
+        "comfyui_url": comfyui_url,
+        # Deprecated compatibility alias for older clients.
+        "runner_url": comfyui_url,
         "workflow_label": workflow_label or DEFAULT_PHASE7_WORKFLOW_LABEL,
         "jobs": jobs,
         "blockers": [],

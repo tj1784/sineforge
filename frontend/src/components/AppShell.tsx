@@ -1,5 +1,5 @@
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { api, type LMStudioModelCatalog } from '../api/client'
+import { api, type LMStudioModelCatalog, type ManagedEngineStatus } from '../api/client'
 import type { ProjectWorkflowLane } from '../workflowLanes'
 import {
   getShellTopbarActions,
@@ -23,7 +23,7 @@ export type PageId =
   | 'exports'
   | 'settings'
 
-export type ShellView = 'projects' | 'new-project' | 'studio'
+export type ShellView = 'projects' | 'new-project' | 'studio' | 'engine'
 
 /** Exact Gold Sites `IconName` subset used by AppShell chrome. */
 type ShellIconName =
@@ -56,7 +56,6 @@ const navItems: { id: PageId; label: string; icon: ShellIconName }[] = [
   { id: 'routing', label: 'Model routing', icon: 'cpu' },
   { id: 'workflows', label: 'Workflows', icon: 'layers' },
   { id: 'sequence-sheet', label: 'Sequence Sheet', icon: 'film' },
-  { id: 'api-caller', label: 'API Caller', icon: 'play' },
   { id: 'api-runner', label: 'API Runner', icon: 'play' },
   { id: 'downloads', label: 'Downloads', icon: 'download' },
   { id: 'exports', label: 'Exports', icon: 'download' },
@@ -227,11 +226,18 @@ export function AppShell({
   const [modelCatalogLoading, setModelCatalogLoading] = useState(true)
   const [modelChanging, setModelChanging] = useState(false)
   const [modelError, setModelError] = useState<string | null>(null)
+  const [engineStatus, setEngineStatus] = useState<ManagedEngineStatus | null>(null)
+  const [engineLoading, setEngineLoading] = useState(false)
+  const [engineError, setEngineError] = useState<string | null>(null)
+  const [engineRefresh, setEngineRefresh] = useState(0)
   const [shellActions, setShellActions] = useState<ShellTopbarActions>(() => getShellTopbarActions())
   const navId = useId()
   const isStudio = view === 'studio'
+  const isEngine = view === 'engine'
   const isAgentless = isStudio && workflowLane === 'agentless'
-  const visibleNavItems = isAgentless
+  const visibleNavItems = isEngine
+    ? navItems.filter((item) => item.id === 'api-runner')
+    : isAgentless
     ? navItems.filter(
         (item) => !['images', 'routing', 'api-caller', 'api-runner'].includes(item.id),
       )
@@ -243,12 +249,16 @@ export function AppShell({
       : view === 'new-project'
         ? labels['new-project']
         : labels[activePage]
-  // Local runtime shortcuts live in the sidebar popover; backend status remains read-only.
-  const runtimeLabel = 'Local AI tools'
+  const runtimeLabel = 'Sineforge engine'
   const runtimeStatusDetail =
     backendStatus === 'ok' || backendStatus === 'ready'
       ? 'Local backend ok'
       : `Local backend ${backendStatus}`
+  const engineStatusDetail = engineLoading
+    ? 'Checking bundled engine…'
+    : engineStatus?.ready
+      ? `BlokeyUI ready${engineStatus.pid ? ` · PID ${engineStatus.pid}` : ''}`
+      : engineError ?? engineStatus?.last_error ?? `Bundled engine ${engineStatus?.status ?? 'unavailable'}`
   const activeModel = modelCatalog?.models.find(
     (model) =>
       model.selected ||
@@ -263,7 +273,10 @@ export function AppShell({
     api
       .listLmStudioModels()
       .then((catalog) => {
-        if (!cancelled) setModelCatalog(catalog)
+        if (!cancelled) {
+          setModelCatalog(catalog)
+          setModelError(null)
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -277,6 +290,41 @@ export function AppShell({
       cancelled = true
     }
   }, [runtime])
+
+  useEffect(() => {
+    if (!runtime) return
+    let cancelled = false
+    let requesting = false
+    const readEngineStatus = () => {
+      if (requesting) return
+      requesting = true
+      void api.engineStatus()
+      .then((status) => {
+        if (!cancelled) {
+          setEngineStatus(status)
+          setEngineError(null)
+        }
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setEngineStatus(null)
+          setEngineError(
+            error instanceof Error ? error.message : 'Bundled engine status is unavailable.',
+          )
+        }
+      })
+      .finally(() => {
+        requesting = false
+        if (!cancelled) setEngineLoading(false)
+      })
+    }
+    readEngineStatus()
+    const timer = window.setInterval(readEngineStatus, 3_000)
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [engineRefresh, runtime])
 
   useEffect(() => {
     if (!mobile && !projectMenu && !profile && !runtime) return
@@ -444,10 +492,10 @@ export function AppShell({
         </div>
 
         <section className="sidebar-project-section" aria-label="Current project navigation">
-          <p className="nav-label project-nav-label">PRODUCTION</p>
+          <p className="nav-label project-nav-label">{isEngine ? 'ENGINE' : 'PRODUCTION'}</p>
           <nav id={navId} className="project-nav">
             {visibleNavItems.map((item) => {
-              const active = isStudio && item.id === activePage
+              const active = (isStudio || isEngine) && item.id === activePage
               return (
                 <button
                   type="button"
@@ -472,6 +520,7 @@ export function AppShell({
           <button
             type="button"
             className={isStudio && activePage === 'settings' ? 'active' : ''}
+            disabled={!isStudio}
             onClick={() => goPage('settings')}
           >
             <Icon name="settings" size={18} />
@@ -485,7 +534,12 @@ export function AppShell({
             aria-controls="runtime-preview-popover"
             aria-haspopup="dialog"
             onClick={() => {
-              setRuntime((open) => !open)
+              const opening = !runtime
+              setRuntime(opening)
+              if (opening) {
+                setEngineLoading(true)
+                setEngineError(null)
+              }
               setProfile(false)
               setProjectMenu(false)
             }}
@@ -493,7 +547,7 @@ export function AppShell({
             <i aria-hidden="true" />
             <span>
               <strong>{runtimeLabel}</strong>
-              <small>{isAgentless ? 'LM Studio · ComfyUI · JSON manifests' : 'ComfyUI · Runner · local agents'}</small>
+              <small>{isAgentless ? 'LM Studio · bundled engine · JSON manifests' : 'BlokeyUI engine · local agents'}</small>
             </span>
           </button>
           {runtime ? (
@@ -503,10 +557,10 @@ export function AppShell({
               role="dialog"
               aria-label="Preview runtime status"
             >
-              <b>Local runtime tools</b>
-              <p>
-                Sineforge keeps public submission gated while supervising the approved local
-                runtimes. Backend status: {runtimeStatusDetail}.
+              <b>Sineforge runtime</b>
+              <p role="status" aria-live="polite">
+                Sineforge owns the bundled BlokeyUI process and sends validated workflows to
+                its ComfyUI engine. {engineStatusDetail}. Backend: {runtimeStatusDetail}.
               </p>
               <div className="runtime-model-toggle">
                 <label htmlFor="runtime-planning-model">
@@ -565,29 +619,23 @@ export function AppShell({
                   scene-reset workflows pass admission.
                 </p>
               ) : null}
-              <a
-                href="http://127.0.0.1:8022"
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setRuntime(false)}
+              <button
+                type="button"
+                onClick={() => {
+                  setRuntime(false)
+                  goPage('api-runner')
+                }}
               >
-                Open ComfyAPI Runner
+                Open Engine workspace
                 <Icon name="arrow" size={14} />
-              </a>
-              <a
-                href="http://127.0.0.1:8888"
-                target="_blank"
-                rel="noreferrer"
-                onClick={() => setRuntime(false)}
-              >
-                Open ComfyUI
-                <Icon name="arrow" size={14} />
-              </a>
+              </button>
               {onRefreshStatus ? (
                 <button
                   type="button"
                   onClick={() => {
-                    setRuntime(false)
+                    setEngineLoading(true)
+                    setEngineError(null)
+                    setEngineRefresh((value) => value + 1)
                     onRefreshStatus()
                   }}
                 >
@@ -692,6 +740,18 @@ export function AppShell({
                     aria-label={isAgentless ? 'Local-agent deterministic workflow' : 'Seven production phases'}
                   >
                     {isAgentless ? 'AGENTLESS' : '7 PHASES'}
+                  </span>
+                </>
+              ) : null}
+              {isEngine ? (
+                <>
+                  <button type="button" onClick={() => goWorkspace(onOpenProjects)}>
+                    Projects
+                  </button>
+                  <Icon name="chevron" size={13} />
+                  <b>Engine</b>
+                  <span className="phase" aria-label="Bundled local engine workspace">
+                    LOCAL
                   </span>
                 </>
               ) : null}

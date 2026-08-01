@@ -86,13 +86,15 @@ class NativeRunnerAnalyzeRequest(StrictRequest):
 class NativeRunnerRunRequest(StrictRequest):
     workflow: dict[str, Any]
     workflow_name: str = Field(min_length=1, max_length=160)
-    workflow_sha256: str = Field(min_length=64, max_length=64)
+    workflow_sha256: str | None = Field(default=None, min_length=64, max_length=64)
     confirmation: Literal[True]
     idempotency_key: str = Field(min_length=8, max_length=120)
 
     @field_validator("workflow_sha256")
     @classmethod
-    def validate_sha256(cls, value: str) -> str:
+    def validate_sha256(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         lowered = value.casefold()
         if any(character not in "0123456789abcdef" for character in lowered):
             raise ValueError("workflow_sha256 must be hexadecimal")

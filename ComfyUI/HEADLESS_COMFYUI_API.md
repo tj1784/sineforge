@@ -1,5 +1,10 @@
 # Headless ComfyUI API Plan
 
+> Current unified-app note: Sineforge owns BlokeyUI on
+> `http://127.0.0.1:8190` and uses `/api/*` for new integration code. Port 8188
+> examples below describe generic ComfyUI conventions, not this workstation's
+> active binding. The legacy external Runner is not part of this flow.
+
 Evidence sources: ComfyUI server docs, message docs, server source, and official API examples listed in `Sources/SOURCE_REGISTER.md`.
 
 ## API Function Matrix
