@@ -59,7 +59,7 @@ KREA_VAE = "qwen_image_vae.safetensors"
 SHARED_MODEL_ROOT = r"C:\ComfyUI\ComfyUI_Shared_Folders\models"
 CUSTOM_NODE_ROOT = r"C:\ComfyUI\LTX\ComfyUI\ComfyUI\custom_nodes"
 TRUSTED_MODEL_ROOT = r"C:\Users\Blokey\.lmstudio\models"
-REFERENCE_DEFAULT = "example.png"
+REFERENCE_DEFAULT = "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png"
 TOKEN_STRENGTHS = ("max", "high", "high", "normal")
 
 FALLBACK_PROFILE = {
@@ -345,10 +345,10 @@ def _api_workflow(contract: dict[str, Any]) -> dict[str, Any]:
     }
 
     branches = [
-        ("10", "11", "12", "13", "14", 1, 5, 768, 768, "Front face"),
-        ("20", "21", "22", "23", "24", 2, 6, 768, 768, "Three-quarter face"),
-        ("30", "31", "32", "33", "34", 3, 7, 768, 768, "Side profile"),
-        ("40", "41", "42", "43", "44", 4, 8, 1024, 576, "Body turnaround"),
+        ("10", "11", "12", "13", "14", 1, 5, 1024, 1024, "Front face"),
+        ("20", "21", "22", "23", "24", 2, 6, 1024, 1024, "Three-quarter face"),
+        ("30", "31", "32", "33", "34", 3, 7, 1024, 1024, "Side profile"),
+        ("40", "41", "42", "43", "44", 4, 8, 1024, 1536, "Body turnaround"),
     ]
     for (
         encode_id,
@@ -424,8 +424,8 @@ def _api_workflow(contract: dict[str, Any]) -> dict[str, Any]:
                 "inputs": {
                     "image_count": 4,
                     "layout": "wide_bottom",
-                    "output_width": 768,
-                    "output_height": 448,
+                    "output_width": 1536,
+                    "output_height": 1920,
                     "columns": 0,
                     "gutter": 4,
                     "outer_padding": 4,
@@ -721,7 +721,7 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
     )
 
     branch_specs = [
-        (10, 11, 12, 13, 14, 1, 5, 768, 768, "Front face", 60),
+        (10, 11, 12, 13, 14, 1, 5, 1024, 1024, "Front face", 60),
         (
             20,
             21,
@@ -730,12 +730,12 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
             24,
             2,
             6,
-            768,
-            768,
+            1024,
+            1024,
             "Three-quarter face",
             1030,
         ),
-        (30, 31, 32, 33, 34, 3, 7, 768, 768, "Side profile", 2000),
+        (30, 31, 32, 33, 34, 3, 7, 1024, 1024, "Side profile", 2000),
         (
             40,
             41,
@@ -745,7 +745,7 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
             4,
             8,
             1024,
-            576,
+            1536,
             "Body turnaround",
             2970,
         ),
@@ -914,8 +914,8 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
             widgets_values=[
                 4,
                 "wide_bottom",
-                768,
-                448,
+                1536,
+                1920,
                 0,
                 4,
                 4,
@@ -1001,7 +1001,7 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
             outputs=[],
             widgets_values=[
                 "# SineForge · Krea 2 Character Ingredients Sheet\n\n"
-                "1. Upload one clean identity image in node 2. Use a clear "
+                "1. Choose one high-resolution local sheet in node 2, or upload one clean identity image. Use a clear "
                 "front or three-quarter view of the single character whose "
                 "identity and wardrobe should remain consistent.\n"
                 "2. Edit only `character_profile_json` in node 1. Keep it valid "
@@ -1019,10 +1019,10 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
                 "4. Every Krea branch receives the same single uploaded identity "
                 "image through the available conditioning slots. The branches generate a "
                 "front face, three-quarter face, profile, and body turnaround.\n"
-                "5. Face views use 768×768 latents. The body turnaround uses "
-                "1024×576. All samplers use 8 steps, CFG 1, ER-SDE, simple "
+                "5. Face views use 1024×1024 latents. The body turnaround uses "
+                "1024×1536. All samplers use 8 steps, CFG 1, ER-SDE, simple "
                 "schedule, batch size one.\n"
-                "6. Node 50 creates a clean 768×448 `wide_bottom` Ingredients "
+                "6. Node 50 creates a clean 1536×1920 `wide_bottom` Ingredients "
                 "sheet with a black background and no labels. The compositor "
                 "internally produces an 8-bit-equivalent tensor; node 51 saves "
                 "that result in a lossless 16-bit PNG container without claiming "
@@ -1160,7 +1160,7 @@ def _editor_workflow(contract: dict[str, Any]) -> dict[str, Any]:
                 "grid": {
                     "node": "VRGDG_LTXICIngredientsGrid",
                     "layout": "wide_bottom",
-                    "size": [768, 448],
+                    "size": [1536, 1920],
                     "background": "#000000",
                     "labels": False,
                 },
@@ -1175,7 +1175,7 @@ def _manifest(contract: dict[str, Any]) -> dict[str, Any]:
         "schema_version": "sineforge.semantic-workflow-manifest/v1",
         "template_id": "krea2-character-ingredients-v1",
         "workflow_name": (
-            "Krea 2 Character Ingredients Sheet — Selectable Local Model"
+            "Krea 2 Character Ingredients Sheet — High-Resolution Local Models"
         ),
         "editor_workflow": EDITOR_FILENAME,
         "api_workflow": API_FILENAME,
@@ -1222,35 +1222,35 @@ def _manifest(contract: dict[str, Any]) -> dict[str, Any]:
                     "seed_output_index": 5,
                     "encode_node": "10",
                     "sampler_node": "13",
-                    "latent": [768, 768],
+                    "latent": [1024, 1024],
                 },
                 "three_quarter_face": {
                     "prompt_output_index": 2,
                     "seed_output_index": 6,
                     "encode_node": "20",
                     "sampler_node": "23",
-                    "latent": [768, 768],
+                    "latent": [1024, 1024],
                 },
                 "profile": {
                     "prompt_output_index": 3,
                     "seed_output_index": 7,
                     "encode_node": "30",
                     "sampler_node": "33",
-                    "latent": [768, 768],
+                    "latent": [1024, 1024],
                 },
                 "body_turnaround": {
                     "prompt_output_index": 4,
                     "seed_output_index": 8,
                     "encode_node": "40",
                     "sampler_node": "43",
-                    "latent": [1024, 576],
+                    "latent": [1024, 1536],
                 },
             },
             "ingredients_grid": {
                 "node_id": "50",
                 "class_type": "VRGDG_LTXICIngredientsGrid",
                 "layout": "wide_bottom",
-                "output_size": [768, 448],
+                "output_size": [1536, 1920],
                 "background": "#000000",
                 "labels": False,
             },
@@ -1277,13 +1277,13 @@ def _manifest(contract: dict[str, Any]) -> dict[str, Any]:
 
 
 def _instructions() -> str:
-    return """1. Upload one clean image of one character in node 2. A clear front or three-quarter identity view works best. The same image conditions every Krea branch.
+    return """1. Choose one high-resolution local sheet from `SineForge/CharacterIngredients/` in node 2, or upload one clean image of one character. A clear front or three-quarter identity view works best. The same image conditions every Krea branch.
 2. Edit node 1 `character_profile_json`. It must remain valid JSON and conform to the embedded profile schema. Preserve all keys: `schema_version`, `character_id`, `character_name`, `character_kind`, `identity_brief`, `age_presentation`, `face_identity`, `hair`, `complexion`, `body_build`, `wardrobe`, `accessories`, `identity_locks`, `visual_style`, `background`, and `avoid`.
 3. Keep the profile limited to one canonical character. Specify stable face geometry, age, complexion, eyes, hairstyle, distinctive features, wardrobe colors/materials, footwear, and accessories. Do not request labels or decorative frames.
 4. Node 1 exposes every installed GGUF package beneath the local LM Studio model root as a visible model dropdown. Qwen 3.6 40B is selected by default, but it is not locked. The chosen local model returns one complete JSON record, four standalone Krea prompts, four independent image seeds, an output prefix, and status JSON. No hosted/API Krea or prompt agent is present.
 5. Every Krea2EncodeRebalance branch receives the same uploaded identity image. The prompt changes the view; the identity and wardrobe instructions remain locked.
-6. The three face branches use independent 768×768 latents. The body-turnaround branch uses a 1024×576 latent. Every KSampler is independent and uses 8 steps, CFG 1, ER-SDE, the simple scheduler, denoise 1, and batch size one.
-7. Node 50 composes the decoded views with the installed `VRGDG_LTXICIngredientsGrid` at 768×448 using `wide_bottom`, black background/cells, contain-pad fitting, and no text labels.
+6. The three face branches use independent 1024×1024 latents. The body-turnaround branch uses a 1024×1536 latent. Every KSampler is independent and uses 8 steps, CFG 1, ER-SDE, the simple scheduler, denoise 1, and batch size one.
+7. Node 50 composes the decoded views with the installed `VRGDG_LTXICIngredientsGrid` at 1536×1920 using `wide_bottom`, black background/cells, contain-pad fitting, and no text labels.
 8. The installed Ingredients compositor converts panels to an 8-bit-equivalent tensor internally. Node 51 saves that compositor result in a lossless 16-bit PNG container; this prevents further PNG compression loss but does not recreate source precision discarded by the grid. Node 52 saves the exact planner prompt/provenance record with `format=json`. Node 53 previews the same image returned by the save node.
 9. Use the accepted PNG as an LTX-2.3 Ingredients reference sheet. If one view is weak, change the planner seed or improve the uploaded identity image/profile and regenerate; do not add labels or clutter to compensate.
 10. The workflow is repository-managed and read-only in the SineForge library. Load it into ComfyUI to make an editable working copy."""
@@ -1317,10 +1317,10 @@ def _library_record(
     return {
         "schema": "sineforge.api-caller-workflow.v1",
         "id": WORKFLOW_ID,
-        "name": "Krea 2 Character Ingredients Sheet — Selectable Local Model",
+        "name": "Krea 2 Character Ingredients Sheet — High-Resolution Local Models",
         "version": "1.0",
         "description": (
-            "Creates one clean LTX-2.3 Ingredients reference sheet for a "
+            "Creates one clean high-resolution LTX-2.3 Ingredients reference sheet for a "
             "recurring character. The visible planner dropdown discovers every "
             "installed GGUF package beneath the local LM Studio model root, with "
             "Qwen 3.6 40B selected only as the default. The chosen local planner "
@@ -1329,7 +1329,7 @@ def _library_record(
             "seeds for a front face, three-quarter face, profile, and full-body "
             "turnaround. Every local Krea branch reuses the one uploaded identity "
             "image for consistent conditioning. The installed LTX Ingredients grid "
-            "composes a label-free 768×448 sheet on black; the workflow saves a "
+            "composes a label-free 1536×1920 high-resolution sheet on black; the workflow saves a "
             "16-bit PNG container plus complete JSON prompt and provenance."
         ),
         "category": "Image Editing & Composition",
@@ -1428,9 +1428,9 @@ def _library_record(
                     "references": 4,
                     "sampler_steps": 8,
                     "batch_size": 1,
-                    "face_latent": [768, 768],
-                    "body_latent": [1024, 576],
-                    "sheet_size": [768, 448],
+                    "face_latent": [1024, 1024],
+                    "body_latent": [1024, 1536],
+                    "sheet_size": [1536, 1920],
                     "queue_depth": 1,
                 },
             },

@@ -1,7 +1,7 @@
 {
   "schema_version": "sineforge.semantic-workflow-manifest/v1",
   "template_id": "krea2-character-ingredients-v1",
-  "workflow_name": "Krea 2 Character Ingredients Sheet — Selectable Local Model",
+  "workflow_name": "Krea 2 Character Ingredients Sheet — High-Resolution Local Models",
   "editor_workflow": "SineForge_Krea2_Character_Ingredients.workflow.json",
   "api_workflow": "SineForge_Krea2_Character_Ingredients.api.json",
   "prompt_contract": "SineForge_Krea2_Character_Ingredients.prompt.json",
@@ -129,6 +129,18 @@
     "steps": 8,
     "cfg": 1.0,
     "denoise": 1.0,
-    "seed_policy": "four planner-derived independent seeds"
+    "seed_policy": "four planner-derived independent seeds",
+    "face_latent_size": {
+      "width": 1024,
+      "height": 1024
+    },
+    "body_latent_size": {
+      "width": 1024,
+      "height": 1536
+    },
+    "ingredients_grid_size": {
+      "width": 1536,
+      "height": 1920
+    }
   }
 }

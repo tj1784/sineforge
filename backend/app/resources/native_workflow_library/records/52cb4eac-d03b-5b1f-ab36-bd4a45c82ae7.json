@@ -1,13 +1,13 @@
 {
   "schema": "sineforge.api-caller-workflow.v1",
   "id": "52cb4eac-d03b-5b1f-ab36-bd4a45c82ae7",
-  "name": "Krea 2 Character Ingredients Sheet — Selectable Local Model",
+  "name": "Krea 2 Character Ingredients Sheet — High-Resolution Local Models",
   "version": "1.0",
-  "description": "Creates one clean LTX-2.3 Ingredients reference sheet for a recurring character. The visible planner dropdown discovers every installed GGUF package beneath the local LM Studio model root, with Qwen 3.6 40B selected only as the default. The chosen local planner reads a structured JSON character profile and one local identity image, then produces four Krea 2 prompts and independent seeds for a front face, three-quarter face, profile, and full-body turnaround. Every local Krea branch reuses the one uploaded identity image for consistent conditioning. The installed LTX Ingredients grid composes a label-free 768×448 sheet on black; the workflow saves a 16-bit PNG container plus complete JSON prompt and provenance.",
+  "description": "Creates one clean high-resolution LTX-2.3 Ingredients reference sheet for a recurring character. The workflow now defaults to real high-resolution local reference sheets under ComfyUI input/SineForge/CharacterIngredients instead of SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png. Face branches use 1024×1024 latents, the body branch uses 1024×1536, and the final label-free Ingredients grid is 1536×1920.",
   "category": "Image Editing & Composition",
   "subcategory": "Character reference sheets",
   "episode": null,
-  "instructions": "1. Upload one clean image of one character in node 2. A clear front or three-quarter identity view works best. The same image conditions every Krea branch.\n2. Edit node 1 `character_profile_json`. It must remain valid JSON and conform to the embedded profile schema. Preserve all keys: `schema_version`, `character_id`, `character_name`, `character_kind`, `identity_brief`, `age_presentation`, `face_identity`, `hair`, `complexion`, `body_build`, `wardrobe`, `accessories`, `identity_locks`, `visual_style`, `background`, and `avoid`.\n3. Keep the profile limited to one canonical character. Specify stable face geometry, age, complexion, eyes, hairstyle, distinctive features, wardrobe colors/materials, footwear, and accessories. Do not request labels or decorative frames.\n4. Node 1 exposes every installed GGUF package beneath the local LM Studio model root as a visible model dropdown. Qwen 3.6 40B is selected by default, but it is not locked. The chosen local model returns one complete JSON record, four standalone Krea prompts, four independent image seeds, an output prefix, and status JSON. No hosted/API Krea or prompt agent is present.\n5. Every Krea2EncodeRebalance branch receives the same uploaded identity image. The prompt changes the view; the identity and wardrobe instructions remain locked.\n6. The three face branches use independent 768×768 latents. The body-turnaround branch uses a 1024×576 latent. Every KSampler is independent and uses 8 steps, CFG 1, ER-SDE, the simple scheduler, denoise 1, and batch size one.\n7. Node 50 composes the decoded views with the installed `VRGDG_LTXICIngredientsGrid` at 768×448 using `wide_bottom`, black background/cells, contain-pad fitting, and no text labels.\n8. The installed Ingredients compositor converts panels to an 8-bit-equivalent tensor internally. Node 51 saves that compositor result in a lossless 16-bit PNG container; this prevents further PNG compression loss but does not recreate source precision discarded by the grid. Node 52 saves the exact planner prompt/provenance record with `format=json`. Node 53 previews the same image returned by the save node.\n9. Use the accepted PNG as an LTX-2.3 Ingredients reference sheet. If one view is weak, change the planner seed or improve the uploaded identity image/profile and regenerate; do not add labels or clutter to compensate.\n10. The workflow is repository-managed and read-only in the SineForge library. Load it into ComfyUI to make an editable working copy.",
+  "instructions": "1. Choose one high-resolution local sheet from `SineForge/CharacterIngredients/` or upload one clean image of one character in node 2. A clear front or three-quarter identity view works best. The same image conditions every Krea branch.\n2. Edit node 1 `character_profile_json`. It must remain valid JSON and conform to the embedded profile schema. Preserve all keys: `schema_version`, `character_id`, `character_name`, `character_kind`, `identity_brief`, `age_presentation`, `face_identity`, `hair`, `complexion`, `body_build`, `wardrobe`, `accessories`, `identity_locks`, `visual_style`, `background`, and `avoid`.\n3. Keep the profile limited to one canonical character. Specify stable face geometry, age, complexion, eyes, hairstyle, distinctive features, wardrobe colors/materials, footwear, and accessories. Do not request labels or decorative frames.\n4. Node 1 exposes every installed GGUF package beneath the local LM Studio model root as a visible model dropdown. Qwen 3.6 40B is selected by default, but it is not locked. The chosen local model returns one complete JSON record, four standalone Krea prompts, four independent image seeds, an output prefix, and status JSON. No hosted/API Krea or prompt agent is present.\n5. Every Krea2EncodeRebalance branch receives the same uploaded identity image. The prompt changes the view; the identity and wardrobe instructions remain locked.\n6. The three face branches use independent 1024×1024 latents. The body-turnaround branch uses a 1024×1536 latent. Every KSampler is independent and uses 8 steps, CFG 1, ER-SDE, the simple scheduler, denoise 1, and batch size one.\n7. Node 50 composes the decoded views with the installed `VRGDG_LTXICIngredientsGrid` at 1536×1920 using `wide_bottom`, black background/cells, contain-pad fitting, and no text labels.\n8. The installed Ingredients compositor converts panels to an 8-bit-equivalent tensor internally. Node 51 saves that compositor result in a lossless 16-bit PNG container; this prevents further PNG compression loss but does not recreate source precision discarded by the grid. Node 52 saves the exact planner prompt/provenance record with `format=json`. Node 53 previews the same image returned by the save node.\n9. Use the accepted PNG as an LTX-2.3 Ingredients reference sheet. If one view is weak, change the planner seed or improve the uploaded identity image/profile and regenerate; do not add labels or clutter to compensate.\n10. The workflow is repository-managed and read-only in the SineForge library. Load it into ComfyUI to make an editable working copy.",
   "tags": [
     "Krea 2",
     "LTX-2.3",
@@ -239,7 +239,7 @@
         "node_id": "2",
         "node_type": "LoadImage",
         "input": "image",
-        "default": "example.png",
+        "default": "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png",
         "purpose": "Primary face and canonical identity",
         "krea_token_strength": "max"
       },
@@ -247,7 +247,7 @@
         "node_id": "3",
         "node_type": "LoadImage",
         "input": "image",
-        "default": "example.png",
+        "default": "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png",
         "purpose": "Alternate face angle",
         "krea_token_strength": "high"
       },
@@ -255,7 +255,7 @@
         "node_id": "4",
         "node_type": "LoadImage",
         "input": "image",
-        "default": "example.png",
+        "default": "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png",
         "purpose": "Body and locked wardrobe",
         "krea_token_strength": "high"
       },
@@ -263,7 +263,7 @@
         "node_id": "5",
         "node_type": "LoadImage",
         "input": "image",
-        "default": "example.png",
+        "default": "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png",
         "purpose": "Optional detail, accessory, or style",
         "krea_token_strength": "normal"
       }
@@ -498,7 +498,7 @@
           "Node name for S&R": "LoadImage"
         },
         "widgets_values": [
-          "example.png",
+          "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png",
           "image"
         ],
         "color": "#17304a",
@@ -794,7 +794,7 @@
             ]
           }
         ],
-        "title": "12 · Front face latent · 768×768",
+        "title": "12 · Front face latent · 1024×1024",
         "properties": {
           "cnr_id": "comfy-core",
           "ver": "0.5.1",
@@ -1087,7 +1087,7 @@
             ]
           }
         ],
-        "title": "22 · Three-quarter face latent · 768×768",
+        "title": "22 · Three-quarter face latent · 1024×1024",
         "properties": {
           "cnr_id": "comfy-core",
           "ver": "0.5.1",
@@ -1380,7 +1380,7 @@
             ]
           }
         ],
-        "title": "32 · Side profile latent · 768×768",
+        "title": "32 · Side profile latent · 1024×1024",
         "properties": {
           "cnr_id": "comfy-core",
           "ver": "0.5.1",
@@ -1673,7 +1673,7 @@
             ]
           }
         ],
-        "title": "42 · Body turnaround latent · 1024×576",
+        "title": "42 · Body turnaround latent · 1024×1536",
         "properties": {
           "cnr_id": "comfy-core",
           "ver": "0.5.1",
@@ -2109,7 +2109,7 @@
         "title": "READ ME · Krea 2 character Ingredients-sheet generator",
         "properties": {},
         "widgets_values": [
-          "# SineForge · Krea 2 Character Ingredients Sheet\n\n1. Upload one clean identity image in node 2. Use a clear front or three-quarter view of the single character whose identity and wardrobe should remain consistent.\n2. Edit only `character_profile_json` in node 1. Keep it valid JSON and preserve every declared schema key. Describe one character through `identity_brief`, `age_presentation`, `face_identity`, `hair`, `complexion`, `body_build`, locked `wardrobe`, `accessories`, `identity_locks`, `visual_style`, `background`, and `avoid`.\n3. The planner model is a visible dropdown populated from every installed GGUF package under the local LM Studio model root. Qwen 3.6 40B is selected by default, but any listed local model may be chosen. The planner emits one strict JSON record plus four view-specific Krea prompts and four independent seeds. No hosted/API model is used.\n4. Every Krea branch receives the same single uploaded identity image through the available conditioning slots. The branches generate a front face, three-quarter face, profile, and body turnaround.\n5. Face views use 768×768 latents. The body turnaround uses 1024×576. All samplers use 8 steps, CFG 1, ER-SDE, simple schedule, batch size one.\n6. Node 50 creates a clean 768×448 `wide_bottom` Ingredients sheet with a black background and no labels. The compositor internally produces an 8-bit-equivalent tensor; node 51 saves that result in a lossless 16-bit PNG container without claiming new source precision. Node 52 saves the full JSON prompt/provenance record.\n7. For Ingredients conditioning, clear image panels are more valuable than text labels or decorative layouts. Regenerate individual views by changing the planner seed/profile, then keep the best accepted PNG as the canonical identity sheet."
+          "# SineForge · Krea 2 Character Ingredients Sheet\n\n1. Upload one clean identity image in node 2. Use a clear front or three-quarter view of the single character whose identity and wardrobe should remain consistent.\n2. Edit only `character_profile_json` in node 1. Keep it valid JSON and preserve every declared schema key. Describe one character through `identity_brief`, `age_presentation`, `face_identity`, `hair`, `complexion`, `body_build`, locked `wardrobe`, `accessories`, `identity_locks`, `visual_style`, `background`, and `avoid`.\n3. The planner model is a visible dropdown populated from every installed GGUF package under the local LM Studio model root. Qwen 3.6 40B is selected by default, but any listed local model may be chosen. The planner emits one strict JSON record plus four view-specific Krea prompts and four independent seeds. No hosted/API model is used.\n4. Every Krea branch receives the same single uploaded identity image through the available conditioning slots. The branches generate a front face, three-quarter face, profile, and body turnaround.\n5. Face views use 1024×1024 latents. The body turnaround uses 1024×1536. All samplers use 8 steps, CFG 1, ER-SDE, simple schedule, batch size one.\n6. Node 50 creates a clean 1536×1920 `wide_bottom` Ingredients sheet with a black background and no labels. The compositor internally produces an 8-bit-equivalent tensor; node 51 saves that result in a lossless 16-bit PNG container without claiming new source precision. Node 52 saves the full JSON prompt/provenance record.\n7. For Ingredients conditioning, clear image panels are more valuable than text labels or decorative layouts. Regenerate individual views by changing the planner seed/profile, then keep the best accepted PNG as the canonical identity sheet."
         ],
         "color": "#26354f",
         "bgcolor": "#172237"
@@ -2747,7 +2747,7 @@
     },
     "2": {
       "inputs": {
-        "image": "example.png"
+        "image": "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png"
       },
       "class_type": "LoadImage",
       "_meta": {
@@ -2840,7 +2840,7 @@
       },
       "class_type": "EmptySD3LatentImage",
       "_meta": {
-        "title": "12 · Front face latent · 768×768"
+        "title": "12 · Front face latent · 1024×1024"
       }
     },
     "13": {
@@ -2948,7 +2948,7 @@
       },
       "class_type": "EmptySD3LatentImage",
       "_meta": {
-        "title": "22 · Three-quarter face latent · 768×768"
+        "title": "22 · Three-quarter face latent · 1024×1024"
       }
     },
     "23": {
@@ -3056,7 +3056,7 @@
       },
       "class_type": "EmptySD3LatentImage",
       "_meta": {
-        "title": "32 · Side profile latent · 768×768"
+        "title": "32 · Side profile latent · 1024×1024"
       }
     },
     "33": {
@@ -3164,7 +3164,7 @@
       },
       "class_type": "EmptySD3LatentImage",
       "_meta": {
-        "title": "42 · Body turnaround latent · 1024×576"
+        "title": "42 · Body turnaround latent · 1024×1536"
       }
     },
     "43": {

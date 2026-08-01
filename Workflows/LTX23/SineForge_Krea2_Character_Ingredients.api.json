@@ -21,7 +21,7 @@
   },
   "2": {
     "inputs": {
-      "image": "example.png"
+      "image": "SineForge/CharacterIngredients/jesus_white_robe_highres_ingredients.png"
     },
     "class_type": "LoadImage",
     "_meta": {
@@ -108,13 +108,13 @@
   },
   "12": {
     "inputs": {
-      "width": 768,
-      "height": 768,
+      "width": 1024,
+      "height": 1024,
       "batch_size": 1
     },
     "class_type": "EmptySD3LatentImage",
     "_meta": {
-      "title": "12 · Front face latent · 768×768"
+      "title": "12 · Front face latent · 1024×1024"
     }
   },
   "13": {
@@ -216,13 +216,13 @@
   },
   "22": {
     "inputs": {
-      "width": 768,
-      "height": 768,
+      "width": 1024,
+      "height": 1024,
       "batch_size": 1
     },
     "class_type": "EmptySD3LatentImage",
     "_meta": {
-      "title": "22 · Three-quarter face latent · 768×768"
+      "title": "22 · Three-quarter face latent · 1024×1024"
     }
   },
   "23": {
@@ -324,13 +324,13 @@
   },
   "32": {
     "inputs": {
-      "width": 768,
-      "height": 768,
+      "width": 1024,
+      "height": 1024,
       "batch_size": 1
     },
     "class_type": "EmptySD3LatentImage",
     "_meta": {
-      "title": "32 · Side profile latent · 768×768"
+      "title": "32 · Side profile latent · 1024×1024"
     }
   },
   "33": {
@@ -433,12 +433,12 @@
   "42": {
     "inputs": {
       "width": 1024,
-      "height": 576,
+      "height": 1536,
       "batch_size": 1
     },
     "class_type": "EmptySD3LatentImage",
     "_meta": {
-      "title": "42 · Body turnaround latent · 1024×576"
+      "title": "42 · Body turnaround latent · 1024×1536"
     }
   },
   "43": {
@@ -494,8 +494,8 @@
     "inputs": {
       "image_count": 4,
       "layout": "wide_bottom",
-      "output_width": 768,
-      "output_height": 448,
+      "output_width": 1536,
+      "output_height": 1920,
       "columns": 0,
       "gutter": 4,
       "outer_padding": 4,
