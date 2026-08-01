@@ -9,6 +9,7 @@ from typing import Any
 import httpx
 
 from backend.app.core.config import Settings, get_settings
+from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 
 
 class AgentProviderError(RuntimeError):
@@ -98,14 +99,26 @@ class OpenAICompatibleAgentProvider:
         messages: list[dict[str, str]],
         response_schema: dict[str, Any],
         idempotency_key: str,
+        thinking_enabled: bool = True,
     ) -> dict[str, Any]:
         if not self.settings.ai_agent_enabled:
             raise AgentProviderError("Contextual Operator is disabled")
 
+        # Resolve the persisted SineForge selection against LM Studio's live
+        # OpenAI-compatible catalog. The default AI_MODEL can be stale (for
+        # example, the historic default is "grok") while the user has selected a
+        # different local model. Supplying that stale alias can make LM Studio
+        # return HTTP 400 instead of serving the selected model.
+        request_model = await self._resolve_request_model()
         body = {
-            "model": self.settings.ai_model,
+            "model": request_model,
             "messages": messages,
             "temperature": 0.2,
+            # LM Studio exposes the model capability as on/off in its native
+            # catalog, while its OpenAI-compatible endpoint accepts the OpenAI
+            # effort vocabulary. "none" disables reasoning; "medium" is the
+            # stable enabled/default-equivalent setting for the Operator.
+            "reasoning_effort": "medium" if thinking_enabled else "none",
             "response_format": {
                 "type": "json_schema",
                 "json_schema": {
@@ -134,6 +147,9 @@ class OpenAICompatibleAgentProvider:
                 )
                 response.raise_for_status()
                 envelope = response.json()
+        except httpx.HTTPStatusError as exc:
+            detail = self._http_error_detail(exc.response)
+            raise AgentProviderError(detail) from exc
         except (httpx.HTTPError, ValueError, json.JSONDecodeError) as exc:
             raise AgentProviderError(str(exc)[:500]) from exc
 
@@ -152,14 +168,42 @@ class OpenAICompatibleAgentProvider:
             raise AgentProviderError("Provider action envelope must be a JSON object")
         return parsed
 
+    async def _resolve_request_model(self) -> str:
+        """Resolve the model LM Studio can actually serve for this turn."""
+        try:
+            models = await self.list_models()
+        except (httpx.HTTPError, ValueError, json.JSONDecodeError, AgentProviderError):
+            return self.settings.ai_model
+        return self._active_model_id(models) or self.settings.ai_model
+
+    @staticmethod
+    def _http_error_detail(response: httpx.Response) -> str:
+        """Keep provider diagnostics useful without returning an unbounded body."""
+        status = f"LM Studio request failed with HTTP {response.status_code}"
+        try:
+            payload = response.json()
+        except (ValueError, json.JSONDecodeError):
+            payload = None
+        if isinstance(payload, dict):
+            error = payload.get("error")
+            if isinstance(error, dict):
+                message = error.get("message")
+                if isinstance(message, str) and message.strip():
+                    return f"{status}: {message.strip()}"[:500]
+            message = payload.get("message")
+            if isinstance(message, str) and message.strip():
+                return f"{status}: {message.strip()}"[:500]
+        text = response.text.strip()
+        return (f"{status}: {text}" if text else status)[:500]
+
     def _active_model_id(self, models: list[dict[str, Any]]) -> str | None:
-        configured = self.settings.ai_model
         ids = [
             str(item.get("id"))
             for item in models
             if isinstance(item.get("id"), str)
         ]
-        if configured in ids:
-            return configured
+        selected = get_active_lm_studio_model_id(self.settings)
+        for candidate in (selected, self.settings.ai_model):
+            if candidate in ids:
+                return candidate
         return ids[0] if ids else None
-

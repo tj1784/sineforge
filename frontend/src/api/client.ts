@@ -2360,8 +2360,9 @@ export function nativeApiRunnerWorkflowOpenUrl(workflowId: string): string {
   )
 }
 
-export function planningAssetContentUrl(assetId: string): string {
-  return `${API_BASE_URL}/assets/${assetId}/content`
+export function planningAssetContentUrl(assetId: string, version?: string | null): string {
+  const url = `${API_BASE_URL}/assets/${assetId}/content`
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url
 }
 
 export const api = {
@@ -2406,6 +2407,7 @@ export const api = {
       actor_id?: string
       content: string
       context: PageContextEnvelope
+      thinking_enabled?: boolean
       idempotency_key?: string | null
     },
   ) =>

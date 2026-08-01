@@ -454,6 +454,7 @@ export function ImagesPage() {
                 sceneNumber,
                 filename: asset.original_filename,
                 assetId: asset.mime_type && !asset.mime_type.startsWith('image/') ? null : asset.id,
+                version: asset.sha256 ?? asset.updated_at,
                 ...mediaScope,
               })
               return (

@@ -4,6 +4,25 @@ This package contains repository-managed LTX-2.3 workflows for the main LTX
 ComfyUI installation. The general continuation workflow is genre-neutral. The
 dynamic podcast workflow remains available as a separate specialized lane.
 
+## WhatDreamsCost LTX Director 2 lane
+
+`WhatDreamsCost-Director-2/LTX_Director_2_Distilled.workflow.json` provides a
+shot-by-shot timeline for image, text, video, and audio segments, prompt relay,
+keyframe guides, native audio, and long sequence construction. The package
+contains the source provenance, required nodes and models, normalized bundled
+model paths, API Runner graph, and live-validation evidence. See that folder's
+`README.md` for first-run guidance and the members-only Hotfix disclosure.
+
+## Licon MSR V2 multi-scene lane
+
+`Licon-MSR-V2/LTX-2.3_MSR_Single_Image_to_Multiple_Scenes_V2.workflow.json`
+uses LiconStudio's Multiple Subject Reference V2 LoRA to preserve referenced
+characters, objects, clothing, and environments across an ordered sequence of
+pipe-delimited scene prompts. Its full-precision LTX checkpoint, Gemma encoder,
+MSR V2 LoRA, demonstration references, required custom nodes, API Runner graph,
+and dependency manifest are kept together under `Licon-MSR-V2/`. See that
+folder's `README.md` for model paths and first-run instructions.
+
 ## General Krea 2 → LTX-2.3 continuation
 
 `SineForge_LTX23_Krea2_Lossless_Continuation_Loop.workflow.json` accepts any

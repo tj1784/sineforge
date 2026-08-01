@@ -1,6 +1,6 @@
 # Local Model Resources
 
-Audited on 2026-07-28 against the supplied Civitai pages, the Civitai version API, publisher file metadata, the generation metadata attached to the supplied image, and the files under `C:\ComfyUI\ComfyUI_Shared_Folders\models`. Current installation status was refreshed on 2026-07-29 for the 10Eros-to-Sulphur 2 migration and the Rebels Sulphur 2 GGUF workflow stack, then reconciled again on 2026-07-30 for the official gated LTX-2.3 IC-LoRA collection.
+Audited on 2026-07-28 against the supplied Civitai pages, the Civitai version API, publisher file metadata, the generation metadata attached to the supplied image, and the files under `C:\ComfyUI\ComfyUI_Shared_Folders\models`. Current installation status was refreshed on 2026-07-29 for the 10Eros-to-Sulphur 2 migration and the Rebels Sulphur 2 GGUF workflow stack, reconciled again on 2026-07-30 for the official gated LTX-2.3 IC-LoRA collection, and extended on 2026-07-31 with the bundled BlokeyUI LTX 2.3 MSR V2 model and workflow library.
 
 `Verified` means the local file exists in the standard ComfyUI subfolder and its full SHA-256 digest matches the publisher's artifact. `Missing` means the supplied resource was reviewed but no matching file exists anywhere under the shared model root. `Downloading` means only an incomplete browser temporary file exists; it is not installed and has not passed final integrity verification. Missing and downloading rows link to their intended local destinations so placement is unambiguous after download.
 
@@ -8,6 +8,7 @@ Audited on 2026-07-28 against the supplied Civitai pages, the Civitai version AP
 
 | Date | Asset set | Files | Installed bytes | State | Runtime verification |
 |---|---|---:|---:|---|---|
+| 2026-07-31 | LiconStudio LTX 2.3 MSR V2 workflow stack: full distilled checkpoint, Gemma text encoder, MSR V2 LoRA, editor workflow, API workflow, manifest, and publisher references | 8 | 71,183,257,616 model bytes (66.295 GiB) | Models installed and SHA-256 verified; workflow added to bundled ComfyUI and SineForge API Runner | All 34 executable API nodes resolve; the corrected editor graph reopens without a validation error banner at `127.0.0.1:8190`; no render was queued |
 | 2026-07-30 | Official LTX-2.3 gated IC-LoRAs: Ingredients, DubIt/LipDub, Pixel Spatial Upscaler x2/x4, HDR plus HDR scene embedding, and In/Outpainting | 7 | 6,733,044,728 (6.271 GiB) | Installed and SHA-256 verified | All seven recursive paths are exposed by the live ComfyUI `LTXICLoRALoaderModelOnly` selector at `127.0.0.1:8889`; no restart was required |
 
 ## Supplied Civitai Resources
@@ -119,6 +120,11 @@ These LTXV 2.3 Civitai resources were audited against the publisher version API 
 | [LTX 2.3 I2V/T2V Video Reasoning LoRA VBVR](https://civitai.red/models/2497207/ltx-23-i2v-t2v-video-reasoning-lora-vbvr?modelVersionId=3025398) | `v4.0 motion I2V Sulphur 2` · LoRA | Not specified | LTXV 2.3 | [LTX2.3_reasoning_Sulphur-2_I2V_V4.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/loras/LTX/2.3/VBVR/LTX2.3_reasoning_Sulphur-2_I2V_V4.safetensors) | `1F7C87052D44087E17630B7075D8DFD8205C17CE5E7D3BCBEAE11AF2102C88DB` · Verified |
 | [LTX 2.3 Multi Step Video Reasoning LoRA VBVR](https://civitai.red/models/2610321/ltx-23-multi-step-video-reasoning-lora-vbvr?modelVersionId=2930993) | `v0.1 I2V` · LoRA | Not specified | LTXV 2.3 | [LTX2.3_Multi_step_video_reasoning_V0.1.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/loras/LTX/2.3/VBVR/LTX2.3_Multi_step_video_reasoning_V0.1.safetensors) | `3605F3E49E4E243E3DB729EE4F2211BF281FE1345D81888AA519E65A81EA237D` · Verified |
 | [ABERCROM-ME — IC-LoRA for LTX-2.3 by CoachBate](https://civitai.red/models/2791912/abercrom-me-ic-lora-for-ltx-23-by-coachbate?modelVersionId=3146354) | `v3` · image-conditioned LoRA | `ABERCROM-ME` | LTXV 2.3 I2V | [ltx-2.3-IC-LoRA-ABERCROM-ME_coachbate_v3_02000.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/loras/LTX/2.3/IC-LoRA/ltx-2.3-IC-LoRA-ABERCROM-ME_coachbate_v3_02000.safetensors) | `C3FA498E97C2E1B71A90E3DA14876FCDE805F050523219315CDA22D98B551EFF` · Verified · [Downloads copy](file:///C:/Users/Blokey/Downloads/ltx-2.3-IC-LoRA-ABERCROM-ME_coachbate_v3_02000.safetensors) retained |
+| [Licon MSR V2 for LTX 2.3](https://huggingface.co/LiconStudio/LTX-2.3-Multiple-Subject-Reference) | `V2` · Apache-2.0 multiple-subject reference LoRA | Multiple reference images plus optional background through `LiconMSR` | LTX 2.3 22B | [LTX-2.3-Licon-MSR-V2.safetensors](file:///C:/Users/Blokey/Documents/Sineforge/BlokeyUI/ComfyUI/models/loras/LTX/2.3/Licon/MSR/LTX-2.3-Licon-MSR-V2.safetensors) | `6F61D3B5C61B160C409B45EBAA72FD7AB9BB38BF3BF7F09EDADDC87762D5FA98` · Verified · installed in the new bundled model library |
+| [LTX 2.3 22B Distilled 1.1](https://huggingface.co/Lightricks/LTX-2.3/blob/main/ltx-2.3-22b-distilled-1.1.safetensors) | distilled `1.1` · full checkpoint | Not applicable | LTX 2.3 22B | [ltx-2.3-22b-distilled-1.1.safetensors](file:///C:/Users/Blokey/Documents/Sineforge/BlokeyUI/ComfyUI/models/checkpoints/LTX-Video/ltx-2.3-22b-distilled-1.1.safetensors) | `B33B7FE4BBFE084F484BE4AAF90B0F1D95DCA20D403AC4C0E037EB8C4F0AF7CC` · Verified · 46,149,345,334 bytes · new bundled model library |
+| [Gemma 3 12B IT — LTX text encoder](https://huggingface.co/Comfy-Org/ltx-2/blob/main/split_files/text_encoders/gemma_3_12B_it.safetensors) | ComfyUI BF16 safetensors · text encoder | Not applicable | LTX 2 / LTX 2.3 | [gemma_3_12B_it.safetensors](file:///C:/Users/Blokey/Documents/Sineforge/BlokeyUI/ComfyUI/models/text_encoders/gemma_3_12B_it.safetensors) | `56EAA964A0D9325D2DC9ECAF7759BFAF0FAC78AE36C789BED6E03E275A3729EC` · Verified · 24,379,468,890 bytes · new bundled model library |
+| [LTX 2.3 MSR V2 — Single Image to Multiple Scenes](https://www.youtube.com/watch?v=EFm4z0ZF20M) | publisher V2 · editor + API workflows | Global prompt plus ordered temporal scene prompts | LTX 2.3 22B + Licon MSR V2 | [workflow package](file:///C:/Users/Blokey/Documents/Sineforge/Workflows/LTX23/Licon-MSR-V2) | editor `DCC220FA59E70D1D0E4F1B9114136FB5FB459A6636F338972B9B2A5C5F05FBF4`; API `9E47A94DC875AF452FB8596580CD9D63CB3D67A3DB19DB125EF1B7B487C4F4B1` · Installed in bundled ComfyUI and native API Runner |
+| [LTX Director 2 — distilled timeline](https://www.youtube.com/watch?v=GpsS9YW2MQk) | WhatDreamsCost 2.0.5 · editor + API workflows | Timeline image/text/video/audio segments, prompt relay, keyframe guides, native audio | LTX 2.3 distilled FP8 | [workflow package](file:///C:/Users/Blokey/Documents/Sineforge/Workflows/LTX23/WhatDreamsCost-Director-2) | Official public Distilled graph installed; selectors normalized to the bundled `LTX\\2.3\\Director` model folders; Patreon Hotfix attachment is members-only and was not present locally |
 | [LTX 2.3 Ingredients IC-LoRA](https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Ingredients) | `0.9` · official gated IC-LoRA | `Reference sheet: …` / `Generated video: …` prompt sections | LTX 2.3 22B | [ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/loras/LTX/2.3/Official/IC-LoRA/Ingredients/ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors) | `515E4E139001AC6282357A5B35372E42E98B3AFFD5FCC886A52242ABEED19559` · Verified · moved from Downloads · visible in live LTX IC-LoRA loader |
 | [LTX 2.3 DubIt Lip-Sync IC-LoRA](https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-DubIt) | `0.9` · official gated IC-LoRA | Audio/reference conditioned | LTX 2.3 22B | [ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/loras/LTX/2.3/Official/IC-LoRA/DubIt/ltx-2.3-22b-ic-lora-lipdub-0.9.safetensors) | `FC415B12CB639E78511BC264F85080C2F7B188E334C1D9FADE76B310E2BC419C` · Verified · moved from Downloads · visible in live LTX IC-LoRA loader |
 | [LTX 2.3 Pixel Spatial Upscaler IC-LoRA — 2×](https://huggingface.co/Lightricks/LTX-2.3-22b-IC-LoRA-Pixel-Spatial-Upscaler) | `0.9` · official gated generative upscaler | Low-resolution reference video | LTX 2.3 22B | [ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x2-0.9.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/loras/LTX/2.3/Official/IC-LoRA/Pixel-Spatial-Upscaler/ltx-2.3-22b-ic-lora-pixel-spatial-upscaler-x2-0.9.safetensors) | `0667334E23AF9FC0AB3FDFF2E059C805AC0D162B1F96F18A462801478027451E` · Verified · moved from Downloads · visible in live LTX IC-LoRA loader |
@@ -133,6 +139,9 @@ These non-LoRA dependencies were downloaded for the static ABERCROM-ME multi-sta
 
 | Resource | Version / type | Trigger word(s) | Model(s) | Local path URL | Integrity / status |
 |---|---|---|---|---|---|
+| [LTX 2.3 22B distilled 1.1 transformer-only FP8 scaled](https://huggingface.co/Kijai/LTX2.3_comfy/blob/main/diffusion_models/ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors) | FP8 scaled diffusion transformer | Not applicable | LTX 2.3 Director 2 | [bundled Director transformer](file:///C:/Users/Blokey/Documents/Sineforge/BlokeyUI/ComfyUI/models/diffusion_models/LTX/2.3/Director/ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors) | `0A1D7AAC2B338E8EC7E832149F1DCF11C9323272482B1CCA0673D229702370F0` · 25,226,571,988 bytes · publisher digest verified after download |
+| [Gemma 3 12B IT FP4 mixed](https://huggingface.co/Comfy-Org/ltx-2/blob/main/split_files/text_encoders/gemma_3_12B_it_fp4_mixed.safetensors) | FP4 mixed text encoder | Not applicable | LTX 2 / LTX 2.3 Director 2 | [bundled Director encoder](file:///C:/Users/Blokey/Documents/Sineforge/BlokeyUI/ComfyUI/models/text_encoders/LTX/2.3/Director/gemma_3_12B_it_fp4_mixed.safetensors) | `AACA463D11E6D8D2A4BDB0D6299214C15EF78A3F73E0EF8113D5A9D0219B3F6D` · 9,447,702,218 bytes · Verified |
+| [LTX 2.3 spatial upscaler x2 v1.1 — bundled Director copy](https://huggingface.co/Lightricks/LTX-2.3/blob/main/ltx-2.3-spatial-upscaler-x2-1.1.safetensors) | Latent spatial upscaler | Not applicable | LTX 2.3 Director 2 | [bundled Director upscaler](file:///C:/Users/Blokey/Documents/Sineforge/BlokeyUI/ComfyUI/models/latent_upscale_models/LTX/2.3/Director/ltx-2.3-spatial-upscaler-x2-1.1.safetensors) | `5F416311FA8172B65AF67530758964708D29A317B830D689A51143B7F91913ED` · 995,743,560 bytes · Verified; organized copy for the bundled installation |
 | [Gemma 3 12B FP8 E4M3FN](https://huggingface.co/GitMylo/LTX-2-comfy_gemma_fp8_e4m3fn/blob/main/gemma_3_12B_it_fp8_e4m3fn.safetensors) | FP8 text encoder | Not applicable | LTX 2 / LTX 2.3 | [gemma_3_12B_it_fp8_e4m3fn.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/text_encoders/gemma_3_12B_it_fp8_e4m3fn.safetensors) | `38C8CA98D01AFC93A04F9FB18255755884B9EB52B7B40080076E9C892609751B` · Verified |
 | [LTX 2.3 text projection BF16](https://huggingface.co/Kijai/LTX2.3_comfy/blob/main/text_encoders/ltx-2.3_text_projection_bf16.safetensors) | BF16 text projection | Not applicable | LTX 2.3 | [ltx-2.3_text_projection_bf16.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/text_encoders/ltx-2.3_text_projection_bf16.safetensors) | `911D59BB4CB7708179C9A0045EA0FE41212ECFB77AED3A02702B7C0A8274911F` · Verified |
 | [LTX 2.3 audio VAE BF16](https://huggingface.co/Kijai/LTX2.3_comfy/blob/main/vae/LTX23_audio_vae_bf16.safetensors) | BF16 audio VAE | Not applicable | LTX 2.3 | [LTX23_audio_vae_bf16.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/vae/LTX23_audio_vae_bf16.safetensors) | `5BC10FA4ADECF99DDA132D916E23048CBD56797702C5FA50EB5D2079048A38C3` · Verified |
@@ -282,6 +291,46 @@ The official ComfyUI IPAdapter Plus unified-loader list was refreshed on 2026-07
 | Resource | Version / type | Trigger word(s) | Model(s) | Local path URL | Integrity / status |
 |---|---|---|---|---|---|
 | [LTX 2.3 Distilled 1.1 INT8 ConvRot transformer](https://huggingface.co/Kijai/LTX2.3_comfy/blob/main/diffusion_models/ltx-2.3-22b-distilled-1.1_transformer_only_int8_convrot.safetensors) | `distilled-1.1` · diffusion model / transformer | Not applicable | LTX 2.3 22B | [ltx-2.3-22b-distilled-1.1_transformer_only_int8_convrot.safetensors](file:///C:/ComfyUI/ComfyUI_Shared_Folders/models/diffusion_models/ltx-2.3-22b-distilled-1.1_transformer_only_int8_convrot.safetensors) | `30FE2173FDB18881EB2482ECE17CA044BEDB8F28A38550EA7230DA796FB8B614` · Verified |
+
+## Licon MSR V2 Workflow Runtime
+
+The MSR V2 workflow is installed in the bundled BlokeyUI runtime under
+`C:\Users\Blokey\Documents\Sineforge\BlokeyUI\ComfyUI`. The following
+publisher node packs were installed and validated through the live bundled
+ComfyUI `object_info` registry on port 8190:
+
+| Node pack | Upstream | Installed commit | Required workflow classes |
+|---|---|---|---|
+| ComfyUI-Licon-MSR | [liconstudio/ComfyUI-Licon-MSR](https://github.com/liconstudio/ComfyUI-Licon-MSR) | `94a52bfec735ff6f802c480f7fe8fdac1d279a7f` | `LiconMSR` |
+| ComfyUI-LTXVideo | [Lightricks/ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `3b9c5cde4700917074823d45e25401d81049f8fc` | `LowVRAMCheckpointLoader`, `LTXICLoRALoaderModelOnly`, `LTXAddVideoICLoRAGuide`, `LTXVSetAudioRefTokens` |
+| ComfyUI-KJNodes | [kijai/ComfyUI-KJNodes](https://github.com/kijai/ComfyUI-KJNodes) | `4d46ac107c33ed8a3d181b8776ede66498583380` | `LTX2_NAG`, `FloatConstant`, `INTConstant` |
+| ComfyUI Essentials | [cubiq/ComfyUI_essentials](https://github.com/cubiq/ComfyUI_essentials) | `9d9f4bedfc9f0321c19faf71855e228c93bd0dc9` | `SimpleMath+` |
+| Comfyroll | [Suzie1/ComfyUI_Comfyroll_CustomNodes](https://github.com/Suzie1/ComfyUI_Comfyroll_CustomNodes) | `d78b780ae43fcf8c6b7c6505e6ffb4584281ceca` | `CR Float To Integer` |
+| ComfyUI-PromptRelay | [kijai/ComfyUI-PromptRelay](https://github.com/kijai/ComfyUI-PromptRelay) | `ca5d4e3edb6abd9c2a4c68a3a6798eec1980f450` | `PromptRelayEncode` |
+
+The installed LTXVideo requirements are locally constrained to
+`kornia>=0.7.1,<0.8`; Kornia 0.8 removed the pyramid `pad` helper used by the
+current upstream node pack. KJNodes' optional Triton VAE node is unavailable on
+this Windows runtime, but that optional class is not referenced by the MSR V2
+workflow. All node classes actually used by the workflow passed live discovery.
+
+Three publisher V2 demonstration reference images are retained under
+`Workflows\LTX23\Licon-MSR-V2\assets` and copied into bundled ComfyUI's input
+folder using the source graph's expected names. They are replaceable media
+inputs, not model weights.
+
+The queueable 34-node API export is registered in SineForge's native API
+Runner as `4c088eaa-926a-4aad-875f-f714e30299a6`. The operational editor graph
+disables two disconnected upstream test nodes, eliminating their missing-input
+warnings without changing the execution path. Its three models occupy the new
+bundled library tree:
+
+```text
+C:\Users\Blokey\Documents\Sineforge\BlokeyUI\ComfyUI\models\
+├── checkpoints\LTX-Video\ltx-2.3-22b-distilled-1.1.safetensors
+├── loras\LTX\2.3\Licon\MSR\LTX-2.3-Licon-MSR-V2.safetensors
+└── text_encoders\gemma_3_12B_it.safetensors
+```
 
 ## Review Notes and Gaps
 

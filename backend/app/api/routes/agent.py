@@ -91,6 +91,7 @@ async def create_agent_message(
             actor_id=payload.actor_id,
             content=payload.content,
             context=payload.context,
+            thinking_enabled=payload.thinking_enabled,
             idempotency_key=payload.idempotency_key,
         )
     except AgentServiceError as exc:
@@ -206,4 +207,3 @@ def undo_agent_action(
         return service.undo_action(db, action_id, payload)
     except AgentServiceError as exc:
         _raise_agent_error(exc)
-

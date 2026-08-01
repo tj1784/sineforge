@@ -234,7 +234,7 @@ def test_repository_workflow_catalog_is_shared_and_read_only(tmp_path: Path):
         item
         for item in listed
         if item["name"]
-        == "Krea 2 Character Ingredients Sheet — Selectable Local Model"
+        == "Krea 2 Character Ingredients Sheet — High-Resolution Local Models"
     )
     ingredients_detail = native.get(ingredients["id"])
     ingredients_planner = next(

@@ -140,6 +140,7 @@ class AgentMessageCreate(StrictModel):
     actor_id: str = Field(default="local-user", min_length=1, max_length=200)
     content: str = Field(min_length=1, max_length=20000)
     context: PageContextEnvelope
+    thinking_enabled: bool = True
     idempotency_key: str | None = Field(default=None, max_length=128)
 
 

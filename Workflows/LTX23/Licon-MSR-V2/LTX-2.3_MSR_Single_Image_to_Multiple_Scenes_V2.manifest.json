@@ -1,0 +1,127 @@
+{
+  "schema": "sineforge.semantic-workflow-manifest/v1",
+  "template_id": "ltx23-licon-msr-v2-single-image-multiple-scenes",
+  "workflow_name": "LTX 2.3 MSR V2 — Single Image to Multiple Scenes",
+  "version": "2.0",
+  "editor_workflow": {
+    "path": "LTX-2.3_MSR_Single_Image_to_Multiple_Scenes_V2.workflow.json",
+    "sha256": "DCC220FA59E70D1D0E4F1B9114136FB5FB459A6636F338972B9B2A5C5F05FBF4",
+    "node_count": 38,
+    "disabled_publisher_test_nodes": [104, 105]
+  },
+  "api_workflow": {
+    "path": "LTX-2.3_MSR_Single_Image_to_Multiple_Scenes_V2.api.json",
+    "sha256": "9E47A94DC875AF452FB8596580CD9D63CB3D67A3DB19DB125EF1B7B487C4F4B1",
+    "executable_node_count": 34,
+    "native_api_runner_id": "4c088eaa-926a-4aad-875f-f714e30299a6",
+    "native_api_runner_sha256": "39ff54869b62ff3efb4b64563288b7b8eed8ae24912b213d12414fcd478f4bdf"
+  },
+  "source": {
+    "video": "https://www.youtube.com/watch?v=EFm4z0ZF20M",
+    "repository": "https://huggingface.co/LiconStudio/LTX-2.3-Multiple-Subject-Reference",
+    "workflow_filename": "LTX-2.3_MSR_sample_workflow_V2.json",
+    "license": "Apache-2.0"
+  },
+  "execution_policy": {
+    "model_root": "C:\\Users\\Blokey\\Documents\\Sineforge\\BlokeyUI\\ComfyUI\\models",
+    "comfyui_validation_url": "http://127.0.0.1:8190",
+    "queue_depth": 1,
+    "native_audio": true,
+    "validation_only": true,
+    "render_performed": false
+  },
+  "required_models": [
+    {
+      "kind": "checkpoint",
+      "path": "checkpoints\\LTX-Video\\ltx-2.3-22b-distilled-1.1.safetensors",
+      "size": 46149345334,
+      "sha256": "B33B7FE4BBFE084F484BE4AAF90B0F1D95DCA20D403AC4C0E037EB8C4F0AF7CC"
+    },
+    {
+      "kind": "text_encoder",
+      "path": "text_encoders\\gemma_3_12B_it.safetensors",
+      "size": 24379468890,
+      "sha256": "56EAA964A0D9325D2DC9ECAF7759BFAF0FAC78AE36C789BED6E03E275A3729EC"
+    },
+    {
+      "kind": "lora",
+      "path": "loras\\LTX\\2.3\\Licon\\MSR\\LTX-2.3-Licon-MSR-V2.safetensors",
+      "size": 654443392,
+      "sha256": "6F61D3B5C61B160C409B45EBAA72FD7AB9BB38BF3BF7F09EDADDC87762D5FA98"
+    }
+  ],
+  "custom_node_packs": [
+    {
+      "name": "ComfyUI-Licon-MSR",
+      "commit": "94a52bfec735ff6f802c480f7fe8fdac1d279a7f"
+    },
+    {
+      "name": "ComfyUI-LTXVideo",
+      "commit": "3b9c5cde4700917074823d45e25401d81049f8fc",
+      "local_requirement_override": "kornia>=0.7.1,<0.8"
+    },
+    {
+      "name": "ComfyUI-KJNodes",
+      "commit": "4d46ac107c33ed8a3d181b8776ede66498583380"
+    },
+    {
+      "name": "ComfyUI_essentials",
+      "commit": "9d9f4bedfc9f0321c19faf71855e228c93bd0dc9"
+    },
+    {
+      "name": "ComfyUI_Comfyroll_CustomNodes",
+      "commit": "d78b780ae43fcf8c6b7c6505e6ffb4584281ceca"
+    },
+    {
+      "name": "ComfyUI-PromptRelay",
+      "commit": "ca5d4e3edb6abd9c2a4c68a3a6798eec1980f450"
+    }
+  ],
+  "media_bindings": [
+    {
+      "node_id": "29",
+      "input": "image",
+      "role": "subject_1",
+      "default": "01 (3).jfif"
+    },
+    {
+      "node_id": "33",
+      "input": "image",
+      "role": "subject_2",
+      "default": "02 (3).jfif"
+    },
+    {
+      "node_id": "30",
+      "input": "image",
+      "role": "background",
+      "default": "03 (4).jfif"
+    }
+  ],
+  "prompt_bindings": [
+    {
+      "node_id": "180",
+      "input": "global_prompt",
+      "role": "persistent identity and scene context"
+    },
+    {
+      "node_id": "180",
+      "input": "local_prompts",
+      "role": "ordered temporal scene prompts"
+    },
+    {
+      "node_id": "180",
+      "input": "segment_lengths",
+      "role": "optional comma-separated segment lengths"
+    }
+  ],
+  "claims": {
+    "models_installed": true,
+    "model_hashes_verified": true,
+    "node_classes_live_discovered": true,
+    "workflow_opened_without_validation_errors": true,
+    "api_format_exported_by_comfyui": true,
+    "api_runner_registered": true,
+    "execution_performed": false,
+    "benchmarked": false
+  }
+}

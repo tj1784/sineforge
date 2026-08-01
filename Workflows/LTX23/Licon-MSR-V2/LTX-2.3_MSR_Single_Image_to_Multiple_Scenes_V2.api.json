@@ -1,0 +1,528 @@
+{
+  "3": {
+    "inputs": {
+      "ckpt_name": "LTX-Video\\ltx-2.3-22b-distilled-1.1.safetensors"
+    },
+    "class_type": "LowVRAMCheckpointLoader",
+    "_meta": {
+      "title": "🅛🅣🅧 Low VRAM Checkpoint Loader"
+    }
+  },
+  "7": {
+    "inputs": {
+      "frame_rate": [
+        "129",
+        0
+      ],
+      "positive": [
+        "180",
+        1
+      ],
+      "negative": [
+        "185",
+        0
+      ]
+    },
+    "class_type": "LTXVConditioning",
+    "_meta": {
+      "title": "LTXVConditioning"
+    }
+  },
+  "8": {
+    "inputs": {
+      "width": [
+        "43",
+        0
+      ],
+      "height": [
+        "44",
+        0
+      ],
+      "length": [
+        "50",
+        0
+      ],
+      "batch_size": 1
+    },
+    "class_type": "EmptyLTXVLatentVideo",
+    "_meta": {
+      "title": "EmptyLTXVLatentVideo"
+    }
+  },
+  "9": {
+    "inputs": {
+      "frame_idx": 0,
+      "strength": 1,
+      "latent_downscale_factor": 1,
+      "crop": "center",
+      "use_tiled_encode": false,
+      "tile_size": 256,
+      "tile_overlap": 64,
+      "positive": [
+        "7",
+        0
+      ],
+      "negative": [
+        "7",
+        1
+      ],
+      "vae": [
+        "3",
+        2
+      ],
+      "latent": [
+        "8",
+        0
+      ],
+      "image": [
+        "190",
+        0
+      ]
+    },
+    "class_type": "LTXAddVideoICLoRAGuide",
+    "_meta": {
+      "title": "🅛🅣🅧 Add Video IC-LoRA Guide"
+    }
+  },
+  "10": {
+    "inputs": {
+      "lora_name": "LTX\\2.3\\Licon\\MSR\\LTX-2.3-Licon-MSR-V2.safetensors",
+      "strength_model": 1,
+      "model": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "LTXICLoRALoaderModelOnly",
+    "_meta": {
+      "title": "🅛🅣🅧 IC-LoRA Loader Model Only"
+    }
+  },
+  "13": {
+    "inputs": {
+      "sampler_name": "euler_ancestral"
+    },
+    "class_type": "KSamplerSelect",
+    "_meta": {
+      "title": "KSamplerSelect"
+    }
+  },
+  "15": {
+    "inputs": {
+      "noise_seed": 443228135032638
+    },
+    "class_type": "RandomNoise",
+    "_meta": {
+      "title": "RandomNoise"
+    }
+  },
+  "16": {
+    "inputs": {
+      "noise": [
+        "15",
+        0
+      ],
+      "guider": [
+        "37",
+        0
+      ],
+      "sampler": [
+        "13",
+        0
+      ],
+      "sigmas": [
+        "27",
+        0
+      ],
+      "latent_image": [
+        "23",
+        0
+      ]
+    },
+    "class_type": "SamplerCustomAdvanced",
+    "_meta": {
+      "title": "SamplerCustomAdvanced"
+    }
+  },
+  "17": {
+    "inputs": {
+      "positive": [
+        "9",
+        0
+      ],
+      "negative": [
+        "9",
+        1
+      ],
+      "latent": [
+        "24",
+        0
+      ]
+    },
+    "class_type": "LTXVCropGuides",
+    "_meta": {
+      "title": "LTXVCropGuides"
+    }
+  },
+  "21": {
+    "inputs": {
+      "ckpt_name": "LTX-Video\\ltx-2.3-22b-distilled-1.1.safetensors"
+    },
+    "class_type": "LTXVAudioVAELoader",
+    "_meta": {
+      "title": "Load LTXV Audio VAE"
+    }
+  },
+  "22": {
+    "inputs": {
+      "frames_number": [
+        "50",
+        0
+      ],
+      "frame_rate": [
+        "128",
+        0
+      ],
+      "batch_size": 1,
+      "audio_vae": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "LTXVEmptyLatentAudio",
+    "_meta": {
+      "title": "LTXV Empty Latent Audio"
+    }
+  },
+  "23": {
+    "inputs": {
+      "video_latent": [
+        "9",
+        2
+      ],
+      "audio_latent": [
+        "22",
+        0
+      ]
+    },
+    "class_type": "LTXVConcatAVLatent",
+    "_meta": {
+      "title": "LTXVConcatAVLatent"
+    }
+  },
+  "24": {
+    "inputs": {
+      "av_latent": [
+        "16",
+        0
+      ]
+    },
+    "class_type": "LTXVSeparateAVLatent",
+    "_meta": {
+      "title": "LTXVSeparateAVLatent"
+    }
+  },
+  "26": {
+    "inputs": {
+      "text_encoder": "gemma_3_12B_it.safetensors",
+      "ckpt_name": "LTX-Video\\ltx-2.3-22b-distilled-1.1.safetensors",
+      "device": "default"
+    },
+    "class_type": "LTXAVTextEncoderLoader",
+    "_meta": {
+      "title": "Load LTXV Audio Text Encoder"
+    }
+  },
+  "27": {
+    "inputs": {
+      "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    },
+    "class_type": "ManualSigmas",
+    "_meta": {
+      "title": "ManualSigmas"
+    }
+  },
+  "29": {
+    "inputs": {
+      "image": "01 (3).jfif"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "30": {
+    "inputs": {
+      "image": "03 (4).jfif"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "33": {
+    "inputs": {
+      "image": "02 (3).jfif"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "37": {
+    "inputs": {
+      "cfg": 1,
+      "model": [
+        "121",
+        0
+      ],
+      "positive": [
+        "9",
+        0
+      ],
+      "negative": [
+        "9",
+        1
+      ]
+    },
+    "class_type": "CFGGuider",
+    "_meta": {
+      "title": "CFG Guider"
+    }
+  },
+  "38": {
+    "inputs": {
+      "samples": [
+        "17",
+        2
+      ],
+      "vae": [
+        "3",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "43": {
+    "inputs": {
+      "value": 1280
+    },
+    "class_type": "INTConstant",
+    "_meta": {
+      "title": "Width"
+    }
+  },
+  "44": {
+    "inputs": {
+      "value": 720
+    },
+    "class_type": "INTConstant",
+    "_meta": {
+      "title": "Height"
+    }
+  },
+  "50": {
+    "inputs": {
+      "value": [
+        "177",
+        0
+      ]
+    },
+    "class_type": "INTConstant",
+    "_meta": {
+      "title": "Length"
+    }
+  },
+  "121": {
+    "inputs": {
+      "nag_scale": 11,
+      "nag_alpha": 0.25,
+      "nag_tau": 2.5,
+      "inplace": true,
+      "model": [
+        "180",
+        0
+      ],
+      "nag_cond_video": [
+        "9",
+        1
+      ],
+      "nag_cond_audio": [
+        "9",
+        1
+      ]
+    },
+    "class_type": "LTX2_NAG",
+    "_meta": {
+      "title": "LTX2 NAG"
+    }
+  },
+  "128": {
+    "inputs": {
+      "_float": [
+        "129",
+        0
+      ]
+    },
+    "class_type": "CR Float To Integer",
+    "_meta": {
+      "title": "浮点到整数"
+    }
+  },
+  "129": {
+    "inputs": {
+      "value": 50
+    },
+    "class_type": "FloatConstant",
+    "_meta": {
+      "title": "FPS"
+    }
+  },
+  "172": {
+    "inputs": {
+      "fps": [
+        "129",
+        0
+      ],
+      "bit_depth": 8,
+      "images": [
+        "38",
+        0
+      ],
+      "audio": [
+        "174",
+        0
+      ]
+    },
+    "class_type": "CreateVideo",
+    "_meta": {
+      "title": "Create Video"
+    }
+  },
+  "173": {
+    "inputs": {
+      "filename_prefix": "LTX-2/多参",
+      "format": "auto",
+      "codec": "auto",
+      "video": [
+        "172",
+        0
+      ]
+    },
+    "class_type": "SaveVideo",
+    "_meta": {
+      "title": "Save Video"
+    }
+  },
+  "174": {
+    "inputs": {
+      "samples": [
+        "24",
+        1
+      ],
+      "audio_vae": [
+        "21",
+        0
+      ]
+    },
+    "class_type": "LTXVAudioVAEDecode",
+    "_meta": {
+      "title": "LTXV Audio VAE Decode"
+    }
+  },
+  "177": {
+    "inputs": {
+      "value": "a*b+1",
+      "a": [
+        "129",
+        0
+      ],
+      "b": [
+        "178",
+        0
+      ]
+    },
+    "class_type": "SimpleMath+",
+    "_meta": {
+      "title": "简易运算"
+    }
+  },
+  "178": {
+    "inputs": {
+      "value": 15
+    },
+    "class_type": "INTConstant",
+    "_meta": {
+      "title": "整数常量"
+    }
+  },
+  "180": {
+    "inputs": {
+      "global_prompt": "图 1：醉酒，红脸的男人，短发，凌乱金丝眼镜，灰西装，污渍领带，醉态，实拍自然质感。 \n图 2：女子，黑发盘髻，透明眼镜，深蓝便利店制服，实拍自然质感。 \n图 3：夜间罗森便利店收银台货架冷柜入口，实拍自然质感。",
+      "local_prompts": "夜间罗森便利店内部，收银台灯光明亮，货架与冷柜整齐排列，玻璃门外夜色深沉，色温暖白偏冷，摄影机轴线侧前中景锁定，图1身着皱巴巴灰西装站在画面左侧收银台前，身体微微摇晃，脸颊通红，领带松垮，图2身着深蓝便利店制服站在画面右侧收银台后，双手扶着扫码枪，眉头微皱面朝图1，货架与冷柜在背景中延伸。\n图1身体左右摇晃，一手撑住柜台，说话断断续续，图1（喃喃说，迟疑试探，沙哑音）：「我……我要……那个……水……」\n镜头切至图2近景，单人镜头。她眼神紧张，轻轻前倾，图2（急切说，轻柔舒缓，软糯音）：「您还好吗？要不要先坐下？」\n镜头切回两人中景，双人镜头。图1又晃了一下，差点扶不稳，图1（哽咽说，哽咽顿挫，气音）：「没事……我……还能……走……」\n镜头切至过肩，双人镜头。图2伸手想扶，又停在半空，眼神满是担心，图2（叮嘱说，恳切说，软糯音）：「您别急，我帮您拿。」柜台灯管微微嗡响，门外夜色静默。",
+      "segment_lengths": "",
+      "epsilon": 0.0011,
+      "model": [
+        "10",
+        0
+      ],
+      "clip": [
+        "26",
+        0
+      ],
+      "latent": [
+        "8",
+        0
+      ]
+    },
+    "class_type": "PromptRelayEncode",
+    "_meta": {
+      "title": "Prompt Relay Encode"
+    }
+  },
+  "185": {
+    "inputs": {
+      "text": "subtitles, watermark, worst quality, blurry, jittery, distorted, inconsistent appearance\n",
+      "clip": [
+        "26",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "190": {
+    "inputs": {
+      "1": [
+        "29",
+        0
+      ],
+      "2": [
+        "33",
+        0
+      ],
+      "width": [
+        "43",
+        0
+      ],
+      "height": [
+        "44",
+        0
+      ],
+      "frame_count": "65",
+      "background": [
+        "30",
+        0
+      ]
+    },
+    "class_type": "LiconMSR",
+    "_meta": {
+      "title": "Licon MSR"
+    }
+  }
+}

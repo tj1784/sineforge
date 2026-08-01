@@ -54,6 +54,12 @@ describe('mediaUrls dry-run honesty', () => {
         shotTitles: [],
       }),
     ).toBe('/transfiguration/starting-images/S04B.webp')
+    expect(
+      artDirectionBoardUrl({
+        sceneNumber: 1,
+        projectName: 'The Transfiguration',
+      }),
+    ).toBe('/transfiguration/storyboards/scene-01.png?v=highres-numbered-1-through-8-v2')
   })
 
   it('uses managed asset for art boards and portraits when present', () => {
@@ -61,9 +67,10 @@ describe('mediaUrls dry-run honesty', () => {
       artDirectionBoardUrl({
         sceneNumber: 1,
         assetId: 'board-1',
+        version: 'sha-1',
         projectName: 'Other',
       }),
-    ).toMatch(/\/assets\/board-1\/content$/)
+    ).toMatch(/\/assets\/board-1\/content\?v=sha-1$/)
     expect(
       characterPortraitUrl({
         name: 'Jesus',

@@ -34,20 +34,23 @@ export function staticCharacterImageUrl(slug: string): string {
   return `/transfiguration/characters/${slug.toLowerCase()}.webp`
 }
 
+const TRANSFIGURATION_STORYBOARD_VERSION = 'highres-numbered-1-through-8-v2'
+
 export function staticStoryboardUrl(sceneNumber: number): string {
-  return `/transfiguration/storyboards/scene-${String(sceneNumber).padStart(2, '0')}.png`
+  return `/transfiguration/storyboards/scene-${String(sceneNumber).padStart(2, '0')}.png?v=${TRANSFIGURATION_STORYBOARD_VERSION}`
 }
 
 export function artDirectionBoardUrl(input: {
   sceneNumber?: number | null
   filename?: string | null
   assetId?: string | null
+  version?: string | null
   projectId?: string | null
   projectName?: string | null
   storyTitle?: string | null
 }): string | null {
   // Managed asset bytes always win when present.
-  if (input.assetId) return planningAssetContentUrl(input.assetId)
+  if (input.assetId) return planningAssetContentUrl(input.assetId, input.version)
 
   if (!isTransfigurationCanon(input)) return null
   if (typeof input.sceneNumber === 'number' && input.sceneNumber > 0) {
@@ -66,11 +69,12 @@ export function startingFrameUrl(input: {
   code?: string | null
   filename?: string | null
   assetId?: string | null
+  version?: string | null
   projectId?: string | null
   projectName?: string | null
   storyTitle?: string | null
 }): string | null {
-  if (input.assetId) return planningAssetContentUrl(input.assetId)
+  if (input.assetId) return planningAssetContentUrl(input.assetId, input.version)
 
   if (!isTransfigurationCanon(input)) return null
 
@@ -88,9 +92,10 @@ export function projectCoverUrl(input: {
   storyTitle?: string | null
   shotTitles?: Array<string | null | undefined>
   firstAssetId?: string | null
+  firstAssetVersion?: string | null
 }): string | null {
   // Prefer a real managed starting-image assignment on any project.
-  if (input.firstAssetId) return planningAssetContentUrl(input.firstAssetId)
+  if (input.firstAssetId) return planningAssetContentUrl(input.firstAssetId, input.firstAssetVersion)
 
   if (!isTransfigurationCanon(input)) return null
 
@@ -114,11 +119,12 @@ const CHARACTER_SLUGS: Record<string, string> = {
 export function characterPortraitUrl(input: {
   name?: string | null
   assetId?: string | null
+  version?: string | null
   projectId?: string | null
   projectName?: string | null
   storyTitle?: string | null
 }): string | null {
-  if (input.assetId) return planningAssetContentUrl(input.assetId)
+  if (input.assetId) return planningAssetContentUrl(input.assetId, input.version)
 
   if (!isTransfigurationCanon(input)) return null
 

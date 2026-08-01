@@ -209,6 +209,11 @@ describe('OperatorChatLauncher', () => {
     expect(await screen.findByText('qwen-local')).toBeTruthy()
     expect(screen.getByText('/projects/project-123/studio/story')).toBeTruthy()
 
+    const thinkingToggle = screen.getByRole('button', { name: 'Turn thinking off' })
+    expect(thinkingToggle.getAttribute('aria-pressed')).toBe('true')
+    fireEvent.click(thinkingToggle)
+    expect(screen.getByRole('button', { name: 'Turn thinking on' }).getAttribute('aria-pressed')).toBe('false')
+
     fireEvent.change(screen.getByLabelText('Message CineForge Operator'), {
       target: { value: 'Add a review note' },
     })
@@ -218,6 +223,7 @@ describe('OperatorChatLauncher', () => {
     const sentPayload = vi.mocked(api.sendAgentMessage).mock.calls[0][1]
     expect(sentPayload.context.recordId).toBe(baseContext.recordId)
     expect(sentPayload.context.correlationId).not.toBe('initial-correlation')
+    expect(sentPayload.thinking_enabled).toBe(false)
     expect(await screen.findByText('+ Check transition.')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Approve' }))

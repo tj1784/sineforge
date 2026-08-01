@@ -61,6 +61,7 @@ function OperatorChatPanel({ operatorContext }: { operatorContext: OperatorConte
   const [items, setItems] = useState<TranscriptItem[]>([])
   const [draft, setDraft] = useState('')
   const [busy, setBusy] = useState(false)
+  const [thinkingEnabled, setThinkingEnabled] = useState(true)
   const [approvingId, setApprovingId] = useState<string | null>(null)
   const panelRef = useRef<HTMLDivElement | null>(null)
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
@@ -153,6 +154,7 @@ function OperatorChatPanel({ operatorContext }: { operatorContext: OperatorConte
         actor_id: 'local-user',
         content,
         context: captured,
+        thinking_enabled: thinkingEnabled,
         idempotency_key: randomId('operator-message'),
       })
       setHealth(response.provider_health)
@@ -301,9 +303,22 @@ function OperatorChatPanel({ operatorContext }: { operatorContext: OperatorConte
               <strong>CineForge Operator</strong>
               <small>{providerLabel(health)}</small>
             </div>
-            <button type="button" aria-label="Close CineForge Operator" onClick={() => setOpen(false)}>
-              x
-            </button>
+            <div className="operator-header-actions">
+              <button
+                type="button"
+                className={`operator-thinking-toggle ${thinkingEnabled ? 'active' : ''}`}
+                aria-label={`Turn thinking ${thinkingEnabled ? 'off' : 'on'}`}
+                aria-pressed={thinkingEnabled}
+                title={thinkingEnabled ? 'Thinking is enabled' : 'Thinking is disabled'}
+                onClick={() => setThinkingEnabled((value) => !value)}
+              >
+                <span aria-hidden="true">◈</span>
+                Thinking {thinkingEnabled ? 'on' : 'off'}
+              </button>
+              <button type="button" aria-label="Close CineForge Operator" onClick={() => setOpen(false)}>
+                x
+              </button>
+            </div>
           </header>
 
           <section className="operator-context-card" aria-label="Active operator context">

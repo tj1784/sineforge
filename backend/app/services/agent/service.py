@@ -296,6 +296,7 @@ class AgentService:
         actor_id: str,
         content: str,
         context: PageContextEnvelope,
+        thinking_enabled: bool,
         idempotency_key: str | None,
     ) -> AgentMessageTurnResponse:
         session = db.get(AgentSession, session_id)
@@ -315,7 +316,10 @@ class AgentService:
             role="user",
             content=content,
             status="complete",
-            metadata_json={"context_hash": hydrated.context_hash},
+            metadata_json={
+                "context_hash": hydrated.context_hash,
+                "thinking_enabled": thinking_enabled,
+            },
         )
         db.add(user_message)
         db.flush()
@@ -343,6 +347,7 @@ class AgentService:
                 snapshot=snapshot,
                 hydrated=hydrated,
                 user_content=content,
+                thinking_enabled=thinking_enabled,
                 idempotency_key=idempotency_key or str(user_message.id),
             )
 
@@ -355,6 +360,7 @@ class AgentService:
             metadata_json={
                 "context_hash": hydrated.context_hash,
                 "provider_status": health.status,
+                "thinking_enabled": thinking_enabled,
                 "tool_activity_count": len(tool_activities),
             },
         )
@@ -368,7 +374,10 @@ class AgentService:
             target_type=context.recordType,
             target_id=UUID(context.recordId) if context.recordId and _looks_uuid(context.recordId) else None,
             policy_decision="allowed",
-            details={"context_hash": hydrated.context_hash},
+            details={
+                "context_hash": hydrated.context_hash,
+                "thinking_enabled": thinking_enabled,
+            },
         )
         db.commit()
         db.refresh(session)
@@ -395,6 +404,7 @@ class AgentService:
         snapshot: AgentContextSnapshot,
         hydrated: HydratedContext,
         user_content: str,
+        thinking_enabled: bool,
         idempotency_key: str,
     ) -> tuple[str, list[AgentToolActivity], list[AgentProposalRead]]:
         response_schema = {
@@ -443,6 +453,7 @@ class AgentService:
                 messages=messages,
                 response_schema=response_schema,
                 idempotency_key=idempotency_key,
+                thinking_enabled=thinking_enabled,
             )
         except AgentProviderError as exc:
             _audit(

@@ -390,7 +390,16 @@ describe('project workspace navigation', () => {
     fireEvent.click(screen.getByRole('radio', { name: /CineForge Studio Workflow/ }))
     await screen.findByText(/3 LM Studio models available/)
     expect(screen.getByRole('radio', { name: /Qwen3.5 9B The Defiant/ })).toBeTruthy()
-    fireEvent.click(screen.getByRole('radio', { name: /Sulphur 2 Base/ }))
+    const sulphurAgent = screen
+      .getAllByRole('radio', { name: /Sulphur 2 Base/ })
+      .find((element) => (element as HTMLInputElement).value === 'sulphur')
+    expect(sulphurAgent).toBeTruthy()
+    fireEvent.click(sulphurAgent as HTMLInputElement)
+    const sulphurModel = screen
+      .getAllByRole('radio', { name: /Sulphur 2 Base/ })
+      .find((element) => (element as HTMLInputElement).value === 'sulphur-2-base')
+    expect(sulphurModel).toBeTruthy()
+    fireEvent.click(sulphurModel as HTMLInputElement)
     fireEvent.click(await screen.findByRole('button', { name: /Create with Sulphur/ }))
 
     await waitFor(() => expect(api.createProjectFromSulphur).toHaveBeenCalledTimes(1))
@@ -424,9 +433,11 @@ describe('project workspace navigation', () => {
 
     fireEvent.click(screen.getByRole('radio', { name: /CineForge Studio Workflow/ }))
     await screen.findByText(/3 LM Studio models available/)
-    expect(
-      (screen.getByRole('radio', { name: /Qwen3 4B Hivemind/ }) as HTMLInputElement).checked,
-    ).toBe(true)
+    const qwenAgent = screen
+      .getAllByRole('radio', { name: /Qwen3 4B Hivemind/ })
+      .find((element) => (element as HTMLInputElement).value === 'qwen')
+    expect(qwenAgent).toBeTruthy()
+    expect((qwenAgent as HTMLInputElement).checked).toBe(true)
     fireEvent.change(
       screen.getByLabelText('Describe the complete CineForge project'),
       { target: { value: sourcePrompt } },

@@ -1,0 +1,85 @@
+{
+  "schema": "sineforge.semantic-workflow-manifest/v1",
+  "template_id": "ltx23-whatdreamscost-director-2-distilled",
+  "workflow_name": "LTX Director 2 — Distilled Timeline",
+  "version": "2.0.5-public",
+  "editor_workflow": {
+    "path": "LTX_Director_2_Distilled.workflow.json",
+    "sha256": "244D3F82876024BAECB45D97D39CD0223A450FA10C2E87E1C63F4FC4B71D6D1A",
+    "node_count": 33,
+    "upstream_sha256": "AE3B4D3616EDF1A055C1C2B635E852ECFB455811FB97A0E84B2E04E0CF9F88A3"
+  },
+  "api_workflow": {
+    "path": "LTX_Director_2_Distilled.api.json",
+    "file_sha256": "61455004C54E555B76BBD80C55B58FB6D804D0FA9440900F6AD1BD26D7D79581",
+    "normalized_sha256": "FEA20CAB23CC0C2496B616683F7F144894BBC1D035F1BBCAAA3B312E1B749BD0",
+    "executable_node_count": 32,
+    "native_api_runner_id": "b37c1d10-0607-40d7-be94-21062ef642e3"
+  },
+  "source": {
+    "video": "https://www.youtube.com/watch?v=GpsS9YW2MQk",
+    "repository": "https://github.com/WhatDreamsCost/WhatDreamsCost-ComfyUI",
+    "repository_commit": "a3c809c8b593a74c2ddcd6c1f83ad85ebebe3c64",
+    "workflow_filename": "example_workflows/LTX_Director_2_Workflow_Distilled.json",
+    "members_guide": "https://www.patreon.com/posts/ltx2-3-director-160709967",
+    "members_attachment": "LTX_Director_2_Workflow_Hotfix.json",
+    "members_attachment_installed": false,
+    "license": "GPL-3.0"
+  },
+  "required_models": [
+    {
+      "kind": "diffusion_model",
+      "path": "diffusion_models\\LTX\\2.3\\Director\\ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors",
+      "source": "Kijai/LTX2.3_comfy",
+      "size": 25226571988,
+      "sha256": "0A1D7AAC2B338E8EC7E832149F1DCF11C9323272482B1CCA0673D229702370F0"
+    },
+    {
+      "kind": "text_encoder",
+      "path": "text_encoders\\LTX\\2.3\\Director\\gemma_3_12B_it_fp4_mixed.safetensors",
+      "source": "Comfy-Org/ltx-2",
+      "size": 9447702218,
+      "sha256": "AACA463D11E6D8D2A4BDB0D6299214C15EF78A3F73E0EF8113D5A9D0219B3F6D"
+    },
+    {
+      "kind": "latent_upscale_model",
+      "path": "latent_upscale_models\\LTX\\2.3\\Director\\ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+      "source": "Lightricks/LTX-2.3",
+      "size": 995743560,
+      "sha256": "5F416311FA8172B65AF67530758964708D29A317B830D689A51143B7F91913ED"
+    }
+  ],
+  "existing_runtime_models": [
+    "text_encoders\\ltx-2.3_text_projection_bf16.safetensors",
+    "vae\\LTX23_audio_vae_bf16.safetensors",
+    "vae\\LTX23_video_vae_bf16.safetensors",
+    "vae\\taeltx2_3.safetensors"
+  ],
+  "custom_node_packs": [
+    {
+      "name": "WhatDreamsCost-ComfyUI",
+      "version": "2.0.5",
+      "commit": "a3c809c8b593a74c2ddcd6c1f83ad85ebebe3c64"
+    },
+    {
+      "name": "ComfyUI-LTXVideo",
+      "commit": "3b9c5cde4700917074823d45e25401d81049f8fc",
+      "local_requirement_override": "kornia>=0.7.1,<0.8"
+    },
+    {
+      "name": "ComfyUI-KJNodes",
+      "commit": "4d46ac107c33ed8a3d181b8776ede66498583380"
+    }
+  ],
+  "validation": {
+    "comfyui_url": "http://127.0.0.1:8190",
+    "mode": "whitelisted custom-node validation instance",
+    "node_classes_live_discovered": true,
+    "model_selectors_live_discovered": true,
+    "api_runner_analysis_ok": true,
+    "api_runner_error_count": 0,
+    "api_runner_warning_count": 0,
+    "queueable": true,
+    "render_performed": false
+  }
+}

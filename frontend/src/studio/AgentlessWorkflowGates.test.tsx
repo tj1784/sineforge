@@ -18,7 +18,7 @@ const profile: AgentlessWorkflowProfile = {
   agent_runtime_required: true,
   local_planning_agent_required: true,
   hosted_planning_agents_allowed: false,
-  default_planning_agent: 'qwen',
+  default_planning_agent: 'grok',
   selected_planning_agent: 'qwen',
   prompt_artifact_format: 'json',
   prompt_artifact_extension: '.json',

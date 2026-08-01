@@ -46,6 +46,7 @@ class FakeProvider:
         messages: list[dict[str, str]],
         response_schema: dict[str, Any],
         idempotency_key: str,
+        thinking_enabled: bool = True,
     ) -> dict[str, Any]:
         self.messages = messages
         return self.action
@@ -325,4 +326,3 @@ def test_stale_target_version_blocks_approved_mutation(db_session: Session):
     assert approval.status_code == 409, approval.text
     assert "Target changed" in approval.json()["detail"]
     assert db_session.scalar(select(CreativeReviewNote)) is None
-

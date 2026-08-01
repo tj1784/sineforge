@@ -57,6 +57,10 @@ describe('DownloadsPage installation truth', () => {
     expect(within(videoVaeRow as HTMLTableRowElement).getByText('Installed')).toBeTruthy()
 
     for (const name of [
+      'Licon MSR V2 for LTX 2.3',
+      'LTX 2.3 22B Distilled 1.1',
+      'Gemma 3 12B IT — LTX text encoder',
+      'LTX 2.3 MSR V2 — Single Image to Multiple Scenes',
       'LTX 2.3 Ingredients IC-LoRA',
       'LTX 2.3 DubIt Lip-Sync IC-LoRA',
       'LTX 2.3 Pixel Spatial Upscaler IC-LoRA — 2×',
@@ -74,8 +78,8 @@ describe('DownloadsPage installation truth', () => {
     const summary = screen.getByText('Download rows').closest('.workflow-summary')
     expect(summary).not.toBeNull()
     const summaryScope = within(summary as HTMLElement)
-    expect(summaryScope.getByText('Download rows').parentElement?.textContent).toBe('Download rows37')
-    expect(summaryScope.getByText('Installed / verified').parentElement?.textContent).toBe('Installed / verified34')
+    expect(summaryScope.getByText('Download rows').parentElement?.textContent).toBe('Download rows45')
+    expect(summaryScope.getByText('Installed / verified').parentElement?.textContent).toBe('Installed / verified42')
     expect(summaryScope.getByText('Missing').parentElement?.textContent).toBe('Missing3')
     expect(summaryScope.getByText('Downloading').parentElement?.textContent).toBe('Downloading0')
   })
