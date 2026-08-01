@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent, FormEvent } from 'react'
 import {
+  BackendUnavailableError,
   api,
   type PhaseASnapshot,
   type Project,
@@ -13,6 +14,7 @@ import { PageHeader } from '../components/Page'
 import { StudioHomeHero } from '../components/StudioHomeHero'
 import { LocalPlanningAgentFieldset } from '../components/LocalPlanningAgentFieldset'
 import { ChapterIntakeForm } from '../components/ChapterIntakeForm'
+import { ThemeSelector } from '../components/ThemeSelector'
 import { makeChapterIntakeDraft, type ChapterIntakeDraft } from '../components/chapterIntake'
 import {
   localPlanningAgent,
@@ -25,6 +27,13 @@ import {
   type ProjectWorkflowLane,
 } from '../workflowLanes'
 import '../workflow-lanes.css'
+import {
+  EMPTY_BIBLICAL_CONTEXT,
+  biblicalContextPayload,
+  creativeThemeLabel,
+  type BiblicalContextDraft,
+  type CreativeThemeId,
+} from '../themes'
 /* PIXEL: Sites project-card density (also loaded last from main.tsx). */
 import '../projects-sites-density.css'
 
@@ -56,6 +65,8 @@ type SourceMode = 'story' | 'blank' | 'import'
 
 type ProjectDraft = {
   workflowLane: ProjectWorkflowLane | null
+  themeId: CreativeThemeId
+  themeContext: BiblicalContextDraft
   planningAgent: PlanningAgent
   planningModelId: string | null
   name: string
@@ -96,6 +107,8 @@ function makeChapterIntakes(count: number, targetRuntime: number): ChapterIntake
 
 const EMPTY_DRAFT: ProjectDraft = {
   workflowLane: null,
+  themeId: 'default',
+  themeContext: { ...EMPTY_BIBLICAL_CONTEXT },
   planningAgent: 'qwen',
   planningModelId: null,
   name: '',
@@ -133,6 +146,7 @@ function makeInitialDraft(
     ...EMPTY_DRAFT,
     chapterIntake: EMPTY_DRAFT.chapterIntake.map((chapter) => ({ ...chapter })),
     workflowLane: initialWorkflowLane,
+    themeContext: { ...EMPTY_BIBLICAL_CONTEXT },
     planningAgent: initialPlanningAgent,
     ...(initialWorkflowLane === 'agentless'
       ? {
@@ -246,9 +260,17 @@ function ProjectList({
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('All')
   const [sort, setSort] = useState('Recently created')
+  const [loadVersion, setLoadVersion] = useState(0)
+  const transportRetryCount = useRef(0)
+
+  const retryNow = useCallback(() => {
+    transportRetryCount.current = 0
+    setLoadVersion((current) => current + 1)
+  }, [])
 
   useEffect(() => {
     let active = true
+    let retryTimer: number | undefined
     const load = async () => {
       setLoading(true)
       setError(null)
@@ -257,9 +279,22 @@ function ProjectList({
         if (!active) return
         onProjectsLoaded?.(projects)
         const enriched = await Promise.all(projects.map(enrichProject))
-        if (active) setSummaries(enriched)
+        if (active) {
+          transportRetryCount.current = 0
+          setSummaries(enriched)
+        }
       } catch (err) {
-        if (active) setError(err instanceof Error ? err.message : 'Unable to load projects.')
+        if (active) {
+          setError(err instanceof Error ? err.message : 'Unable to load projects.')
+          if (err instanceof BackendUnavailableError) {
+            const delay = Math.min(2_000 * 2 ** transportRetryCount.current, 15_000)
+            transportRetryCount.current += 1
+            retryTimer = window.setTimeout(
+              () => setLoadVersion((current) => current + 1),
+              delay,
+            )
+          }
+        }
       } finally {
         if (active) setLoading(false)
       }
@@ -267,8 +302,9 @@ function ProjectList({
     void load()
     return () => {
       active = false
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer)
     }
-  }, [onProjectsLoaded])
+  }, [loadVersion, onProjectsLoaded])
 
   const filtered = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase()
@@ -337,7 +373,7 @@ function ProjectList({
               onOpenProject?.(target.id, target.name)
               return
             }
-            onCreateNew?.()
+            onNavigateStudio(page)
           }}
         />
       ) : (
@@ -353,7 +389,7 @@ function ProjectList({
         </div>
       )}
 
-      {error ? <ErrorNotice message={error} /> : null}
+      {error ? <ErrorNotice message={error} actionLabel="Retry now" onAction={retryNow} /> : null}
 
       <section className="projects-summary" aria-label="Project summary">
         <div><span className="summary-icon mint">▣</span><span><small>Total projects</small><b>{summaries.length}</b></span></div>
@@ -460,7 +496,7 @@ function ProjectList({
           </button>
         </div>
       ) : null}
-      {!loading && !filtered.length ? (
+      {!loading && !error && !filtered.length ? (
         <EmptyState title={summaries.length ? 'No projects match.' : 'No projects yet.'} detail={summaries.length ? 'Clear the search or choose another status filter.' : 'Create a project to begin a production plan.'} />
       ) : null}
     </div>
@@ -578,6 +614,25 @@ function NewProject({
       setError('Choose a local planning agent.')
       return false
     }
+    if (draft.themeId === 'biblical') {
+      const context = biblicalContextPayload(draft.themeContext)
+      if (!context) {
+        setError('Complete every required Biblical context field before continuing.')
+        return false
+      }
+      if (context.canon_context === 'hebrew_bible' && context.roman_presence !== 'none') {
+        setError('Hebrew Bible contexts cannot include Roman presence.')
+        return false
+      }
+      if (context.historical_preset.startsWith('hb_') && context.canon_context !== 'hebrew_bible') {
+        setError('Choose Hebrew Bible for an HB historical preset.')
+        return false
+      }
+      if (context.historical_preset.startsWith('nt_') && context.canon_context !== 'new_testament') {
+        setError('Choose New Testament for an NT historical preset.')
+        return false
+      }
+    }
     if (step === 2 && draft.sourceMode !== 'blank' && !draft.baseStory.trim()) {
       setError(draft.sourceMode === 'import' ? 'Choose a source file or paste its contents.' : 'Add the source story, script, or treatment.')
       return false
@@ -626,6 +681,10 @@ function NewProject({
       const workspace = await api.createProjectWorkspace({
         idempotency_key: idempotencyKey.current,
         workflow_lane: workflowLane,
+        theme_id: draft.themeId,
+        theme_context: draft.themeId === 'biblical'
+          ? biblicalContextPayload(draft.themeContext)
+          : null,
         planning_agent: draft.planningAgent,
         planning_model_id: draft.planningModelId,
         prompt_artifact_format: 'json',
@@ -651,7 +710,8 @@ function NewProject({
         chapter_intake: chapterIntake,
         run_phase_one: shouldRunInitialPlan,
         bootstrap_phase_plan: shouldRunInitialPlan,
-        auto_approve_phases_through: shouldRunInitialPlan ? 5 : null,
+        auto_approve_phases_through: shouldRunInitialPlan ? 1 : null,
+        run_phases_two_through_five: shouldRunInitialPlan,
         aspect_ratio: draft.aspectRatio,
         preview_width: dimensions.preview[0],
         preview_height: dimensions.preview[1],
@@ -698,13 +758,13 @@ function NewProject({
   const selectedPlanningAgent = localPlanningAgent(draft.planningAgent)
   const submitLabel = saving
     ? isAgentless
-      ? `${selectedPlanningAgent?.label ?? 'Local agent'} · drafting Phase 1…`
-      : 'Phase 1 · Drafting complete script…'
+      ? `${selectedPlanningAgent?.label ?? 'Local agent'} · planning Phases 1–5…`
+      : 'Local planning · completing Phases 1–5…'
     : isAgentless
       ? `Create with ${selectedPlanningAgent?.label ?? 'local agent'}`
       : draft.sourceMode === 'blank'
         ? '✦ Create project shell'
-        : '✦ Create project & complete script'
+        : '✦ Create project & complete Phases 1–5'
 
   return (
     <form className="page new-project-page" onSubmit={createProject}>
@@ -749,6 +809,21 @@ function NewProject({
                   ))}
                 </div>
               </fieldset>
+              <ThemeSelector
+                value={draft.themeId}
+                context={draft.themeContext}
+                onChange={(themeId) => {
+                  update('themeId', themeId)
+                  setError(null)
+                }}
+                onContextChange={(key, value) => {
+                  setDraft((current) => ({
+                    ...current,
+                    themeContext: { ...current.themeContext, [key]: value },
+                  }))
+                  setError(null)
+                }}
+              />
               {draft.workflowLane ? (
                 <LocalPlanningAgentFieldset
                   name="wizard-planning-agent"
@@ -924,9 +999,10 @@ function NewProject({
 
         <aside className="project-preview">
           <div className="preview-cover"><span className="cover-grid" /><span className="cover-orb orb-a" /><span className="cover-orb orb-b" /><b>{projectInitials(draft.name || 'New project')}</b><small>PROJECT PREVIEW</small></div>
-          <div className="preview-copy"><span className="eyebrow">PRODUCTION FOUNDATION</span><h2>{draft.name.trim() || 'Title generated from your prompt'}</h2><p>{draft.description.trim() || (isAgentless ? 'Your source and deterministic production settings remain editable.' : 'Your complete Phase 1 script will remain editable and unapproved.')}</p></div>
+          <div className="preview-copy"><span className="eyebrow">PRODUCTION FOUNDATION</span><h2>{draft.name.trim() || 'Title generated from your prompt'}</h2><p>{draft.description.trim() || (isAgentless ? 'Your source and deterministic production settings remain editable.' : 'Your complete local planning package remains editable after creation.')}</p></div>
           <dl>
             <div><dt>Workflow</dt><dd>{draft.workflowLane ? projectWorkflowLaneLabel(draft.workflowLane) : 'Choose a workflow'}</dd></div>
+            <div><dt>Theme</dt><dd>{creativeThemeLabel(draft.themeId)}</dd></div>
             <div><dt>Source</dt><dd>{SOURCE_OPTIONS.find((option) => option.id === draft.sourceMode)?.title.replace('Start from a ', '')}</dd></div>
             <div><dt>Target runtime</dt><dd>{formatRuntime(draft.targetRuntime)}</dd></div><div><dt>Output</dt><dd>{draft.aspectRatio} · {draft.fps} fps</dd></div>
             <div><dt>Chapters</dt><dd>{draft.requestedChapterCount}</dd></div>
@@ -948,9 +1024,9 @@ function NewProject({
           <div className="creation-boundary">
             <span>▣</span>
             {isAgentless ? (
-              <p><b>Local-only Agentless creation</b>The selected LM Studio agent builds Phase 1 using structured JSON prompts. Hosted/API agents stay blocked, and no rendering starts during creation.</p>
+              <p><b>Local-only Agentless creation</b>The selected LM Studio agent builds Phases 1–5 using structured JSON prompts. Hosted/API agents stay blocked, and no rendering starts during creation.</p>
             ) : (
-              <p><b>Phase 1 only</b>One submission creates an editable script package and QA report. Phases 2–8 stay locked. No image, voice, video, audio, ComfyUI, FFmpeg, model-download, or render job can start.</p>
+              <p><b>Local planning through Phase 5</b>One submission creates the script, scenes, shots, characters, assets, and production prompt package. Phases 6–8 stay locked. No image, voice, video, audio, ComfyUI, FFmpeg, model-download, or render job starts during creation.</p>
             )}
           </div>
         </aside>
@@ -959,10 +1035,10 @@ function NewProject({
         <div className="phase-one-progress" role="status" aria-live="polite">
           <div className="phase-one-progress-card">
             <span className="phase-one-spinner" aria-hidden="true" />
-            <div><span className="eyebrow">PHASE 1 OF EXACTLY 8</span><h2>Building your complete script</h2><p>{selectedPlanningAgent?.label ?? 'The selected local agent'} is drafting a structured JSON narrative package and running Phase 1 QA. Approval is never automatic.</p></div>
+            <div><span className="eyebrow">LOCAL PLANNING · PHASES 1–5 OF 8</span><h2>Building your production plan</h2><p>{selectedPlanningAgent?.label ?? 'The selected local agent'} is creating and validating the script, scene breakdown, shot list, character and asset bible, and production prompt package.</p></div>
             <ol>
-              <li className="active"><b>1</b><span>Script and Narrative Development<small>Drafting · QA pending</small></span></li>
               {[
+                'Script and Narrative Development',
                 'Scene and Shot Segmentation',
                 'Character Development',
                 'Location and Key-Asset Development',
@@ -970,7 +1046,12 @@ function NewProject({
                 'Image and Voice Generation and Mapping',
                 'Video Generation, Continuity, Assembly, and Picture Lock',
                 'Foley, Audio Mix, Final Mux, and Delivery QA',
-              ].map((name, index) => <li key={name}><b>{index + 2}</b><span>{name}<small>Locked · not started</small></span></li>)}
+              ].map((name, index) => (
+                <li key={name} className={index < 5 ? 'active' : undefined}>
+                  <b>{index + 1}</b>
+                  <span>{name}<small>{index < 5 ? 'Local planning · validation in progress' : 'Locked · not started'}</small></span>
+                </li>
+              ))}
             </ol>
           </div>
         </div>

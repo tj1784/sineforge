@@ -21,6 +21,7 @@ from backend.app.api.routes import (
     storyboard,
     storyboard_crud,
     storyboard_settings,
+    themes,
     video,
     video_ingest,
     voices,
@@ -34,6 +35,7 @@ api_router.include_router(lm_studio.router)
 api_router.include_router(health.router)
 api_router.include_router(audio.router)
 api_router.include_router(storyboard_settings.router)
+api_router.include_router(themes.router)
 api_router.include_router(projects.router)
 api_router.include_router(agentless_workflow.router)
 api_router.include_router(production.router)

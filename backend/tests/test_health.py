@@ -1,7 +1,8 @@
 from fastapi.testclient import TestClient
 import pytest
 
-from backend.app.main import app
+from backend.app.core.config import Settings
+from backend.app.main import app, create_app
 
 
 client = TestClient(app)
@@ -21,10 +22,10 @@ def test_root_returns_useful_cineforge_status_json():
         "status": "ok",
         "message": "CineForge backend is running.",
         "docs_url": "/docs",
-        "frontend_dev_url": "http://localhost:5173",
-        "generation_enabled": False,
+        "frontend_dev_url": "http://127.0.0.1:5174",
+        "generation_enabled": True,
         "prompt_submission_publicly_accessible": False,
-        "current_phase": "Phase 2 controlled ComfyUI submission backend capability",
+        "current_phase": "Bundled ComfyUI engine with Sineforge-native submission",
     }
 
 
@@ -38,6 +39,22 @@ def test_health_returns_ok():
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+
+
+def test_health_uses_the_same_injected_settings_as_the_lifespan_owner():
+    candidate = create_app(
+        Settings(
+            _env_file=None,
+            env="integration-test",
+            comfyui_backend_managed=False,
+            comfyui_autostart=False,
+        )
+    )
+
+    response = TestClient(candidate).get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["env"] == "integration-test"
 
 
 def test_local_vite_origin_is_allowed_by_cors():
@@ -85,6 +102,29 @@ def test_ffmpeg_unavailable_handled_gracefully(monkeypatch):
     response = client.get("/health/ffmpeg")
     assert response.status_code == 200
     assert response.json()["status"] == "unavailable"
+
+
+def test_engine_mutation_fails_closed_without_lifespan_owner():
+    candidate = create_app(
+        Settings(_env_file=None, comfyui_backend_managed=True, comfyui_autostart=False)
+    )
+
+    response = TestClient(candidate).post("/runtime/engine/start")
+
+    assert response.status_code == 503
+    assert "lifespan" in response.json()["detail"]
+
+
+def test_engine_mutation_rejects_cross_site_browser_origin():
+    response = client.post(
+        "/runtime/engine/stop",
+        headers={
+            "Origin": "https://untrusted.example",
+            "Sec-Fetch-Site": "cross-site",
+        },
+    )
+
+    assert response.status_code == 403
 
 
 def test_runtime_status_is_read_only_and_reports_disabled_actions(monkeypatch):

@@ -8,8 +8,10 @@ from fastapi.testclient import TestClient
 
 from backend.app.api.routes import native_api_runner as route
 from backend.app.api.routes.native_api_runner import get_native_api_workflow_library
+from backend.app.core.config import get_settings
 from backend.app.main import create_app
 from backend.app.services.api_workflows import ApiWorkflowLibrary, workflow_sha256
+from backend.app.services.comfy.engine import ComfyEngineManager
 from backend.app.services.native_api_runner import (
     NativeApiWorkflowLibrary,
     NativeRepositoryWorkflowReadOnly,
@@ -184,7 +186,7 @@ def test_repository_workflow_catalog_is_shared_and_read_only(tmp_path: Path):
 
     listed = native.list()
 
-    assert len(listed) == 172
+    assert len(listed) == 174
     assert {item["category"] for item in listed} == {
         "Image Editing & Composition",
         "Image Generation",
@@ -194,7 +196,7 @@ def test_repository_workflow_catalog_is_shared_and_read_only(tmp_path: Path):
         "Utilities & Workflow Tools",
         "Video & Animation",
     }
-    assert sum(item["repository_managed"] for item in listed) == 172
+    assert sum(item["repository_managed"] for item in listed) == 174
     assert sum(
         item["workflow_status"] == "requires_custom_nodes" for item in listed
     ) == 42
@@ -228,24 +230,198 @@ def test_repository_workflow_catalog_is_shared_and_read_only(tmp_path: Path):
     assert unchanged["is_overridden"] is False
     assert not (native.root / f"{original['id']}.json").is_file()
 
+    ingredients = next(
+        item
+        for item in listed
+        if item["name"]
+        == "Krea 2 Character Ingredients Sheet — Selectable Local Model"
+    )
+    ingredients_detail = native.get(ingredients["id"])
+    ingredients_planner = next(
+        node
+        for node in ingredients_detail["source_workflow"]["nodes"]
+        if node["type"] == "SineForgeKrea2CharacterIngredientsPlanner"
+    )
+    assert "cnr_id" not in ingredients_planner["properties"]
+    assert "ver" not in ingredients_planner["properties"]
+
     dynamic_podcast = next(
         item
         for item in listed
         if item["name"]
-        == "LTX-2.3 Dynamic Podcast — Local Qwen JSON + Native Audio"
+        == (
+            "LTX-2.3 Dynamic Podcast — Selectable Local Model + Native Audio"
+        )
     )
     assert dynamic_podcast["subcategory"] == "LTX-2.3 · Dynamic podcasts"
     assert dynamic_podcast["repository_managed"] is True
     podcast_detail = native.get(dynamic_podcast["id"])
+    podcast_planner = next(
+        node
+        for node in podcast_detail["source_workflow"]["nodes"]
+        if node["type"] == "SineForgeLTXPodcastPlanner"
+    )
+    assert "cnr_id" not in podcast_planner["properties"]
+    assert "ver" not in podcast_planner["properties"]
     assert podcast_detail["workflow"]["2"]["class_type"] == (
         "SineForgeLTXPodcastPlanner"
     )
     assert podcast_detail["workflow"]["6"]["inputs"]["format"] == "json"
     assert podcast_detail["requirements"]["local_services"][0]["cloud"] is False
+    assert podcast_detail["requirements"]["shared_model_root"] == (
+        r"C:\ComfyUI\ComfyUI_Shared_Folders\models"
+    )
+    assert podcast_detail["requirements"]["trusted_prompt_model_root"] == (
+        r"C:\Users\Blokey\.lmstudio\models"
+    )
+    assert (
+        podcast_detail["requirements"]["local_services"][0][
+            "root_boundary_enforced"
+        ]
+        is True
+    )
+    assert podcast_detail["requirements"]["local_services"][0][
+        "text_only_models_allowed"
+    ] is True
+    assert (
+        podcast_detail["requirements"]["local_services"][0]["preload"]
+        is False
+    )
+    assert podcast_detail["requirements"]["prompt_examples"] == [
+        "Workflows/LTX23/"
+        "SineForge_LTX23_Podcast_Geopolitics_To_Everyday.prompt.json"
+    ]
+    assert {
+        item["preferred_relative_path"]
+        for item in podcast_detail["requirements"]["model_files"]
+    } == {
+        "checkpoints/sulphur2Base_distilled.safetensors",
+        "text_encoders/gemma_3_12B_it_fp8_e4m3fn.safetensors",
+        "text_encoders/ltx-2.3_text_projection_bf16.safetensors",
+        "vae/LTX23_video_vae_bf16.safetensors",
+        "vae/LTX23_audio_vae_bf16.safetensors",
+        "latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+    }
     assert (
         podcast_detail["requirements"]["qualification"]["status"]
         == "static_validated_not_rendered"
     )
+
+    continuation = next(
+        item
+        for item in listed
+        if item["name"]
+        == "LTX-2.3 + Krea 2 General Continuation Loop — Local GGUF JSON"
+    )
+    assert continuation["subcategory"] == "LTX-2.3 · Automated continuation"
+    assert continuation["repository_managed"] is True
+    continuation_detail = native.get(continuation["id"])
+    assert continuation_detail["workflow"]["32"]["class_type"] == (
+        "SineForgeContinuationLoopCount"
+    )
+    assert continuation_detail["workflow"]["32"]["inputs"]["loop_count"] == 4
+    assert continuation_detail["workflow"]["2"]["inputs"]["total"] == ["32", 0]
+    assert continuation_detail["workflow"]["2"]["class_type"] == (
+        "easy forLoopStart"
+    )
+    assert continuation_detail["workflow"]["3"]["class_type"] == (
+        "SineForgeLTXGeneralContinuationPlanner"
+    )
+    assert continuation_detail["workflow"]["3"]["inputs"]["scene_or_subject"]
+    assert continuation_detail["workflow"]["3"]["inputs"]["next_event"]
+    assert (
+        continuation_detail["workflow"]["3"]["inputs"]["audio_mode"]
+        == "automatic from scene"
+    )
+    assert continuation_detail["workflow"]["3"]["inputs"]["dialogue_json"] == "[]"
+    assert continuation_detail["workflow"]["3"]["inputs"]["reference_image"] == [
+        "26",
+        0,
+    ]
+    assert continuation_detail["workflow"]["8"]["class_type"] == (
+        "Krea2EncodeRebalance"
+    )
+    assert continuation_detail["workflow"]["8"]["inputs"]["image1"] == ["2", 2]
+    assert continuation_detail["workflow"]["8"]["inputs"]["image2"] == ["26", 0]
+    assert continuation_detail["workflow"]["14"]["class_type"] == (
+        "SaveImageAdvanced"
+    )
+    assert continuation_detail["workflow"]["15"]["inputs"]["model_override"] == [
+        "31",
+        0,
+    ]
+    assert continuation_detail["workflow"]["26"]["class_type"] == "LoadImage"
+    assert continuation_detail["workflow"]["28"]["class_type"] == (
+        "LTXICLoRALoaderModelOnly"
+    )
+    assert continuation_detail["workflow"]["31"]["class_type"] == (
+        "LTXReferenceConditioning"
+    )
+    assert continuation_detail["workflow"]["14"]["inputs"]["format"] == {
+        "format": "png",
+        "bit_depth": "16-bit",
+        "input_color_space": "sRGB",
+    }
+    assert continuation_detail["workflow"]["16"]["inputs"]["format"] == (
+        "video/ffv1-mkv"
+    )
+    assert continuation_detail["workflow"]["18"]["inputs"]["batch_index"] == -1
+    assert continuation_detail["workflow"]["20"]["inputs"]["format"] == {
+        "format": "png",
+        "bit_depth": "16-bit",
+        "input_color_space": "sRGB",
+    }
+    assert continuation_detail["workflow"]["22"]["class_type"] == (
+        "easy forLoopEnd"
+    )
+    editor_nodes = {
+        node["id"]: node for node in continuation_detail["source_workflow"]["nodes"]
+    }
+    for node_id in (3, 32):
+        assert "cnr_id" not in editor_nodes[node_id]["properties"]
+        assert "ver" not in editor_nodes[node_id]["properties"]
+    editor_links = {
+        link[0]: link for link in continuation_detail["source_workflow"]["links"]
+    }
+    assert editor_links[5][3:] == [8, 1, "CLIP"]
+    assert editor_links[6][3:] == [8, 0, "STRING"]
+    assert editor_nodes[14]["widgets_values"] == [
+        None,
+        "png",
+        "16-bit",
+        "sRGB",
+    ]
+    assert editor_nodes[20]["widgets_values"] == [
+        None,
+        "png",
+        "16-bit",
+        "sRGB",
+    ]
+    assert continuation_detail["requirements"]["preferred_prompt_model"].startswith(
+        "qwen3.6-40b"
+    )
+    assert (
+        continuation_detail["requirements"]["prompt_model_selection"]["source"]
+        == "recursive_local_gguf_package_discovery"
+    )
+    assert {
+        item["preferred_relative_path"]
+        for item in continuation_detail["requirements"]["model_files"]
+    } == {
+        "diffusion_models/krea2TurboOfficialComfy_krea2RawInt8Convrot.safetensors",
+        "text_encoders/qwen3vl_4b_fp8_scaled.safetensors",
+        "vae/qwen_image_vae.safetensors",
+        "checkpoints/sulphur2Base_distilled.safetensors",
+        "text_encoders/gemma_3_12B_it_fp8_e4m3fn.safetensors",
+        "text_encoders/ltx-2.3_text_projection_bf16.safetensors",
+        "vae/LTX23_video_vae_bf16.safetensors",
+        "vae/LTX23_audio_vae_bf16.safetensors",
+        "latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+        (
+            "loras/LTX/2.3/Official/IC-LoRA/Ingredients/"
+            "ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors"
+        ),
+    }
 
 
 def test_repository_routes_reject_mutation_and_stage_original_for_comfyui(
@@ -278,13 +454,14 @@ def test_repository_routes_reject_mutation_and_stage_original_for_comfyui(
     assert removed.status_code == 409
     assert "read-only" in updated.json()["detail"]
     assert loaded.status_code == 200
+    comfy_url = str(route.get_settings().comfyui_base_url).rstrip("/")
     assert loaded.json() == {
         "ok": True,
         "workflow_id": original["id"],
         "workflow_name": original["name"],
-        "comfy_url": "http://127.0.0.1:8888",
+        "comfy_url": comfy_url,
         "open_url": (
-            "http://127.0.0.1:8888/"
+            f"{comfy_url}/"
             "?sineforge_workflow=bc8c139e-1330-4ec8-9323-116a91ff3c85"
         ),
         "transfer_token": "bc8c139e-1330-4ec8-9323-116a91ff3c85",
@@ -298,7 +475,7 @@ def test_repository_routes_reject_mutation_and_stage_original_for_comfyui(
     assert FakeComfyUIClient.submissions == []
     assert opened.status_code == 303
     assert opened.headers["location"].startswith(
-        "http://127.0.0.1:8888/?sineforge_workflow="
+        f"{comfy_url}/?sineforge_workflow="
     )
     assert opened.headers["cache-control"] == "no-store"
 
@@ -397,6 +574,7 @@ def test_native_routes_start_empty_and_submit_directly(
 ):
     library = NativeApiWorkflowLibrary(tmp_path, include_repository=False)
     app = create_app()
+    app.state.comfy_engine = ComfyEngineManager(get_settings())
     app.dependency_overrides[get_native_api_workflow_library] = lambda: library
     client = TestClient(app)
     _reset_fake_client()
@@ -469,8 +647,9 @@ def test_native_routes_start_empty_and_submit_directly(
     assert len(FakeComfyUIClient.submissions) == 1
 
 
-def test_native_run_rejects_json_changed_after_validation(tmp_path: Path, monkeypatch):
+def test_native_run_ignores_stale_validation_hash(tmp_path: Path, monkeypatch):
     app = create_app()
+    app.state.comfy_engine = ComfyEngineManager(get_settings())
     app.dependency_overrides[get_native_api_workflow_library] = lambda: NativeApiWorkflowLibrary(
         tmp_path, include_repository=False
     )
@@ -492,8 +671,9 @@ def test_native_run_rejects_json_changed_after_validation(tmp_path: Path, monkey
         },
     )
 
-    assert response.status_code == 409
-    assert "changed after validation" in response.json()["detail"]
+    assert response.status_code == 200
+    assert response.json()["prompt_id"] == "native-prompt-1"
+    assert FakeComfyUIClient.submissions[0][0] == workflow
 
 
 def test_native_routes_map_visual_json_to_422(tmp_path: Path, monkeypatch):
@@ -531,6 +711,10 @@ def test_native_cancel_is_restricted_to_owned_prompt(tmp_path: Path, monkeypatch
     client = TestClient(app)
     _reset_fake_client()
     monkeypatch.setattr(route, "ComfyUIClient", FakeComfyUIClient)
+    managed_settings = route.get_settings().model_copy(
+        update={"comfyui_backend_managed": True}
+    )
+    monkeypatch.setattr(route, "get_settings", lambda: managed_settings)
 
     unknown = client.post("/native-api-runner/jobs/other-prompt/cancel")
     assert unknown.status_code == 404
@@ -572,8 +756,8 @@ def test_native_cancel_is_restricted_to_owned_prompt(tmp_path: Path, monkeypatch
         "/native-api-runner/jobs/active-native-prompt/cancel",
         params={"interrupt_active": True},
     )
-    assert active.status_code == 409
-    assert "interrupt operation is global" in active.json()["detail"]
+    assert active.status_code == 200
+    assert active.json()["action"] == "interrupted_active"
 
 
 def test_native_memory_release_rejects_running_work(tmp_path: Path, monkeypatch):

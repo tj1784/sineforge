@@ -1,0 +1,179 @@
+{
+  "schema_version": "sineforge.semantic-workflow-manifest/v1",
+  "template_id": "ltx23-krea2-lossless-continuation-loop-v1",
+  "workflow_name": "LTX-2.3 + Krea 2 General Continuation Loop — Local GGUF JSON",
+  "editor_workflow": "SineForge_LTX23_Krea2_Lossless_Continuation_Loop.workflow.json",
+  "api_workflow": "SineForge_LTX23_Krea2_Lossless_Continuation_Loop.api.json",
+  "prompt_contract": "SineForge_LTX23_Krea2_Continuation.prompt.json",
+  "execution_policy": {
+    "cloud_agents_allowed": false,
+    "local_planner": "LM Studio",
+    "planner_model_default": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+    "planner_model_selection": "all local executable GGUF packages beneath the trusted LM Studio model root",
+    "shared_model_root": "C:\\ComfyUI\\ComfyUI_Shared_Folders\\models",
+    "loop_count_default": 4,
+    "loop_count_zero_mode": {
+      "meaning": "continuous_until_interrupted",
+      "internal_total": 100000,
+      "stop_control": "ComfyUI Interrupt"
+    },
+    "queue_depth": 1,
+    "batch_size": 1,
+    "anchor_format": "16-bit PNG",
+    "master_video": "FFV1 MKV",
+    "master_audio": "FLAC",
+    "handoff": "unmodified in-memory IMAGE tensor",
+    "reference_conditioning": {
+      "planner": "Node 3 receives the current loop frame and node 1B reference sheet.",
+      "krea": "Node 8 uses Krea2EncodeRebalance with image1=current frame and image2=reference sheet.",
+      "ltx": "Nodes 27-31 patch the all-in-one LTX model_override with Ingredients IC-LoRA and reference-token conditioning.",
+      "ingredients_lora": "LTX\\2.3\\Official\\IC-LoRA\\Ingredients\\ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors"
+    }
+  },
+  "bindings": {
+    "initial_image": {
+      "node_id": "1",
+      "class_type": "LoadImage",
+      "input": "image"
+    },
+    "ingredients_reference_image": {
+      "node_id": "26",
+      "class_type": "LoadImage",
+      "input": "image"
+    },
+    "loop_count": {
+      "node_id": "32",
+      "class_type": "SineForgeContinuationLoopCount",
+      "input": "loop_count"
+    },
+    "loop_engine_total": {
+      "source": {
+        "node_id": "32",
+        "output_index": 0
+      },
+      "target": {
+        "node_id": "2",
+        "class_type": "easy forLoopStart",
+        "input": "total"
+      }
+    },
+    "continuation_request_json": {
+      "node_id": "3",
+      "class_type": "SineForgeLTXGeneralContinuationPlanner",
+      "input": "continuation_request_json",
+      "media_type": "application/json"
+    },
+    "scene_or_subject": {
+      "node_id": "3",
+      "class_type": "SineForgeLTXGeneralContinuationPlanner",
+      "input": "scene_or_subject"
+    },
+    "next_event": {
+      "node_id": "3",
+      "class_type": "SineForgeLTXGeneralContinuationPlanner",
+      "input": "next_event"
+    },
+    "audio_mode": {
+      "node_id": "3",
+      "class_type": "SineForgeLTXGeneralContinuationPlanner",
+      "input": "audio_mode"
+    },
+    "dialogue_json": {
+      "node_id": "3",
+      "class_type": "SineForgeLTXGeneralContinuationPlanner",
+      "input": "dialogue_json",
+      "media_type": "application/json"
+    },
+    "krea_prompt": {
+      "source": {
+        "node_id": "3",
+        "output_index": 1
+      },
+      "target": {
+        "node_id": "8",
+        "class_type": "Krea2EncodeRebalance",
+        "input": "text"
+      }
+    },
+    "krea_current_frame_reference": {
+      "source": {
+        "node_id": "2",
+        "output_index": 2
+      },
+      "target": {
+        "node_id": "8",
+        "class_type": "Krea2EncodeRebalance",
+        "input": "image1"
+      }
+    },
+    "krea_ingredients_reference": {
+      "source": {
+        "node_id": "26",
+        "output_index": 0
+      },
+      "target": {
+        "node_id": "8",
+        "class_type": "Krea2EncodeRebalance",
+        "input": "image2"
+      }
+    },
+    "ltx_ingredients_iclora": {
+      "node_id": "28",
+      "class_type": "LTXICLoRALoaderModelOnly",
+      "input": "lora_name",
+      "value": "LTX\\2.3\\Official\\IC-LoRA\\Ingredients\\ltx-2.3-22b-ic-lora-ingredients-0.9.safetensors"
+    },
+    "ltx_reference_model_override": {
+      "source": {
+        "node_id": "31",
+        "output_index": 0
+      },
+      "target": {
+        "node_id": "15",
+        "class_type": "LTXVSulphurAllInOne",
+        "input": "model_override"
+      }
+    },
+    "krea_anchor": {
+      "source": {
+        "node_id": "14",
+        "output_index": 0
+      },
+      "target": {
+        "node_id": "15",
+        "class_type": "LTXVSulphurAllInOne",
+        "input": "image"
+      }
+    },
+    "final_frame": {
+      "source": {
+        "node_id": "18",
+        "output_index": 0
+      },
+      "save": {
+        "node_id": "20",
+        "class_type": "SaveImageAdvanced",
+        "input": "images"
+      },
+      "next_cycle": {
+        "node_id": "22",
+        "class_type": "easy forLoopEnd",
+        "input": "initial_value1"
+      }
+    }
+  },
+  "lossless_scope": {
+    "true": [
+      "16-bit PNG compression",
+      "FFV1 video",
+      "FLAC audio",
+      "JSON prompts",
+      "in-memory tensor handoff"
+    ],
+    "not_claimed": [
+      "Krea image synthesis",
+      "LTX video synthesis",
+      "mathematically identical generated pixels"
+    ]
+  }
+}

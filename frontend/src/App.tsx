@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { api, type Project } from './api/client'
+import { ApiError, BackendUnavailableError, api, type Project } from './api/client'
 import { AppShell, type PageId, type ShellView } from './components/AppShell'
 import { requestAppNavigation } from './navigationGuard'
 import { Projects } from './pages/Projects'
 import { StoryboardStudio } from './pages/StoryboardStudio'
+import { ApiRunnerPage } from './studio/pages/ApiRunnerPage'
 import type { ProjectWorkflowLane } from './workflowLanes'
 import type { PlanningAgent } from './planningAgents'
 
@@ -20,7 +21,7 @@ const PAGE_TO_ROUTE: Record<PageId, string> = {
   routing: 'model-routing',
   workflows: 'workflows',
   'sequence-sheet': 'sequence-sheet',
-  'api-caller': 'api-caller',
+  'api-caller': 'api-runner',
   'api-runner': 'api-runner',
   downloads: 'downloads',
   exports: 'exports',
@@ -39,7 +40,7 @@ const ROUTE_TO_PAGE: Record<string, PageId> = {
   routing: 'routing',
   workflows: 'workflows',
   'sequence-sheet': 'sequence-sheet',
-  'api-caller': 'api-caller',
+  'api-caller': 'api-runner',
   'api-runner': 'api-runner',
   downloads: 'downloads',
   exports: 'exports',
@@ -49,6 +50,7 @@ const ROUTE_TO_PAGE: Record<string, PageId> = {
 type AppRoute =
   | { kind: 'projects' }
   | { kind: 'new-project' }
+  | { kind: 'engine' }
   | { kind: 'studio'; projectId: string; page: PageId }
 
 type ParsedRoute = {
@@ -79,6 +81,7 @@ function studioPath(projectId: string, page: PageId): string {
 function routePath(route: AppRoute): string {
   if (route.kind === 'projects') return '/projects'
   if (route.kind === 'new-project') return '/projects/new'
+  if (route.kind === 'engine') return '/engine'
   return studioPath(route.projectId, route.page)
 }
 
@@ -95,6 +98,10 @@ function readAppRoute(pathname = window.location.pathname): ParsedRoute {
     return { route: { kind: 'new-project' } }
   }
 
+  if (/^\/engine\/?$/.test(pathname)) {
+    return { route: { kind: 'engine' } }
+  }
+
   const studioMatch = pathname.match(/^\/projects\/([^/]+)\/studio\/([^/]+)\/?$/)
   if (studioMatch) {
     const [, encodedProjectId, routeSegment] = studioMatch
@@ -106,6 +113,9 @@ function readAppRoute(pathname = window.location.pathname): ParsedRoute {
         return { route: { kind: 'projects' }, canonicalPath: '/projects' }
       }
       const route: AppRoute = { kind: 'studio', projectId, page }
+      if (routeSegment === 'api-caller') {
+        return { route, canonicalPath: routePath(route) }
+      }
       return ROUTE_TO_PAGE[routeSegment] ? { route } : { route, canonicalPath: routePath(route) }
     } catch {
       return { route: { kind: 'projects' }, canonicalPath: '/projects' }
@@ -134,6 +144,7 @@ function App() {
       : null,
   )
   const [projectCount, setProjectCount] = useState(0)
+  const backendUnavailable = backendStatus === 'unavailable'
   const [newProjectWorkflowLane, setNewProjectWorkflowLane] =
     useState<ProjectWorkflowLane | null>(null)
   const [newProjectPlanningAgent, setNewProjectPlanningAgent] =
@@ -179,7 +190,11 @@ function App() {
           ? routeState.projectId
           : selectedProjectId
       if (!isRealProjectId(projectId)) {
-        navigateTo({ kind: 'projects' })
+        navigateTo(page === 'api-runner' ? { kind: 'engine' } : { kind: 'projects' })
+        return
+      }
+      if (routeState.kind === 'engine' && page === 'api-runner') {
+        navigateTo({ kind: 'engine' })
         return
       }
       navigateTo({ kind: 'studio', projectId, page })
@@ -276,6 +291,7 @@ function App() {
   useEffect(() => {
     // Invalid / legacy studio ids are already rewritten by readAppRoute / isRealProjectId guards.
     if (routeState.kind !== 'studio' || !isRealProjectId(routeState.projectId)) return
+    if (backendUnavailable) return
 
     let active = true
     void api
@@ -287,18 +303,23 @@ function App() {
           setSelectedProjectId(project.id)
         }
       })
-      .catch(() => {
-        if (active) {
+      .catch((error: unknown) => {
+        if (!active) return
+        if (error instanceof ApiError && (error.status === 404 || error.status === 410)) {
           setActiveProject(null)
           setProjectName('Selected project')
-          // Unknown API id — send user back to the project list (async path, not sync-in-effect).
+          // Only a canonical missing/deleted response invalidates the Studio URL.
           navigateTo({ kind: 'projects' }, { replace: true })
+          return
+        }
+        if (error instanceof BackendUnavailableError) {
+          setBackendStatus('unavailable')
         }
       })
     return () => {
       active = false
     }
-  }, [routeState, navigateTo])
+  }, [backendUnavailable, routeState, navigateTo])
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0 })
@@ -308,16 +329,27 @@ function App() {
     const initial = window.setTimeout(() => void refreshBackendStatus(), 0)
     const timer = window.setInterval(() => {
       void refreshBackendStatus()
-    }, 30_000)
+    }, backendUnavailable ? 2_000 : 10_000)
     return () => {
       window.clearTimeout(initial)
       window.clearInterval(timer)
     }
-  }, [refreshBackendStatus])
+  }, [backendUnavailable, refreshBackendStatus])
 
   const shellView: ShellView =
-    routeState.kind === 'studio' ? 'studio' : routeState.kind === 'new-project' ? 'new-project' : 'projects'
-  const activePage = routeState.kind === 'studio' ? routeState.page : 'overview'
+    routeState.kind === 'studio'
+      ? 'studio'
+      : routeState.kind === 'engine'
+        ? 'engine'
+        : routeState.kind === 'new-project'
+          ? 'new-project'
+          : 'projects'
+  const activePage =
+    routeState.kind === 'studio'
+      ? routeState.page
+      : routeState.kind === 'engine'
+        ? 'api-runner'
+        : 'overview'
   const activeProjectId =
     routeState.kind === 'studio' && isRealProjectId(routeState.projectId)
       ? routeState.projectId
@@ -356,7 +388,7 @@ function App() {
           onProjectsLoaded={handleProjectsLoaded}
           onNavigateStudio={(page) => {
             if (!isRealProjectId(selectedProjectId)) {
-              // No real project selected yet — stay on projects list.
+              if (page === 'api-runner') navigateTo({ kind: 'engine' })
               return
             }
             navigateTo({ kind: 'studio', projectId: selectedProjectId, page })
@@ -383,6 +415,7 @@ function App() {
           onNavigate={navigateStudio}
         />
       ) : null}
+      {routeState.kind === 'engine' ? <ApiRunnerPage /> : null}
     </AppShell>
   )
 }

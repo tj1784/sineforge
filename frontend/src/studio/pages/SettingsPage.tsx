@@ -6,6 +6,7 @@ import {
 } from '../../api/client'
 import { useStudio } from '../StudioState'
 import { ErrorState, LoadingState, UnavailableState } from '../components/StateBlocks'
+import { ProjectThemeSettings } from '../components/ProjectThemeSettings'
 
 const DEFAULT_DRAFT: ProjectStoryboardSettingsUpdate = {
   shot_duration_min_sec: 6,
@@ -181,7 +182,13 @@ export function SettingsPage() {
   const laneLockedDisabled = savingDisabled || agentlessPolicyLocked
 
   return (
-    <form className="panel stack-form" style={{ maxWidth: 760 }} onSubmit={(event) => void onSave(event)}>
+    <>
+    <ProjectThemeSettings
+      projectId={data.story.project_id}
+      disabled={saving || busy}
+      onMessage={setMessage}
+    />
+    <form className="panel stack-form" style={{ maxWidth: 760, marginTop: 14 }} onSubmit={(event) => void onSave(event)}>
       <div className="panel-title">
         <div>
           <h2>Project storyboard settings</h2>
@@ -391,5 +398,6 @@ export function SettingsPage() {
           : 'Model/LoRA download and rendering flags are project policy. Downloads still require a configured runtime and worker; enabling the flags does not auto-fetch weights by itself.'}
       </p>
     </form>
+    </>
   )
 }

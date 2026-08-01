@@ -121,6 +121,13 @@ def test_api_caller_crud_routes_use_operator_library(tmp_path: Path):
     assert client.get(f"/api-caller/workflows/{created['id']}").status_code == 404
 
 
+def test_legacy_api_caller_execution_is_retired():
+    response = TestClient(create_app()).get("/api-caller/runtime")
+
+    assert response.status_code == 410
+    assert "native-api-runner" in response.json()["detail"]
+
+
 @pytest.mark.asyncio
 async def test_runner_submission_forwards_operator_batch_options():
     def handler(request: httpx.Request) -> httpx.Response:

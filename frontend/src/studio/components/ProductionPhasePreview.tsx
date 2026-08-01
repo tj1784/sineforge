@@ -1269,7 +1269,7 @@ function PhaseSevenPreview({
   async function queueVideoPrompts() {
     if (!workspace?.storyId || historical || videoQueueBlockedReason) return
     setVideoQueueState('queueing')
-    setVideoQueueMessage('Submitting all approved shot prompts to ComfyAPI Runner…')
+    setVideoQueueMessage('Submitting all approved shot prompts to the Sineforge engine…')
     try {
       const result = await api.queuePhaseSevenVideos(workspace.storyId, {
         requested_by: 'CineForge Phase 7 video handoff',
@@ -1281,7 +1281,7 @@ function PhaseSevenPreview({
       }
       setVideoQueueState('complete')
       setVideoQueueMessage(
-        `${result.message} Open ComfyAPI Runner to watch ${result.queued_count} job${result.queued_count === 1 ? '' : 's'}.`,
+        `${result.message} Track ${result.queued_count === 1 ? 'it' : 'them'} in the Engine workspace.`,
       )
     } catch (error) {
       setVideoQueueState('error')
@@ -1320,7 +1320,7 @@ function PhaseSevenPreview({
               <h4>Queue all approved image-to-video prompts</h4>
               <p>
                 Once every planned shot has an approved starting image, this submits the full Phase 7 prompt batch
-                to ComfyAPI Runner. Audio, Foley, stitching, and picture lock stay separate.
+                directly to the bundled engine. Audio, Foley, stitching, and picture lock stay separate.
               </p>
             </div>
             <span

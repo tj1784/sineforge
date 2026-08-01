@@ -24,6 +24,11 @@ from backend.app.schemas.storyboard_settings import (
     ProjectStoryboardSettingsRead,
     StitchStage,
 )
+from backend.app.schemas.themes import (
+    THEME_VERSION,
+    BiblicalContext,
+    CreativeThemeId,
+)
 from backend.app.schemas.production import PhaseOneBaselineKey, ProductionPipelineRead
 
 
@@ -31,6 +36,16 @@ class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str | None = Field(default=None, max_length=2000)
     workflow_lane: ProjectWorkflowLane
+    theme_id: CreativeThemeId = CreativeThemeId.default
+    theme_context: BiblicalContext | None = None
+
+    @model_validator(mode="after")
+    def validate_theme(self):
+        if self.theme_id is CreativeThemeId.biblical and self.theme_context is None:
+            raise ValueError("Biblical Theme requires its historical context fields.")
+        if self.theme_id is not CreativeThemeId.biblical and self.theme_context is not None:
+            raise ValueError("theme_context is only accepted for Biblical Theme.")
+        return self
 
 
 class ProjectRead(BaseModel):
@@ -38,6 +53,9 @@ class ProjectRead(BaseModel):
     name: str
     description: str | None = None
     workflow_lane: ProjectWorkflowLane = DEFAULT_PROJECT_WORKFLOW_LANE
+    theme_id: CreativeThemeId = CreativeThemeId.default
+    theme_version: str = THEME_VERSION
+    theme_context: BiblicalContext | None = None
     created_at: datetime
     persistence: str = "stub"
 
@@ -63,6 +81,8 @@ class ProjectWorkspaceCreate(BaseModel):
     idempotency_key: str = Field(min_length=8, max_length=128)
     name: str = Field(min_length=1, max_length=200)
     workflow_lane: ProjectWorkflowLane
+    theme_id: CreativeThemeId = CreativeThemeId.default
+    theme_context: BiblicalContext | None = None
     planning_agent: Literal["sulphur", "qwen"] = "qwen"
     planning_model_id: str | None = Field(
         default=None,
@@ -95,6 +115,7 @@ class ProjectWorkspaceCreate(BaseModel):
     bootstrap_phase_plan: bool = False
     auto_approve_phases_through: int | None = Field(default=None, ge=1, le=5)
     run_phase_one: bool = False
+    run_phases_two_through_five: bool = False
     comparison_baseline: PhaseOneBaselineKey | None = None
 
     aspect_ratio: str = Field(default="16:9", min_length=1, max_length=32)
@@ -142,12 +163,26 @@ class ProjectWorkspaceCreate(BaseModel):
 
     @model_validator(mode="after")
     def require_source_material(self):
+        if self.theme_id is CreativeThemeId.biblical and self.theme_context is None:
+            raise ValueError("Biblical Theme requires its historical context fields.")
+        if self.theme_id is not CreativeThemeId.biblical and self.theme_context is not None:
+            raise ValueError("theme_context is only accepted for Biblical Theme.")
         if self.source_mode != "blank" and not self.base_story.strip():
             raise ValueError("base_story is required unless source_mode is blank.")
         if self.run_phase_one and not self.base_story.strip():
             raise ValueError("base_story is required when run_phase_one is enabled.")
         if (self.bootstrap_phase_plan or self.auto_approve_phases_through) and not self.run_phase_one:
             raise ValueError("Phase plan bootstrap and auto-approval require run_phase_one.")
+        if self.run_phases_two_through_five:
+            if not self.run_phase_one or not self.bootstrap_phase_plan:
+                raise ValueError(
+                    "Phase 2-5 planning requires run_phase_one and bootstrap_phase_plan."
+                )
+            if self.auto_approve_phases_through != 1:
+                raise ValueError(
+                    "Phase 2-5 planning requires auto_approve_phases_through=1; "
+                    "placeholder Phases 2-5 must not be auto-approved before the local run."
+                )
         if len(self.chapter_intake) > self.requested_chapter_count:
             raise ValueError("chapter_intake cannot exceed requested_chapter_count.")
         chapter_indexes = sorted(chapter.order_index for chapter in self.chapter_intake)
@@ -190,6 +225,8 @@ class ProjectWorkspaceRead(BaseModel):
     settings: ProjectStoryboardSettingsRead
     idempotent_replay: bool
     production_pipeline: ProductionPipelineRead | None = None
+    initial_planning_run_id: UUID | None = None
+    completed_planning_phases: list[int] = Field(default_factory=list)
 
 
 class SulphurProjectPromptCreate(BaseModel):

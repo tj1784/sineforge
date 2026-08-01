@@ -10,6 +10,7 @@ from backend.app.core.errors import CineForgeError
 from backend.app.db.base import AuditLog, ComfyJob, QueueStatus, WorkflowRun
 from backend.app.queue.state_machine import JobState
 from backend.app.services.comfy.object_info_cache import ObjectInfoCacheService
+from backend.app.services.comfy.engine import async_comfy_prompt_submission_guard
 from backend.app.services.queue.service import QueueService, SubmissionReadinessResult
 
 
@@ -43,7 +44,11 @@ class ComfyWorkerPromptSubmissionAdapter:
         await self._client.aclose()
 
     async def submit_prompt(self, prompt: dict[str, Any], client_id: str) -> dict[str, Any]:
-        response = await self._client.post("/prompt", json={"prompt": prompt, "client_id": client_id})
+        async with async_comfy_prompt_submission_guard():
+            response = await self._client.post(
+                "/prompt",
+                json={"prompt": prompt, "client_id": client_id},
+            )
         response.raise_for_status()
         return response.json()
 

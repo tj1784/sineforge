@@ -169,7 +169,7 @@ def test_phase_six_generation_entrypoints_reject_before_side_effects(
     db.commit.assert_not_called()
 
 
-def test_phase_seven_queue_rejects_before_reads_copy_or_runner_submission(
+def test_phase_seven_queue_rejects_before_reads_copy_or_comfy_submission(
     agentless_story_context,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -177,7 +177,7 @@ def test_phase_seven_queue_rejects_before_reads_copy_or_runner_submission(
     shot_read = Mock()
     workflow_read = Mock()
     copy_to_input = Mock()
-    runner_submit = Mock()
+    comfy_submit = Mock()
     filesystem_copy = Mock()
     runner_client = Mock()
     monkeypatch.setattr(phase_seven_videos, "_shot_rows", shot_read)
@@ -189,8 +189,8 @@ def test_phase_seven_queue_rejects_before_reads_copy_or_runner_submission(
     )
     monkeypatch.setattr(
         phase_seven_videos,
-        "_post_runner_job",
-        runner_submit,
+        "_post_comfy_prompt",
+        comfy_submit,
     )
     monkeypatch.setattr(phase_seven_videos.shutil, "copy2", filesystem_copy)
     monkeypatch.setattr(phase_seven_videos.httpx, "Client", runner_client)
@@ -209,7 +209,7 @@ def test_phase_seven_queue_rejects_before_reads_copy_or_runner_submission(
     shot_read.assert_not_called()
     workflow_read.assert_not_called()
     copy_to_input.assert_not_called()
-    runner_submit.assert_not_called()
+    comfy_submit.assert_not_called()
     filesystem_copy.assert_not_called()
     runner_client.assert_not_called()
     db.add.assert_not_called()

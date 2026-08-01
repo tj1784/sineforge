@@ -13,6 +13,8 @@ from backend.app.schemas.production import (
     PhaseOneGenerationInput,
     PhaseOneMutationResponse,
     PhaseOneRevisionRequest,
+    PlanningPhaseIterationRequest,
+    PlanningPhaseIterationResponse,
     PhaseVersionCreateRequest,
     PhaseVersionCreateResponse,
     PhaseVersionDetail,
@@ -33,6 +35,11 @@ from backend.app.schemas.video_generation import (
 from backend.app.services import production_phases
 from backend.app.services import phase_six_images
 from backend.app.services import phase_seven_videos
+from backend.app.services.planning.phase_iterations import (
+    PhaseIterationActiveRunError,
+    PhaseIterationPlanningError,
+    generate_planning_phase_iteration,
+)
 
 
 router = APIRouter(prefix="/production", tags=["production"])
@@ -217,6 +224,36 @@ def prepare_phase_six_images(
     except phase_six_images.PhaseSixImageError as exc:
         db.rollback()
         raise _error(exc) from exc
+
+
+@router.post(
+    "/stories/{story_id}/phases/{phase_number}/generate",
+    response_model=PlanningPhaseIterationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+def generate_phase_iteration(
+    story_id: UUID,
+    phase_number: int,
+    payload: PlanningPhaseIterationRequest,
+    db: Session = Depends(get_db),
+) -> PlanningPhaseIterationResponse:
+    try:
+        return generate_planning_phase_iteration(
+            db,
+            story_id=story_id,
+            phase_number=phase_number,
+            payload=payload,
+        )
+    except PhaseIterationActiveRunError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+    except PhaseIterationPlanningError as exc:
+        detail = str(exc)
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if detail == "Story not found." or " is missing." in detail
+            else status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+        raise HTTPException(status_code=code, detail=detail) from exc
 
 
 @router.post(

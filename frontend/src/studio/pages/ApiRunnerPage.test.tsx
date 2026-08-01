@@ -9,7 +9,6 @@ vi.mock('../../api/client', () => ({
   api: {
     listNativeApiRunnerWorkflows: vi.fn(),
     getNativeApiRunnerWorkflow: vi.fn(),
-    loadNativeApiRunnerWorkflowInComfyUI: vi.fn(),
     createNativeApiRunnerWorkflow: vi.fn(),
     updateNativeApiRunnerWorkflow: vi.fn(),
     removeNativeApiRunnerWorkflow: vi.fn(),
@@ -27,8 +26,6 @@ vi.mock('../../api/client', () => ({
   },
   nativeApiRunnerOutputUrl: (_promptId: string, output: { filename: string }) =>
     `http://native-output.test/${output.filename}`,
-  nativeApiRunnerWorkflowOpenUrl: (workflowId: string) =>
-    `http://127.0.0.1:8010/native-api-runner/workflows/${workflowId}/open-in-comfyui`,
 }))
 
 const workflow = {
@@ -47,7 +44,7 @@ const workflow = {
 const runtime = {
   schema: 'sineforge.native-api-runner/v1',
   ok: true,
-  comfyUrl: 'http://127.0.0.1:8888',
+  comfyUrl: 'http://127.0.0.1:8190',
   comfy: { status: 'ok', reachable: true },
   objectInfo: { available: true, classCount: 312, error: null },
   queue: {
@@ -154,16 +151,10 @@ beforeEach(() => {
   vi.mocked(api.getNativeApiRunnerRuntime).mockResolvedValue(runtime as never)
   vi.mocked(api.analyzeNativeApiRunnerWorkflow).mockResolvedValue(analysis as never)
   vi.mocked(api.createNativeApiRunnerWorkflow).mockResolvedValue(workflowDetail() as never)
-  vi.mocked(api.loadNativeApiRunnerWorkflowInComfyUI).mockResolvedValue({
+  vi.mocked(api.cancelNativeApiRunnerJob).mockResolvedValue({
     ok: true,
-    workflow_id: workflowDetail().id,
-    workflow_name: workflowDetail().name,
-    comfy_url: 'http://127.0.0.1:8888',
-    open_url:
-      'http://127.0.0.1:8888/?sineforge_workflow=bc8c139e-1330-4ec8-9323-116a91ff3c85',
-    transfer_token: 'bc8c139e-1330-4ec8-9323-116a91ff3c85',
-    expires_in_sec: 300,
-    queued: false,
+    promptId: 'prompt-native-1',
+    action: 'interrupted_active',
   })
   vi.mocked(api.getNativeApiRunnerJob).mockResolvedValue({
     promptId: 'prompt-native-1',
@@ -224,6 +215,7 @@ describe('ApiRunnerPage native isolation', () => {
 
     const runButton = screen.getByRole('button', { name: 'Run workflow' })
     expect((runButton as HTMLButtonElement).disabled).toBe(true)
+    expect(screen.getByText('Validation required')).toBeTruthy()
 
     fireEvent.click(screen.getByRole('button', { name: 'Save to library' }))
     await waitFor(() => expect(api.createNativeApiRunnerWorkflow).toHaveBeenCalledTimes(1))
@@ -278,7 +270,54 @@ describe('ApiRunnerPage native isolation', () => {
     expect(api.runNativeApiRunnerWorkflow).not.toHaveBeenCalled()
   })
 
-  it('requires raw JSON edits to be applied before saving or leaving the raw editor', async () => {
+  it('keeps execution blocked while the local engine is offline or validation is not queueable', async () => {
+    vi.mocked(api.getNativeApiRunnerRuntime).mockResolvedValueOnce({
+      ...runtime,
+      ok: false,
+      comfy: { status: 'unavailable', reachable: false },
+    } as never)
+    render(<ApiRunnerPage />)
+    await screen.findByRole('heading', { name: 'No workflows yet' })
+    const file = new File([JSON.stringify(workflow)], 'native-test.json', {
+      type: 'application/json',
+    })
+    const fileInput = document.querySelector('input[type="file"][accept*=".json"]')
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } })
+    await screen.findByDisplayValue('A native test prompt')
+
+    expect((screen.getByRole('button', { name: 'Validate live' }) as HTMLButtonElement).disabled).toBe(true)
+    expect((screen.getByRole('button', { name: 'Run workflow' }) as HTMLButtonElement).disabled).toBe(true)
+
+    cleanup()
+    vi.mocked(api.getNativeApiRunnerRuntime).mockResolvedValue(runtime as never)
+    vi.mocked(api.analyzeNativeApiRunnerWorkflow).mockResolvedValueOnce({
+      ...analysis,
+      ok: false,
+      queueable: false,
+      issues: [
+        {
+          severity: 'error',
+          code: 'missing_node',
+          message: 'A required node is unavailable.',
+          nodeId: '1',
+          input: null,
+        },
+      ],
+      errorCount: 1,
+    } as never)
+    render(<ApiRunnerPage />)
+    await screen.findByRole('heading', { name: 'No workflows yet' })
+    const secondFileInput = document.querySelector('input[type="file"][accept*=".json"]')
+    fireEvent.change(secondFileInput as HTMLInputElement, { target: { files: [file] } })
+    await screen.findByDisplayValue('A native test prompt')
+    fireEvent.click(screen.getByRole('button', { name: 'Validate live' }))
+
+    expect(await screen.findByText('1 run issue')).toBeTruthy()
+    expect((screen.getByRole('button', { name: 'Run workflow' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(api.runNativeApiRunnerWorkflow).not.toHaveBeenCalled()
+  })
+
+  it('uses raw JSON edits directly for saving, downloading, and leaving the raw editor', async () => {
     render(<ApiRunnerPage />)
     await screen.findByRole('heading', { name: 'No workflows yet' })
     const file = new File([JSON.stringify(workflow)], 'native-test.json', {
@@ -301,20 +340,16 @@ describe('ApiRunnerPage native isolation', () => {
       },
     })
 
-    expect((screen.getByRole('button', { name: 'Editable inputs' }) as HTMLButtonElement).disabled).toBe(
-      true,
+    await waitFor(() =>
+      expect(
+        (screen.getByRole('button', { name: 'Save to library' }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false),
     )
-    expect((screen.getByRole('button', { name: 'Save to library' }) as HTMLButtonElement).disabled).toBe(
-      true,
-    )
-    expect((screen.getByRole('button', { name: 'Download JSON' }) as HTMLButtonElement).disabled).toBe(
-      true,
-    )
+    expect(
+      (screen.getByRole('button', { name: 'Download JSON' }) as HTMLButtonElement).disabled,
+    ).toBe(false)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Apply JSON' }))
-    expect((screen.getByRole('button', { name: 'Save to library' }) as HTMLButtonElement).disabled).toBe(
-      false,
-    )
     fireEvent.click(screen.getByRole('button', { name: 'Editable inputs' }))
     expect(screen.getByDisplayValue('Edited in raw JSON')).toBeTruthy()
   })
@@ -421,6 +456,47 @@ describe('ApiRunnerPage native isolation', () => {
     expect(secondPayload.idempotency_key).toBe(firstPayload.idempotency_key)
   })
 
+  it('requires confirmation before stopping a Sineforge-owned running prompt', async () => {
+    vi.mocked(api.getNativeApiRunnerRuntime).mockResolvedValue({
+      ...runtime,
+      capabilities: {
+        ...runtime.capabilities,
+        interruptActive: true,
+      },
+    } as never)
+    vi.mocked(api.getNativeApiRunnerJob).mockResolvedValue({
+      promptId: 'prompt-native-1',
+      state: 'running',
+      completed: false,
+      status: 'executing',
+      outputs: [],
+      messages: [],
+    })
+    render(<ApiRunnerPage />)
+    await screen.findByRole('heading', { name: 'No workflows yet' })
+    const file = new File([JSON.stringify(workflow)], 'native-test.json', {
+      type: 'application/json',
+    })
+    const fileInput = document.querySelector('input[type="file"][accept*=".json"]')
+    fireEvent.change(fileInput as HTMLInputElement, { target: { files: [file] } })
+    await screen.findByDisplayValue('A native test prompt')
+    fireEvent.click(screen.getByRole('button', { name: 'Validate live' }))
+    await screen.findByText('Live validation passed')
+    fireEvent.click(screen.getByRole('button', { name: 'Run workflow' }))
+
+    const stopButton = await screen.findByRole('button', { name: 'Stop' })
+    fireEvent.click(stopButton)
+    expect(await screen.findByRole('heading', { name: 'Stop native test?' })).toBeTruthy()
+    expect(screen.getByText(/submitted by the Sineforge native Runner/i)).toBeTruthy()
+    expect(api.cancelNativeApiRunnerJob).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop running prompt' }))
+    await waitFor(() =>
+      expect(api.cancelNativeApiRunnerJob).toHaveBeenCalledWith('prompt-native-1', true),
+    )
+    expect(await screen.findByText('Interrupted active prompt prompt-native-1.')).toBeTruthy()
+  })
+
   it('rejects visual-format JSON without saving or falling back to the external Runner', async () => {
     render(<ApiRunnerPage />)
     await screen.findByRole('heading', { name: 'No workflows yet' })
@@ -439,7 +515,7 @@ describe('ApiRunnerPage native isolation', () => {
     expect(api.runApiCallerWorkflow).not.toHaveBeenCalled()
   })
 
-  it('keeps repository workflows read-only and opens the original graph in ComfyUI', async () => {
+  it('keeps repository originals protected and creates an editable Sineforge API copy', async () => {
     const repositoryWorkflow = repositoryWorkflowDetail()
     vi.mocked(api.listNativeApiRunnerWorkflows).mockResolvedValue([
       repositoryWorkflow,
@@ -447,17 +523,6 @@ describe('ApiRunnerPage native isolation', () => {
     vi.mocked(api.getNativeApiRunnerWorkflow).mockResolvedValue(
       repositoryWorkflow as never,
     )
-    vi.mocked(api.loadNativeApiRunnerWorkflowInComfyUI).mockResolvedValue({
-      ok: true,
-      workflow_id: repositoryWorkflow.id,
-      workflow_name: repositoryWorkflow.name,
-      comfy_url: 'http://127.0.0.1:8888',
-      open_url:
-        'http://127.0.0.1:8888/?sineforge_workflow=bc8c139e-1330-4ec8-9323-116a91ff3c85',
-      transfer_token: 'bc8c139e-1330-4ec8-9323-116a91ff3c85',
-      expires_in_sec: 300,
-      queued: false,
-    })
     render(<ApiRunnerPage />)
     const libraryName = await screen.findByText(repositoryWorkflow.name)
     fireEvent.click(libraryName.closest('button') as HTMLButtonElement)
@@ -475,20 +540,24 @@ describe('ApiRunnerPage native isolation', () => {
       (screen.getByRole('button', { name: 'Save workflow' }) as HTMLButtonElement)
         .disabled,
     ).toBe(true)
+    expect(screen.queryByRole('link', { name: /Load in ComfyUI/i })).toBeNull()
+    expect(screen.getByText(/entirely inside Sineforge/i)).toBeTruthy()
 
-    const loadButton = screen.getByRole('link', {
-      name: 'Load in ComfyUI',
-    }) as HTMLAnchorElement
-    expect(loadButton.target).toBe('_blank')
-    expect(loadButton.rel).toBe('noopener noreferrer')
-    expect(loadButton.href).toBe(
-      `http://127.0.0.1:8010/native-api-runner/workflows/${repositoryWorkflow.id}/open-in-comfyui`,
-    )
-    fireEvent.click(loadButton)
-    expect(api.loadNativeApiRunnerWorkflowInComfyUI).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save as copy' }))
+    expect(
+      (screen.getByDisplayValue('native-test copy') as HTMLInputElement).readOnly,
+    ).toBe(false)
+    expect(
+      (screen.getByDisplayValue('A native test prompt') as HTMLTextAreaElement).readOnly,
+    ).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Raw API JSON' }))
+    const rawEditor = screen.getByRole('textbox', { name: 'Raw API workflow JSON' }) as HTMLTextAreaElement
+    expect(rawEditor.readOnly).toBe(false)
+    expect(rawEditor.value).toContain('A native test prompt')
+    expect(screen.getByRole('button', { name: 'Save to library' })).toBeTruthy()
+
     expect(api.updateNativeApiRunnerWorkflow).not.toHaveBeenCalled()
     expect(api.removeNativeApiRunnerWorkflow).not.toHaveBeenCalled()
     expect(api.runNativeApiRunnerWorkflow).not.toHaveBeenCalled()
-    expect(await screen.findByText(/is opening on the ComfyUI canvas/i)).toBeTruthy()
   })
 })

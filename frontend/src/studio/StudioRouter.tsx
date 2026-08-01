@@ -1,4 +1,5 @@
 import type { PageId } from '../components/AppShell'
+import { ErrorNotice } from '../components/Cards'
 import { useStudio } from './StudioState'
 import { StudioChrome } from './components/StudioChrome'
 import { StoryBootstrap } from './components/StoryBootstrap'
@@ -11,7 +12,6 @@ import { ImagesPage } from './pages/ImagesPage'
 import { RoutingPage } from './pages/RoutingPage'
 import { WorkflowsPage } from './pages/WorkflowsPage'
 import { SequenceSheetPage } from './pages/SequenceSheetPage'
-import { ApiCallerPage } from './pages/ApiCallerPage'
 import { ApiRunnerPage } from './pages/ApiRunnerPage'
 import { DownloadsPage } from './pages/DownloadsPage'
 import { ExportsPage } from './pages/ExportsPage'
@@ -78,7 +78,7 @@ const PAGE_META: Record<PageId, { title: string; description: string }> = {
 }
 
 export function StudioRouter({ page }: { page: PageId }) {
-  const { data, loadState, workflowLane } = useStudio()
+  const { data, error, loadState, retryProjectLoad, workflowLane } = useStudio()
 
   if (workflowLane === null) {
     return (
@@ -124,6 +124,23 @@ export function StudioRouter({ page }: { page: PageId }) {
     )
   }
 
+  if (loadState === 'error') {
+    return (
+      <StudioChrome
+        title="Studio is reconnecting"
+        description="Your project route and persisted data are being preserved while the local backend recovers."
+      >
+        <div className="page">
+          <ErrorNotice
+            message={error ?? 'The selected project is temporarily unavailable.'}
+            actionLabel="Retry now"
+            onAction={() => void retryProjectLoad()}
+          />
+        </div>
+      </StudioChrome>
+    )
+  }
+
   if (!data || loadState === 'empty') {
     return <StoryBootstrap />
   }
@@ -139,7 +156,7 @@ export function StudioRouter({ page }: { page: PageId }) {
     routing: <RoutingPage />,
     workflows: <WorkflowsPage />,
     'sequence-sheet': <SequenceSheetPage />,
-    'api-caller': <ApiCallerPage />,
+    'api-caller': <ApiRunnerPage />,
     'api-runner': <ApiRunnerPage />,
     downloads: <DownloadsPage />,
     exports: <ExportsPage />,

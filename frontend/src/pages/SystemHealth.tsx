@@ -93,13 +93,13 @@ export function SystemHealth() {
         <StatusCard
           title="ComfyUI"
           status={statusOf(health.comfy)}
-          detail="External ComfyUI reachability only; no prompt submission."
+          detail="Sineforge-owned BlokeyUI engine reachability."
           meta="GET /health/comfy"
         />
         <StatusCard
-          title="ComfyAPI Runner"
+          title="Native Engine Runner"
           status={statusOf(health.runner)}
-          detail="Local API-format workflow runner and its ComfyUI connection."
+          detail="Built-in API-format workflow execution through the owned engine."
           meta="GET /health/comfy-api-runner"
         />
         <StatusCard

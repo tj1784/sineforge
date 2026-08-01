@@ -32,6 +32,7 @@ export type StudioContextValue = {
   animaticOpen: boolean
   setAnimaticOpen: (open: boolean) => void
   busy: boolean
+  retryProjectLoad: () => Promise<void>
   reload: (id?: string) => Promise<void>
   createStory: (event: FormEvent<HTMLFormElement>) => Promise<void>
   loadExistingStory: (storyId: string) => Promise<void>

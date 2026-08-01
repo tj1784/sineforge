@@ -1,4 +1,4 @@
-"""Local-only Qwen JSON planner for the SineForge LTX-2.3 podcast workflow.
+"""Local-only JSON planner for the SineForge LTX-2.3 podcast workflow.
 
 The node deliberately sequences GPU ownership:
 
@@ -7,7 +7,9 @@ The node deliberately sequences GPU ownership:
 3. unload and verify the complete LM Studio model-instance set; and
 4. return prompt text only after unload has been confirmed.
 
-No cloud endpoint, API key, or remote host is accepted.
+The model selector is built from executable GGUF packages physically present
+beneath the configured local LM Studio model root.  No cloud endpoint, API
+key, free-form model path, embedding model, or remote host is accepted.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ import io
 import json
 import re
 import secrets
+import subprocess
 import time
 import urllib.error
 import urllib.request
@@ -34,6 +37,7 @@ VARIATION_MODES = (
 )
 MAX_RESPONSE_BYTES = 16 * 1024 * 1024
 WORD_PATTERN = re.compile(r"[\w'’-]+", flags=re.UNICODE)
+GGUF_SUFFIX = re.compile(r"-gguf$", flags=re.IGNORECASE)
 
 
 def _canonical_json(value: Any) -> str:
@@ -53,6 +57,8 @@ def _load_contract() -> dict[str, Any]:
     required = {
         "schema_version",
         "planner_model",
+        "trusted_lm_studio_model_root",
+        "planner_model_policy",
         "system_prompt",
         "default_request",
         "category_hints",
@@ -78,10 +84,32 @@ def _parse_json_object(raw: str, *, label: str) -> dict[str, Any]:
 
 
 def _parse_json_list(raw: str, *, label: str) -> list[Any]:
+    text = str(raw or "").strip()
+    if not text:
+        return []
     try:
-        value = json.loads(str(raw or ""))
+        value = json.loads(text)
     except json.JSONDecodeError as exc:
-        raise ValueError(f"{label} must be valid JSON: {exc.msg}") from exc
+        if exc.msg != "Extra data":
+            raise ValueError(f"{label} must be valid JSON: {exc.msg}") from exc
+
+        decoder = json.JSONDecoder()
+        values: list[Any] = []
+        cursor = 0
+        try:
+            while cursor < len(text):
+                value, cursor = decoder.raw_decode(text, cursor)
+                if isinstance(value, list):
+                    values.extend(value)
+                else:
+                    values.append(value)
+                while cursor < len(text) and text[cursor].isspace():
+                    cursor += 1
+        except json.JSONDecodeError as sequence_exc:
+            raise ValueError(
+                f"{label} must be valid JSON: {sequence_exc.msg}"
+            ) from sequence_exc
+        return values
     if not isinstance(value, list):
         raise ValueError(f"{label} must contain one JSON array.")
     return value
@@ -311,6 +339,148 @@ def _model_entries() -> list[dict[str, Any]]:
     return [item for item in models or [] if isinstance(item, dict)]
 
 
+def _local_model_root() -> Path:
+    configured = Path(
+        str(_load_contract()["trusted_lm_studio_model_root"]).strip()
+    )
+    if not configured.is_absolute():
+        raise RuntimeError("The local LM Studio model root must be absolute.")
+    try:
+        root = configured.resolve(strict=True)
+    except OSError as exc:
+        raise RuntimeError(
+            f"The local LM Studio model root is unavailable: {configured}"
+        ) from exc
+    if not root.is_dir():
+        raise RuntimeError(f"The local LM Studio model root is not a directory: {root}")
+    return root
+
+
+def _package_key(directory_name: str) -> str:
+    key = GGUF_SUFFIX.sub("", str(directory_name or "").strip()).casefold()
+    if not key or not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", key):
+        raise RuntimeError(
+            f"Cannot derive a safe LM Studio model key from package "
+            f"{directory_name!r}."
+        )
+    return key
+
+
+def _discover_local_model_packages() -> dict[str, dict[str, Any]]:
+    """Inventory executable GGUF packages strictly beneath the local root."""
+
+    root = _local_model_root()
+    package_directories: dict[Path, list[Path]] = {}
+    for raw_path in root.rglob("*.gguf"):
+        try:
+            path = raw_path.resolve(strict=True)
+            path.relative_to(root)
+        except (OSError, ValueError) as exc:
+            raise RuntimeError(
+                f"Local GGUF path escaped the approved model root: {raw_path}"
+            ) from exc
+        if not path.is_file() or path.name.casefold().startswith("mmproj"):
+            continue
+        package_directories.setdefault(path.parent, []).append(path)
+
+    packages: dict[str, dict[str, Any]] = {}
+    for directory, model_files in sorted(
+        package_directories.items(),
+        key=lambda item: item[0].as_posix().casefold(),
+    ):
+        try:
+            relative_directory = directory.relative_to(root)
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Local model package escaped the approved root: {directory}"
+            ) from exc
+        if not relative_directory.parts:
+            raise RuntimeError(
+                "GGUF model files must be contained in a named package directory."
+            )
+        key = _package_key(relative_directory.name)
+        if key in packages:
+            raise RuntimeError(
+                f"Local LM Studio model key {key!r} is ambiguous across packages."
+            )
+
+        file_records: list[dict[str, Any]] = []
+        for raw_file in sorted(
+            directory.glob("*.gguf"),
+            key=lambda item: item.name.casefold(),
+        ):
+            try:
+                file_path = raw_file.resolve(strict=True)
+                file_path.relative_to(root)
+            except (OSError, ValueError) as exc:
+                raise RuntimeError(
+                    f"Local package file escaped the approved root: {raw_file}"
+                ) from exc
+            if not file_path.is_file():
+                continue
+            stat = file_path.stat()
+            file_records.append(
+                {
+                    "relative_path": file_path.relative_to(root).as_posix(),
+                    "role": (
+                        "vision_projector"
+                        if file_path.name.casefold().startswith("mmproj")
+                        else "model"
+                    ),
+                    "size_bytes": stat.st_size,
+                    "modified_time_ns": stat.st_mtime_ns,
+                }
+            )
+
+        packages[key] = {
+            "model": key,
+            "root": str(root),
+            "publisher": (
+                relative_directory.parts[0]
+                if len(relative_directory.parts) > 1
+                else ""
+            ),
+            "package": relative_directory.name,
+            "relative_directory": relative_directory.as_posix(),
+            "files": file_records,
+            "executable_model_files": [
+                item["relative_path"]
+                for item in file_records
+                if item["role"] == "model"
+            ],
+            "supports_local_vision_files": any(
+                item["role"] == "vision_projector" for item in file_records
+            ),
+        }
+    if not packages:
+        raise RuntimeError(
+            f"No executable local GGUF model packages were found beneath {root}."
+        )
+    return packages
+
+
+def _selectable_model_keys() -> tuple[str, ...]:
+    packages = _discover_local_model_packages()
+    preferred = str(_load_contract()["planner_model"]).strip()
+    keys = sorted(packages, key=str.casefold)
+    if preferred in packages:
+        keys.remove(preferred)
+        keys.insert(0, preferred)
+    return tuple(keys)
+
+
+def _resolve_local_model_package(model: str) -> dict[str, Any]:
+    model = str(model or "").strip()
+    packages = _discover_local_model_packages()
+    package = packages.get(model)
+    if package is None:
+        raise RuntimeError(
+            f"Planner model {model!r} is not an executable GGUF package beneath "
+            f"{_local_model_root()}. Select one of: {', '.join(sorted(packages))}."
+        )
+    return package
+
+
 def _entry_matches_model(entry: dict[str, Any], model: str) -> bool:
     variants = entry.get("variants")
     if not isinstance(variants, list):
@@ -324,12 +494,20 @@ def _entry_matches_model(entry: dict[str, Any], model: str) -> bool:
 
 
 def _resolve_model_entry(model: str) -> tuple[dict[str, Any], str]:
-    matches = [entry for entry in _model_entries() if _entry_matches_model(entry, model)]
+    _resolve_local_model_package(model)
+    matches = [
+        entry
+        for entry in _model_entries()
+        if str(entry.get("key") or "").strip() == model
+        and str(entry.get("type") or "").strip().casefold() == "llm"
+        and str(entry.get("format") or "").strip().casefold() == "gguf"
+    ]
     if not matches:
         raise RuntimeError(
-            f"LM Studio does not contain the exact requested model key {model!r}. "
-            "Aliases and loaded-instance IDs are rejected because their VRAM "
-            "unload cannot be proven safely."
+            f"LM Studio does not expose the selected local GGUF package {model!r} "
+            "as an executable LLM catalog key. Refresh LM Studio's local model "
+            "catalog. Embeddings, aliases, loaded-instance IDs, and hosted models "
+            "are not selectable."
         )
     if len(matches) > 1:
         raise RuntimeError(
@@ -341,6 +519,12 @@ def _resolve_model_entry(model: str) -> tuple[dict[str, Any], str]:
     if not canonical_key:
         raise RuntimeError("The matched LM Studio model has no stable catalog key.")
     return entry, canonical_key
+
+
+def _validate_trusted_model_package(model: str) -> dict[str, Any]:
+    """Backward-compatible name for root-bounded dynamic package validation."""
+
+    return _resolve_local_model_package(model)
 
 
 def _loaded_instance_ids(
@@ -372,6 +556,46 @@ def _unload_instance(instance_id: str) -> None:
         payload={"instance_id": instance_id},
         timeout=60.0,
     )
+
+
+def _ensure_lm_studio_model_loaded(model: str) -> None:
+    """Load the planner CPU-only so it cannot evict or kill ComfyUI."""
+    try:
+        import comfy.model_management  # noqa: F401
+    except ImportError:
+        return
+    lms = Path.home() / ".lmstudio" / "bin" / "lms.exe"
+    if not lms.is_file():
+        raise RuntimeError(f"LM Studio CLI was not found at {lms}.")
+    result = subprocess.run(
+        [
+            str(lms),
+            "load",
+            model,
+            "--gpu",
+            "off",
+            "--context-length",
+            "8192",
+            "--parallel",
+            "1",
+            "--ttl",
+            "3600",
+            "--identifier",
+            model,
+            "--yes",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=600,
+        check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    combined = f"{result.stdout}\n{result.stderr}".strip()
+    if result.returncode != 0 and "already loaded" not in combined.casefold():
+        raise RuntimeError(
+            "LM Studio could not preload the selected planner CPU-only: "
+            + (combined or f"exit code {result.returncode}")
+        )
 
 
 def _unload_loaded_lm_studio_models(*, except_model: str | None = None) -> None:
@@ -414,7 +638,8 @@ def _release_comfy_models() -> None:
         model_management.soft_empty_cache()
     except Exception as exc:
         raise RuntimeError(
-            "Could not release ComfyUI models before loading local Qwen; "
+            "Could not release ComfyUI models before loading the selected local "
+            "planner; "
             "generation was stopped to protect VRAM."
         ) from exc
 
@@ -490,19 +715,15 @@ def _planner_payload(
         "max_tokens": int(max_tokens),
         "seed": int(seed),
         "stream": False,
-        "response_format": {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "sineforge_ltx23_podcast_variation",
-                "strict": True,
-                "schema": contract["response_schema"],
-            },
-        },
+        # This LM Studio build accepts only json_schema or text, and its schema
+        # grammar parser rejects the full contract. JSON and schema correctness
+        # are therefore enforced locally with a bounded repair retry.
+        "response_format": {"type": "text"},
     }
 
 
 class SineForgeLTXPodcastPlanner:
-    """Generate strict podcast JSON locally, then unload Qwen before LTX."""
+    """Generate strict podcast JSON locally, then unload LM Studio before LTX."""
 
     CATEGORY = "SineForge/Planning"
     FUNCTION = "generate"
@@ -527,23 +748,30 @@ class SineForgeLTXPodcastPlanner:
         "status_json",
     )
     DESCRIPTION = (
-        "Uses local LM Studio Qwen 3.6 40B to create a fresh strict-JSON "
-        "two-person podcast variation from an image. It releases ComfyUI "
-        "models first and refuses to return until every LM Studio model is "
-        "unloaded, preventing local-LLM/LTX VRAM overlap. No cloud or API key "
-        "is used."
+        "Uses a selectable LM Studio GGUF installed under the approved local "
+        "model root to create a fresh strict-JSON two-person podcast variation. "
+        "Qwen 3.6 40B is only the default. Text-only models remain selectable "
+        "and receive JSON without an image attachment. The node releases "
+        "ComfyUI models first and refuses to return until every LM Studio model "
+        "is unloaded, preventing local-LLM/LTX VRAM overlap. No hosted model, "
+        "remote endpoint, or API key is accepted."
     )
 
     @classmethod
     def INPUT_TYPES(cls) -> dict[str, Any]:
         contract = _load_contract()
+        model_keys = list(_selectable_model_keys())
+        preferred_model = str(contract["planner_model"]).strip()
         return {
             "required": {
                 "model": (
-                    "STRING",
+                    model_keys,
                     {
-                        "default": contract["planner_model"],
-                        "multiline": False,
+                        "default": (
+                            preferred_model
+                            if preferred_model in model_keys
+                            else model_keys[0]
+                        ),
                     },
                 ),
                 "variation_mode": (
@@ -645,7 +873,7 @@ class SineForgeLTXPodcastPlanner:
         **_: Any,
     ) -> bool | str:
         if not str(model or "").strip():
-            return "Select the installed local Qwen model."
+            return "Select one locally installed GGUF model."
         if variation_mode not in VARIATION_MODES:
             return "variation_mode is invalid."
         try:
@@ -659,7 +887,10 @@ class SineForgeLTXPodcastPlanner:
                 str(recent_topics_json or ""),
                 label="recent_topics_json",
             )
+            _resolve_local_model_package(str(model or "").strip())
         except ValueError as exc:
+            return str(exc)
+        except RuntimeError as exc:
             return str(exc)
         return True
 
@@ -704,7 +935,7 @@ class SineForgeLTXPodcastPlanner:
         if pivot_index == primary_index:
             pivot_index = (pivot_index + 1) % len(categories)
 
-        user_payload = {
+        user_payload: dict[str, Any] = {
             "schema_version": "sineforge.ltx23-podcast-planner-call/v1",
             "variation_seed": variation_seed,
             "request": request,
@@ -717,14 +948,6 @@ class SineForgeLTXPodcastPlanner:
                     "recent topics. The two new topics must be unrelated."
                 ),
             },
-            "image": {
-                "attached": image is not None,
-                "instruction": (
-                    "Inspect the image for stable visual details, but do not infer "
-                    "names, ethnicity, religion, politics, health, or other "
-                    "sensitive traits from appearance."
-                ),
-            },
         }
         request_sha256 = _request_hash(request, recent_topics)
         source_image_sha256: str | None = None
@@ -734,12 +957,62 @@ class SineForgeLTXPodcastPlanner:
         planner_error: Exception | None = None
         unload_error: Exception | None = None
         attempt_errors: list[str] = []
+        local_package: dict[str, Any] | None = None
+        catalog_provenance: dict[str, Any] | None = None
+        image_delivery: dict[str, Any] | None = None
         try:
             image_url = _image_data_url(image)
             source_image_sha256 = _image_tensor_sha256(image)
-            _, resolved_model = _resolve_model_entry(model)
+            local_package = _resolve_local_model_package(model)
+            model_entry, resolved_model = _resolve_model_entry(model)
+            if resolved_model != model:
+                raise RuntimeError(
+                    f"LM Studio resolved local package {model!r} as "
+                    f"{resolved_model!r}; aliases are rejected."
+                )
+            capabilities = model_entry.get("capabilities")
+            if not isinstance(capabilities, dict):
+                capabilities = {}
+            model_supports_vision = capabilities.get("vision") is True
+            planner_image_url = image_url if model_supports_vision else None
+            image_delivery = {
+                "source_image_attached": image is not None,
+                "selected_model_advertises_vision": model_supports_vision,
+                "sent_to_planner": planner_image_url is not None,
+                "omission_reason": (
+                    None
+                    if image is None or planner_image_url is not None
+                    else "selected_local_model_does_not_advertise_vision"
+                ),
+            }
+            user_payload["image"] = {
+                **image_delivery,
+                "instruction": (
+                    "When an image is delivered, inspect it for stable production "
+                    "details, but do not infer names, ethnicity, religion, "
+                    "politics, health, or other sensitive traits from appearance. "
+                    "When it is omitted, plan only from the strict JSON request."
+                ),
+            }
+            catalog_provenance = {
+                "key": str(model_entry.get("key") or "").strip(),
+                "publisher": str(model_entry.get("publisher") or "").strip(),
+                "display_name": str(
+                    model_entry.get("display_name") or ""
+                ).strip(),
+                "architecture": str(
+                    model_entry.get("architecture") or ""
+                ).strip(),
+                "format": str(model_entry.get("format") or "").strip(),
+                "type": str(model_entry.get("type") or "").strip(),
+                "size_bytes": model_entry.get("size_bytes"),
+                "params_string": model_entry.get("params_string"),
+                "quantization": model_entry.get("quantization"),
+                "capabilities": capabilities,
+            }
             _release_comfy_models()
             _unload_loaded_lm_studio_models(except_model=resolved_model)
+            _ensure_lm_studio_model_loaded(resolved_model)
 
             for attempt in range(2):
                 attempt_payload = dict(user_payload)
@@ -759,7 +1032,7 @@ class SineForgeLTXPodcastPlanner:
                     top_p=top_p,
                     max_tokens=max_tokens,
                     user_payload=attempt_payload,
-                    image_data_url=image_url,
+                    image_data_url=planner_image_url,
                 )
                 try:
                     response = _http_json(
@@ -776,10 +1049,12 @@ class SineForgeLTXPodcastPlanner:
                     break
                 except (RuntimeError, ValueError, json.JSONDecodeError) as exc:
                     attempt_errors.append(str(exc))
+                    if attempt == 0 and "unload" in str(exc).casefold():
+                        _ensure_lm_studio_model_loaded(resolved_model)
             if planner_result is None:
                 raise RuntimeError(
-                    "Local Qwen did not produce a valid podcast JSON object after "
-                    "two attempts: " + " | ".join(attempt_errors)
+                    "The selected local model did not produce a valid podcast "
+                    "JSON object after two attempts: " + " | ".join(attempt_errors)
                 )
         except Exception as exc:
             planner_error = exc
@@ -798,11 +1073,15 @@ class SineForgeLTXPodcastPlanner:
             raise planner_error
         if unload_error is not None:
             raise RuntimeError(
-                f"Qwen planning finished, but LM Studio cleanup failed: "
+                f"Local planning finished, but LM Studio cleanup failed: "
                 f"{unload_error} LTX was not started."
             ) from unload_error
         if planner_result is None:
-            raise RuntimeError("Local Qwen returned no validated podcast plan.")
+            raise RuntimeError(
+                "The selected local model returned no validated podcast plan."
+            )
+        if image_delivery is None:
+            raise RuntimeError("Local planner image-delivery provenance is missing.")
 
         positive_prompt = _build_positive_prompt(
             planner_result,
@@ -824,6 +1103,8 @@ class SineForgeLTXPodcastPlanner:
                 "top_p": float(top_p),
                 "model_unloaded_before_ltx": True,
                 "all_lm_studio_models_unloaded_before_ltx": True,
+                "local_package": local_package,
+                "lm_studio_catalog": catalog_provenance,
             },
             "request_sha256": request_sha256,
             "request": request,
@@ -831,6 +1112,11 @@ class SineForgeLTXPodcastPlanner:
             "source_image": {
                 "attached": image is not None,
                 "tensor_sha256": source_image_sha256,
+                "sent_to_planner": image_delivery["sent_to_planner"],
+                "selected_model_advertises_vision": image_delivery[
+                    "selected_model_advertises_vision"
+                ],
+                "omission_reason": image_delivery["omission_reason"],
             },
             "novelty": user_payload["novelty"],
             "speaker_assignment": request.get("speaker_assignment"),
@@ -856,7 +1142,8 @@ class SineForgeLTXPodcastPlanner:
                 "variation_id": record["variation_id"],
                 "variation_seed": variation_seed,
                 "video_seed": video_seed,
-                "qwen_unloaded": True,
+                "local_planner_model": resolved_model,
+                "local_model_unloaded": True,
                 "all_lm_studio_models_unloaded": True,
                 "request_sha256": request_sha256,
                 "prompt_sha256": record["prompt_sha256"],

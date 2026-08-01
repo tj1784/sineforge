@@ -20,12 +20,14 @@ from backend.app.schemas.api import (
 )
 from backend.app.schemas.storyboard import StoryRead
 from backend.app.schemas.storyboard_settings import ProjectStoryboardSettingsRead
+from backend.app.schemas.themes import ProjectThemeUpdate
 from backend.app.services.planning.sulphur_project_intake import (
     SulphurProjectIntakeError,
     build_sulphur_project_intake,
 )
 from backend.app.services.project_workspace import (
     ProjectWorkspaceConflictError,
+    ProjectWorkspacePlanningError,
     ProjectWorkspaceResult,
     create_project_workspace,
 )
@@ -41,6 +43,9 @@ def project_to_response(project: Project) -> ProjectRead:
         name=project.name,
         description=project.description,
         workflow_lane=project.workflow_lane,
+        theme_id=project.theme_id,
+        theme_version=project.theme_version,
+        theme_context=(project.theme_context_json or None),
         created_at=project.created_at,
         persistence="db",
     )
@@ -56,6 +61,8 @@ def workspace_to_response(
         settings=ProjectStoryboardSettingsRead.model_validate(result.settings),
         idempotent_replay=result.idempotent_replay,
         production_pipeline=production_phases.get_pipeline(db, result.story.id),
+        initial_planning_run_id=result.initial_planning_run_id,
+        completed_planning_phases=list(result.completed_planning_phases),
     )
 
 
@@ -65,6 +72,13 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db)) -> Pro
         name=payload.name,
         description=payload.description,
         workflow_lane=payload.workflow_lane.value,
+        theme_id=payload.theme_id.value,
+        theme_version="1.0.0",
+        theme_context_json=(
+            payload.theme_context.model_dump(mode="json", exclude_none=True)
+            if payload.theme_context is not None
+            else {}
+        ),
     )
     db.add(project)
     db.commit()
@@ -80,6 +94,11 @@ def create_workspace(
         result = create_project_workspace(db, payload)
     except ProjectWorkspaceConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ProjectWorkspacePlanningError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     except production_phases.ProductionPhaseError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -109,6 +128,11 @@ def create_workspace_from_sulphur(
         ) from exc
     except ProjectWorkspaceConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ProjectWorkspacePlanningError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
     except production_phases.ProductionPhaseError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -180,4 +204,28 @@ def get_project(project_id: UUID, db: Session = Depends(get_db)) -> ProjectRead:
     project = db.get(Project, project_id)
     if project is None:
         raise not_found("Project not found.")
+    return project_to_response(project)
+
+
+@router.patch("/{project_id}/theme", response_model=ProjectRead)
+def update_project_theme(
+    project_id: UUID,
+    payload: ProjectThemeUpdate,
+    db: Session = Depends(get_db),
+) -> ProjectRead:
+    """Change the theme for future project iterations only."""
+
+    project = db.get(Project, project_id)
+    if project is None:
+        raise not_found("Project not found.")
+    project.theme_id = payload.theme_id.value
+    project.theme_version = "1.0.0"
+    project.theme_context_json = (
+        payload.theme_context.model_dump(mode="json", exclude_none=True)
+        if payload.theme_context is not None
+        else {}
+    )
+    db.add(project)
+    db.commit()
+    db.refresh(project)
     return project_to_response(project)

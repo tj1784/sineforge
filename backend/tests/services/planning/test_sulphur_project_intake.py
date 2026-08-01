@@ -79,7 +79,8 @@ def test_sulphur_intake_preserves_full_prompt_and_plans_required_scenes(tmp_path
     assert intake.workspace_payload.final_height == 804
     assert intake.workspace_payload.run_phase_one is True
     assert intake.workspace_payload.bootstrap_phase_plan is True
-    assert intake.workspace_payload.auto_approve_phases_through == 5
+    assert intake.workspace_payload.auto_approve_phases_through == 1
+    assert intake.workspace_payload.run_phases_two_through_five is True
     assert intake.workspace_payload.require_production_plan_approval is False
     assert intake.workspace_payload.requested_chapter_count == 2
     assert intake.workspace_payload.prefer_local_providers is True

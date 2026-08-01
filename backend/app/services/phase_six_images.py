@@ -47,6 +47,8 @@ from backend.app.schemas.project_workflows import (
     is_cineforge_studio_workflow_lane,
 )
 from backend.app.services import reference_assets
+from backend.app.services.comfy.engine import comfy_prompt_submission_guard
+from backend.app.services.themes import compile_project_theme_prompts
 
 
 SOURCE_WORKFLOW_PATH = r"C:\Users\razer\Documents\FLUX2.json"
@@ -1342,7 +1344,11 @@ def _generate_bytes(workflow: dict[str, Any], *, timeout_sec: int = 300) -> tupl
                 f"Local ComfyUI is not reachable at {comfyui_base_url}: {exc}"
             ) from exc
 
-        response = client.post("/prompt", json={"prompt": workflow, "client_id": client_id})
+        with comfy_prompt_submission_guard():
+            response = client.post(
+                "/prompt",
+                json={"prompt": workflow, "client_id": client_id},
+            )
         response.raise_for_status()
         response_json = response.json()
         _raise_for_node_errors(response_json)
@@ -1474,6 +1480,17 @@ def generate_shot(
                     f"{asset_label_text}. Match these references for scene continuity."
                 ),
             ).strip()[:2600]
+    project = db.get(Project, story.project_id)
+    if project is None:
+        raise PhaseSixImageError("Project not found for this story.")
+    resolved_theme = compile_project_theme_prompts(
+        project,
+        positive_prompt=positive_prompt,
+        negative_prompt=negative_prompt,
+        medium="image",
+    )
+    positive_prompt = resolved_theme.positive_prompt
+    negative_prompt = resolved_theme.negative_prompt
     labels = _scene_attachment_labels(scene_metadata, character_metadata, asset_reference_metadata)
     filename_prefix = f"cineforge/{story.project_id}/phase6/{_slug(_shot_code(row)).lower()}"
     workflow = _workflow(
@@ -1536,6 +1553,13 @@ def generate_shot(
         "archetype": dict(archetype),
         "positive_prompt": positive_prompt,
         "negative_prompt": negative_prompt,
+        "theme_id": resolved_theme.resolved_theme_id,
+        "theme_version": resolved_theme.theme_version,
+        "theme_context": resolved_theme.context,
+        "theme_snapshot": resolved_theme.snapshot,
+        "theme_snapshot_sha256": resolved_theme.snapshot_sha256,
+        "positive_prompt_sha256": resolved_theme.positive_prompt_sha256,
+        "negative_prompt_sha256": resolved_theme.negative_prompt_sha256,
         "fallback_reason": runtime.get("fallback_reason"),
     }
     asset, created = reference_assets.upload_asset(

@@ -1,9 +1,8 @@
 """Native SineForge API Runner.
 
 Unlike ``/api-caller``, this surface never talks to the separately supervised
-ComfyAPI Runner.  Operator-selected API JSON is stored in an isolated library,
-validated against live ComfyUI object info, and submitted directly to the
-configured ComfyUI URL only after an explicit confirmed request.
+ComfyAPI Runner. Operator-selected API JSON is stored in an isolated library
+and submitted directly to the configured ComfyUI URL after an explicit request.
 """
 
 from __future__ import annotations
@@ -45,6 +44,7 @@ from backend.app.services.api_workflows import (
     workflow_sha256,
 )
 from backend.app.services.comfy.client import ComfyUIClient
+from backend.app.services.comfy.engine import ComfyEngineError, ComfyEngineManager
 from backend.app.services.native_api_runner import (
     NATIVE_RUNNER_SCHEMA,
     NativeApiRunnerStateStore,
@@ -167,6 +167,8 @@ def _http_error(exc: Exception) -> HTTPException:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=f"ComfyUI is unavailable: {exc}",
         )
+    if isinstance(exc, ComfyEngineError):
+        return HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc))
     return HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Native API Runner failed unexpectedly.",
@@ -233,18 +235,10 @@ async def load_workflow_in_comfyui(
     workflow_id: UUID,
     library: NativeApiWorkflowLibrary = Depends(get_native_api_workflow_library),
 ) -> NativeRunnerComfyUILoadResponse:
-    """Stage a bundled editor graph and return its one-time ComfyUI canvas URL."""
+    """Stage an editor graph and return its one-time ComfyUI canvas URL."""
 
     try:
         workflow = library.get(workflow_id)
-        if not workflow.get("repository_managed"):
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail=(
-                    "Only read-only repository workflows use the ComfyUI canvas "
-                    "handoff. Download operator workflow JSON instead."
-                ),
-            )
         source_workflow = workflow.get("source_workflow")
         if (
             not isinstance(source_workflow, dict)
@@ -252,7 +246,7 @@ async def load_workflow_in_comfyui(
         ):
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="This repository record has no editor-format ComfyUI workflow.",
+                detail="This workflow has no editor-format ComfyUI graph to load.",
             )
 
         comfy_url = str(get_settings().comfyui_base_url).rstrip("/")
@@ -435,10 +429,10 @@ async def get_runtime() -> dict[str, Any]:
             "mediaUpload": True,
             "outputPreview": True,
             "cancelPending": True,
-            # ComfyUI's standard /interrupt endpoint is global rather than
-            # prompt-scoped, so the embedded runner deliberately does not
-            # expose it on a shared local ComfyUI instance.
-            "interruptActive": False,
+            # A global interrupt is safe only when this backend owns the
+            # bundled engine process and the running prompt passes the native
+            # Runner ownership check below.
+            "interruptActive": bool(get_settings().comfyui_backend_managed),
             "freeMemory": True,
             "seedVariation": False,
             "mergeMovie": False,
@@ -464,6 +458,7 @@ async def analyze_workflow(payload: NativeRunnerAnalyzeRequest) -> dict[str, Any
 @router.post("/run", response_model=NativeRunnerRunResponse)
 async def run_workflow(
     payload: NativeRunnerRunRequest,
+    request: Request,
     state_store: NativeApiRunnerStateStore = Depends(
         get_native_api_runner_state_store
     ),
@@ -471,11 +466,6 @@ async def run_workflow(
     try:
         workflow = normalize_api_workflow(payload.workflow)
         digest = workflow_sha256(workflow)
-        if digest != payload.workflow_sha256:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="The working JSON changed after validation. Validate this exact graph again.",
-            )
 
         async with _idempotency_lock:
             persisted = state_store.get_by_idempotency_key(payload.idempotency_key)
@@ -519,21 +509,6 @@ async def run_workflow(
                     _native_prompt_clients[prompt_id] = client_id
                 return NativeRunnerRunResponse.model_validate(prior_response)
 
-            async with ComfyUIClient(
-                str(get_settings().comfyui_base_url),
-                timeout=30.0,
-            ) as client:
-                object_info = await client.get_object_info()
-            analysis = analyze_native_workflow(workflow, object_info)
-            if not analysis["queueable"]:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-                    detail={
-                        "message": "Live validation failed; nothing was queued.",
-                        "analysis": analysis,
-                    },
-                )
-
             client_id = f"sineforge-native-{uuid4()}"
             reserved, reservation = state_store.reserve(
                 idempotency_key=payload.idempotency_key,
@@ -554,12 +529,30 @@ async def run_workflow(
                     detail="This idempotency key already has an unresolved submission.",
                 )
 
-            async with ComfyUIClient(
-                str(get_settings().comfyui_base_url),
-                timeout=45.0,
-                allow_mutation=True,
-            ) as client:
-                result = await client.submit_prompt(workflow, client_id)
+            manager = getattr(request.app.state, "comfy_engine", None)
+            if not isinstance(manager, ComfyEngineManager):
+                state_store.release_unsubmitted_reservation(
+                    idempotency_key=payload.idempotency_key,
+                    client_id=client_id,
+                )
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="The Sineforge engine owner is unavailable.",
+                )
+            try:
+                async with manager.submission_guard():
+                    async with ComfyUIClient(
+                        str(manager.settings.comfyui_base_url),
+                        timeout=45.0,
+                        allow_mutation=True,
+                    ) as client:
+                        result = await client.submit_prompt(workflow, client_id)
+            except ComfyEngineError:
+                state_store.release_unsubmitted_reservation(
+                    idempotency_key=payload.idempotency_key,
+                    client_id=client_id,
+                )
+                raise
 
             node_errors = result.get("node_errors")
             if node_errors:
@@ -692,15 +685,39 @@ async def cancel_job(
                         status_code=status.HTTP_409_CONFLICT,
                         detail="The active prompt is not owned by the native API Runner.",
                     )
-                del interrupt_active
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail=(
-                        "Active interruption is disabled because ComfyUI's interrupt "
-                        "operation is global and could stop unrelated work. Use ComfyUI "
-                        "directly only if you intend to interrupt its active prompt."
-                    ),
-                )
+                if not get_settings().comfyui_backend_managed:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail=(
+                            "Active interruption is available only when Sineforge owns "
+                            "the bundled ComfyUI engine process."
+                        ),
+                    )
+                if not interrupt_active:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="Confirm the active Sineforge job interruption first.",
+                    )
+                verification_queue = summarize_queue(await client.get_queue())
+                verification_running = {
+                    item["promptId"]: item for item in verification_queue["running"]
+                }
+                verified_item = verification_running.get(safe_prompt_id)
+                if verified_item is None or verified_item.get("clientId") not in {
+                    None,
+                    expected_client_id,
+                }:
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail="The active engine prompt changed before interruption.",
+                    )
+                await client.interrupt()
+                state_store.update_prompt_state(safe_prompt_id, "failed")
+                return {
+                    "ok": True,
+                    "promptId": safe_prompt_id,
+                    "action": "interrupted_active",
+                }
             return {
                 "ok": False,
                 "promptId": safe_prompt_id,

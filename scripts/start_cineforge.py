@@ -24,6 +24,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import IO, Callable
 
+try:
+    # Package import used by tests and other Sineforge modules.
+    from scripts.headless_orchestrator.windows_job import WindowsJob
+except ModuleNotFoundError:
+    # Direct `python scripts/start_cineforge.py` execution used by the .cmd launcher.
+    from headless_orchestrator.windows_job import WindowsJob
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOT = REPO_ROOT / "storage" / "runtime" / "supervisor"
@@ -31,20 +38,37 @@ LOG_ROOT = RUNTIME_ROOT / "logs"
 STATE_PATH = RUNTIME_ROOT / "cineforge-services.json"
 LOCK_PATH = RUNTIME_ROOT / "cineforge-supervisor.lock"
 MAX_LOG_BYTES = 10 * 1024 * 1024
-CREATE_NO_WINDOW = 0x08000000 if os.name == "nt" else 0
 CREATE_NEW_PROCESS_GROUP = 0x00000200 if os.name == "nt" else 0
 FORBIDDEN_COMMAND_PATH_CHARS = set("\r\n&|<>^`\"%'!()")
+MONITOR_INTERVAL_SECONDS = 5.0
+LIVENESS_FAILURE_THRESHOLD = 3
+RESTART_INITIAL_DELAY_SECONDS = 1.0
+RESTART_MAX_DELAY_SECONDS = 30.0
+_SUPERVISOR_STARTED_AT_EPOCH: float | None = None
 
 
 def apply_primary_workstation_defaults() -> None:
     """Enable the approved local runtimes when no local override was supplied."""
 
     defaults = {
-        "CINEFORGE_COMFYUI_AUTOSTART": "false",
-        "CINEFORGE_COMFYUI_BASE_URL": "http://127.0.0.1:8888",
-        "CINEFORGE_COMFYUI_WORKING_DIR": r"C:\ComfyUI\LTX\ComfyUI",
-        "CINEFORGE_COMFYUI_LAUNCHER": (
-            r"C:\ComfyUI\LTX\ComfyUI\run_cineforge_ltx.bat"
+        "CINEFORGE_COMFYUI_AUTOSTART": "true",
+        "CINEFORGE_COMFYUI_BACKEND_MANAGED": "true",
+        "CINEFORGE_COMFYUI_BASE_URL": "http://127.0.0.1:8190",
+        "CINEFORGE_COMFYUI_WORKING_DIR": str(REPO_ROOT / "BlokeyUI"),
+        "CINEFORGE_COMFYUI_PYTHON_EXECUTABLE": str(
+            Path(r"C:\ComfyUI\LTX\ComfyUI\python_embeded\python.exe")
+        ),
+        "CINEFORGE_COMFYUI_MAIN_PATH": str(
+            REPO_ROOT / "BlokeyUI" / "ComfyUI" / "main.py"
+        ),
+        "CINEFORGE_COMFYUI_BOOTSTRAP_PATH": str(
+            REPO_ROOT / "scripts" / "run_blokeyui_engine.py"
+        ),
+        "CINEFORGE_COMFYUI_CUSTOM_NODES_DIR": str(
+            Path(r"C:\ComfyUI\LTX\ComfyUI\ComfyUI\custom_nodes")
+        ),
+        "CINEFORGE_COMFYUI_SINEFORGE_PATHS_CONFIG": str(
+            REPO_ROOT / "ComfyUI" / "sineforge_engine_paths.yaml"
         ),
         "CINEFORGE_LMS_EXECUTABLE": (
             str(Path.home() / ".lmstudio" / "bin" / "lms.exe")
@@ -118,6 +142,16 @@ class OwnedProcess:
     process: subprocess.Popen[bytes]
     stdout: IO[bytes]
     stderr: IO[bytes]
+    job: WindowsJob | None = None
+    status: str = "starting"
+    restart_count: int = 0
+    consecutive_failures: int = 0
+    last_exit_code: int | None = None
+    last_exit_at_epoch: float | None = None
+    last_error: str | None = None
+    next_restart_at_epoch: float | None = None
+    ready_since_epoch: float | None = None
+    process_started_at_epoch: float | None = None
 
 
 def _env_path(name: str, default: Path) -> Path:
@@ -186,8 +220,62 @@ def _npm_executable() -> Path:
     return Path(found).resolve()
 
 
+def validate_bundled_engine_configuration() -> None:
+    """Fail early when the unified BlokeyUI engine dependency set is missing."""
+
+    root = _env_path("CINEFORGE_COMFYUI_WORKING_DIR", REPO_ROOT / "BlokeyUI")
+    required_files = {
+        "compatibility Python": _env_path(
+            "CINEFORGE_COMFYUI_PYTHON_EXECUTABLE",
+            Path(r"C:\ComfyUI\LTX\ComfyUI\python_embeded\python.exe"),
+        ),
+        "BlokeyUI main.py": _env_path(
+            "CINEFORGE_COMFYUI_MAIN_PATH", root / "ComfyUI" / "main.py"
+        ),
+        "source bootstrap": _env_path(
+            "CINEFORGE_COMFYUI_BOOTSTRAP_PATH",
+            REPO_ROOT / "scripts" / "run_blokeyui_engine.py",
+        ),
+        "Sineforge path config": _env_path(
+            "CINEFORGE_COMFYUI_SINEFORGE_PATHS_CONFIG",
+            REPO_ROOT / "ComfyUI" / "sineforge_engine_paths.yaml",
+        ),
+    }
+    if not root.is_dir():
+        raise FileNotFoundError(f"BlokeyUI root does not exist: {root}")
+    for label, path in required_files.items():
+        if not path.is_file():
+            raise FileNotFoundError(f"{label} does not exist: {path}")
+    custom_nodes = _env_path(
+        "CINEFORGE_COMFYUI_CUSTOM_NODES_DIR",
+        Path(r"C:\ComfyUI\LTX\ComfyUI\ComfyUI\custom_nodes"),
+    )
+    if not custom_nodes.is_dir():
+        raise FileNotFoundError(f"curated custom-node root does not exist: {custom_nodes}")
+
+
+def unified_engine_owner_ready(backend_origin: str) -> tuple[bool, str]:
+    """Verify that an existing backend owns the identity-checked engine."""
+
+    url = backend_origin.rstrip("/") + "/runtime/engine"
+    try:
+        with urllib.request.urlopen(url, timeout=5) as response:
+            payload = json.loads(response.read(1_048_576))
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        return False, str(exc)
+    if not isinstance(payload, dict):
+        return False, "engine status was not a JSON object"
+    expected = (
+        payload.get("schema") == "sineforge.comfy-engine/v1"
+        and payload.get("distribution") == "BlokeyUI"
+        and payload.get("managed") is True
+        and payload.get("ready") is True
+        and isinstance(payload.get("pid"), int)
+    )
+    return bool(expected), str(payload.get("last_error") or payload.get("status") or "unknown")
+
+
 def build_services() -> list[Service]:
-    comfy_autostart = _env_bool("CINEFORGE_COMFYUI_AUTOSTART", False)
     python = _env_path(
         "CINEFORGE_PYTHON_EXECUTABLE",
         REPO_ROOT / ".venv" / "Scripts" / "python.exe",
@@ -205,6 +293,13 @@ def build_services() -> list[Service]:
     )
     backend_port = _port("CINEFORGE_BACKEND_PORT", 8010)
     frontend_port = _port("CINEFORGE_FRONTEND_PORT", 5174)
+    engine_required = _env_bool("CINEFORGE_COMFYUI_AUTOSTART", True) and _env_bool(
+        "CINEFORGE_COMFYUI_BACKEND_MANAGED", True
+    )
+    backend_origin = f"http://127.0.0.1:{backend_port}"
+    backend_readiness = [backend_origin + "/health"]
+    if engine_required:
+        backend_readiness.append(backend_origin + "/health/engine/ready")
 
     services = [
         Service(
@@ -218,53 +313,6 @@ def build_services() -> list[Service]:
             always_start=True,
         ),
     ]
-    if comfy_autostart:
-        comfy_root = _env_path(
-            "CINEFORGE_COMFYUI_WORKING_DIR",
-            Path(r"C:\ComfyUI\LTX\ComfyUI"),
-        )
-        comfy_launcher = _env_path(
-            "CINEFORGE_COMFYUI_LAUNCHER",
-            comfy_root / "run_cineforge_ltx.bat",
-        )
-        comfy_base_url = _loopback_base_url(
-            "CINEFORGE_COMFYUI_BASE_URL",
-            "http://127.0.0.1:8888",
-        )
-        if comfy_launcher.suffix.lower() not in {".bat", ".cmd", ".exe"}:
-            raise ValueError(
-                "ComfyUI launcher must be an administrator-configured .bat, .cmd, or .exe"
-            )
-        try:
-            comfy_launcher.relative_to(comfy_root)
-        except ValueError as exc:
-            raise ValueError(
-                "ComfyUI launcher must be located inside CINEFORGE_COMFYUI_WORKING_DIR"
-            ) from exc
-
-        if comfy_launcher.suffix.lower() in {".bat", ".cmd"}:
-            comfy_command = command_processor
-            comfy_args = ("/d", "/c", str(comfy_launcher))
-        else:
-            comfy_command = comfy_launcher
-            comfy_args = ()
-        services.append(
-            Service(
-                name="comfyui",
-                cwd=comfy_root,
-                executable=comfy_command,
-                args=comfy_args,
-                readiness_urls=(
-                    comfy_base_url + "/",
-                    comfy_base_url + "/object_info",
-                ),
-                timeout_seconds=_timeout(
-                    "CINEFORGE_COMFYUI_STARTUP_TIMEOUT_SEC",
-                    180,
-                ),
-            )
-        )
-
     services.extend(
         [
         Service(
@@ -280,10 +328,11 @@ def build_services() -> list[Service]:
                 "--port",
                 str(backend_port),
             ),
-            readiness_urls=(
-                f"http://127.0.0.1:{backend_port}/health",
+            readiness_urls=tuple(backend_readiness),
+            timeout_seconds=_timeout(
+                "CINEFORGE_BACKEND_STARTUP_TIMEOUT_SEC",
+                360 if engine_required else 60,
             ),
-            timeout_seconds=_timeout("CINEFORGE_BACKEND_STARTUP_TIMEOUT_SEC", 60),
         ),
         Service(
             name="frontend",
@@ -362,7 +411,11 @@ def launch(service: Service) -> OwnedProcess:
     _rotate_log(stderr_path)
     stdout = stdout_path.open("ab", buffering=0)
     stderr = stderr_path.open("ab", buffering=0)
-    flags = CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP
+    # A new process group lets the supervisor deliver a targeted Ctrl+Break for
+    # graceful shutdown. A Job Object is the guaranteed tree-cleanup fallback.
+    flags = CREATE_NEW_PROCESS_GROUP
+    job = WindowsJob()
+    process: subprocess.Popen[bytes] | None = None
     try:
         process = subprocess.Popen(
             [str(service.executable), *service.args],
@@ -372,11 +425,23 @@ def launch(service: Service) -> OwnedProcess:
             stderr=stderr,
             creationflags=flags,
         )
+        if os.name == "nt":
+            job.assign(process._handle)  # type: ignore[attr-defined]
     except Exception:
+        if process is not None and process.poll() is None:
+            process.kill()
+        job.close()
         stdout.close()
         stderr.close()
         raise
-    return OwnedProcess(service=service, process=process, stdout=stdout, stderr=stderr)
+    return OwnedProcess(
+        service=service,
+        process=process,
+        stdout=stdout,
+        stderr=stderr,
+        job=job,
+        process_started_at_epoch=_process_started_at_epoch(process.pid),
+    )
 
 
 def _pid_exists(pid: int) -> bool:
@@ -406,22 +471,173 @@ def _pid_exists(pid: int) -> bool:
     return True
 
 
+def _process_started_at_epoch(pid: int) -> float | None:
+    """Return the Windows process creation time used to detect PID reuse."""
+
+    if pid <= 0 or os.name != "nt":
+        return None
+
+    import ctypes
+    from ctypes import wintypes
+
+    process_query_limited_information = 0x1000
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.GetProcessTimes.argtypes = [
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    ]
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(
+        process_query_limited_information,
+        False,
+        pid,
+    )
+    if not handle:
+        return None
+    try:
+        created = wintypes.FILETIME()
+        exited = wintypes.FILETIME()
+        kernel = wintypes.FILETIME()
+        user = wintypes.FILETIME()
+        if not kernel32.GetProcessTimes(
+            handle,
+            ctypes.byref(created),
+            ctypes.byref(exited),
+            ctypes.byref(kernel),
+            ctypes.byref(user),
+        ):
+            return None
+        windows_ticks = (created.dwHighDateTime << 32) | created.dwLowDateTime
+        return windows_ticks / 10_000_000 - 11_644_473_600
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _process_executable_name(pid: int) -> str | None:
+    """Read a Windows process name even when opening the process is denied."""
+
+    if pid <= 0 or os.name != "nt":
+        return None
+
+    import ctypes
+    from ctypes import wintypes
+
+    class ProcessEntry(ctypes.Structure):
+        _fields_ = [
+            ("size", wintypes.DWORD),
+            ("usage", wintypes.DWORD),
+            ("process_id", wintypes.DWORD),
+            ("default_heap_id", ctypes.c_size_t),
+            ("module_id", wintypes.DWORD),
+            ("threads", wintypes.DWORD),
+            ("parent_process_id", wintypes.DWORD),
+            ("priority_base", wintypes.LONG),
+            ("flags", wintypes.DWORD),
+            ("executable", wintypes.WCHAR * 260),
+        ]
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+    kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
+    kernel32.Process32FirstW.restype = wintypes.BOOL
+    kernel32.Process32NextW.argtypes = [wintypes.HANDLE, ctypes.POINTER(ProcessEntry)]
+    kernel32.Process32NextW.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x00000002, 0)
+    if snapshot in (None, wintypes.HANDLE(-1).value):
+        return None
+    try:
+        entry = ProcessEntry()
+        entry.size = ctypes.sizeof(ProcessEntry)
+        if not kernel32.Process32FirstW(snapshot, ctypes.byref(entry)):
+            return None
+        while True:
+            if entry.process_id == pid:
+                return entry.executable
+            if not kernel32.Process32NextW(snapshot, ctypes.byref(entry)):
+                return None
+    finally:
+        kernel32.CloseHandle(snapshot)
+
+
+def _read_lock_owner() -> tuple[int, float | None]:
+    """Read both legacy PID-only locks and PID-reuse-safe JSON locks."""
+
+    try:
+        payload = json.loads(LOCK_PATH.read_text(encoding="ascii"))
+    except (OSError, ValueError, TypeError):
+        return -1, None
+    if isinstance(payload, int):
+        return payload, None
+    if not isinstance(payload, dict):
+        return -1, None
+    pid = payload.get("pid")
+    started_at = payload.get("process_started_at_epoch")
+    if not isinstance(pid, int):
+        return -1, None
+    if not isinstance(started_at, (int, float)):
+        started_at = None
+    return pid, float(started_at) if started_at is not None else None
+
+
+def _legacy_lock_started_at(owner: int) -> float | None:
+    """Use legacy supervisor state to validate an old PID-only lock."""
+
+    try:
+        payload = json.loads(STATE_PATH.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return None
+    if not isinstance(payload, dict) or payload.get("supervisor_pid") != owner:
+        return None
+    started_at = payload.get("started_at_epoch")
+    return float(started_at) if isinstance(started_at, (int, float)) else None
+
+
+def _lock_owner_is_active(owner: int, expected_started_at: float | None) -> bool:
+    if not _pid_exists(owner):
+        return False
+    actual_started_at = _process_started_at_epoch(owner)
+    if expected_started_at is None:
+        expected_started_at = _legacy_lock_started_at(owner)
+    if actual_started_at is not None and expected_started_at is not None:
+        return abs(actual_started_at - expected_started_at) <= 2.0
+    executable_name = _process_executable_name(owner)
+    if executable_name and not executable_name.casefold().startswith("python"):
+        return False
+    if actual_started_at is None or expected_started_at is None:
+        # Stay conservative when the process still looks like Python but the
+        # platform cannot prove whether its PID was reused.
+        return True
+    return False
+
+
 def acquire_lock() -> None:
     RUNTIME_ROOT.mkdir(parents=True, exist_ok=True)
     for _attempt in range(2):
         try:
             descriptor = os.open(LOCK_PATH, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
-            try:
-                owner = int(LOCK_PATH.read_text(encoding="ascii").strip())
-            except (OSError, ValueError):
-                owner = -1
-            if _pid_exists(owner):
+            owner, expected_started_at = _read_lock_owner()
+            if _lock_owner_is_active(owner, expected_started_at):
                 raise RuntimeError(f"CineForge supervisor is already running with PID {owner}")
             LOCK_PATH.unlink(missing_ok=True)
             continue
         with os.fdopen(descriptor, "w", encoding="ascii") as handle:
-            handle.write(str(os.getpid()))
+            payload: dict[str, int | float] = {"pid": os.getpid()}
+            started_at = _process_started_at_epoch(os.getpid())
+            if started_at is not None:
+                payload["process_started_at_epoch"] = started_at
+            json.dump(payload, handle, separators=(",", ":"))
             handle.flush()
             os.fsync(handle.fileno())
         return
@@ -429,10 +645,7 @@ def acquire_lock() -> None:
 
 
 def release_lock() -> None:
-    try:
-        owner = int(LOCK_PATH.read_text(encoding="ascii").strip())
-    except (OSError, ValueError):
-        return
+    owner, _started_at = _read_lock_owner()
     if owner == os.getpid():
         LOCK_PATH.unlink(missing_ok=True)
 
@@ -444,8 +657,6 @@ def wait_until_ready(
     deadline = time.monotonic() + owned.service.timeout_seconds
     while time.monotonic() < deadline:
         exit_code = owned.process.poll()
-        if owned.service.persistent and is_ready(owned.service, probe_fn):
-            return
         if exit_code is not None:
             if exit_code != 0 or owned.service.persistent:
                 raise RuntimeError(
@@ -453,7 +664,21 @@ def wait_until_ready(
                     f"see {LOG_ROOT}"
                 )
             if is_ready(owned.service, probe_fn):
+                owned.status = "completed"
                 return
+        if owned.service.persistent and is_ready(owned.service, probe_fn):
+            # A foreign or orphaned listener must not make a dead generation
+            # look ready after its own bind attempt failed.
+            exit_code = owned.process.poll()
+            if exit_code is not None:
+                raise RuntimeError(
+                    f"{owned.service.name} exited with code {owned.process.returncode}; "
+                    f"see {LOG_ROOT}"
+                )
+            owned.status = "ready"
+            owned.ready_since_epoch = time.time()
+            owned.consecutive_failures = 0
+            return
         time.sleep(1)
     raise TimeoutError(
         f"{owned.service.name} did not become ready within "
@@ -461,19 +686,48 @@ def wait_until_ready(
     )
 
 
-def write_state(owned: list[OwnedProcess], reused: list[Service]) -> None:
+def _supervisor_started_at_epoch() -> float:
+    global _SUPERVISOR_STARTED_AT_EPOCH
+    if _SUPERVISOR_STARTED_AT_EPOCH is None:
+        _SUPERVISOR_STARTED_AT_EPOCH = (
+            _process_started_at_epoch(os.getpid()) or time.time()
+        )
+    return _SUPERVISOR_STARTED_AT_EPOCH
+
+
+def write_state(
+    owned: list[OwnedProcess],
+    reused: list[Service],
+    *,
+    shutdown_requested: bool = False,
+) -> None:
     RUNTIME_ROOT.mkdir(parents=True, exist_ok=True)
+    started_at_epoch = _supervisor_started_at_epoch()
     state = {
         "supervisor_pid": os.getpid(),
-        "started_at_epoch": time.time(),
+        # Keep the legacy field stable for PID-reuse-safe legacy lock recovery.
+        "started_at_epoch": started_at_epoch,
+        "supervisor_started_at_epoch": started_at_epoch,
+        "updated_at_epoch": time.time(),
+        "shutdown_requested": shutdown_requested,
         "services": [
             {
                 "name": item.service.name,
-                "pid": item.process.pid,
+                "pid": item.process.pid if item.process.poll() is None else None,
                 "owned": True,
+                "status": item.status,
                 "persistent": item.service.persistent,
                 "always_start": item.service.always_start,
+                "process_started_at_epoch": item.process_started_at_epoch,
+                "restart_count": item.restart_count,
+                "consecutive_failures": item.consecutive_failures,
+                "last_exit_code": item.last_exit_code,
+                "last_exit_at_epoch": item.last_exit_at_epoch,
+                "last_error": item.last_error,
+                "next_restart_at_epoch": item.next_restart_at_epoch,
+                "ready_since_epoch": item.ready_since_epoch,
                 "readiness_urls": item.service.readiness_urls,
+                "liveness_urls": item.service.readiness_urls[:1],
             }
             for item in owned
         ]
@@ -482,9 +736,11 @@ def write_state(owned: list[OwnedProcess], reused: list[Service]) -> None:
                 "name": service.name,
                 "pid": None,
                 "owned": False,
+                "status": "reused",
                 "persistent": service.persistent,
                 "always_start": service.always_start,
                 "readiness_urls": service.readiness_urls,
+                "liveness_urls": service.readiness_urls[:1],
             }
             for service in reused
         ],
@@ -500,6 +756,7 @@ def write_state(owned: list[OwnedProcess], reused: list[Service]) -> None:
 
 def stop_owned(owned: list[OwnedProcess]) -> None:
     for item in reversed(owned):
+        item.status = "stopping"
         try:
             if item.process.poll() is None:
                 try:
@@ -507,13 +764,137 @@ def stop_owned(owned: list[OwnedProcess]) -> None:
                         item.process.send_signal(signal.CTRL_BREAK_EVENT)
                     else:
                         item.process.terminate()
-                    item.process.wait(timeout=10)
+                    item.process.wait(timeout=30 if item.service.name == "backend" else 10)
                 except (OSError, subprocess.TimeoutExpired):
-                    item.process.kill()
-                    item.process.wait(timeout=5)
+                    job = getattr(item, "job", None)
+                    if job is not None:
+                        job.close()
+                    if item.process.poll() is None:
+                        item.process.kill()
+                    try:
+                        item.process.wait(timeout=5)
+                    except (OSError, subprocess.TimeoutExpired):
+                        print(
+                            f"[warn] {item.service.name} did not confirm exit after forced cleanup",
+                            file=sys.stderr,
+                            flush=True,
+                        )
+            item.last_exit_code = item.process.poll()
+            item.last_exit_at_epoch = time.time()
+            item.status = "stopped"
+        except Exception as exc:
+            item.last_error = str(exc)
+            item.status = "stop-failed"
+            print(
+                f"[warn] could not fully stop {item.service.name}: {exc}",
+                file=sys.stderr,
+                flush=True,
+            )
         finally:
-            item.stdout.close()
-            item.stderr.close()
+            job = getattr(item, "job", None)
+            if job is not None:
+                job.close()
+            try:
+                item.stdout.close()
+            finally:
+                item.stderr.close()
+
+
+def _verify_backend_generation(item: OwnedProcess) -> None:
+    if item.service.name != "backend" or len(item.service.readiness_urls) <= 1:
+        return
+    owner_ready, reason = unified_engine_owner_ready(
+        item.service.readiness_urls[0].rsplit("/", 1)[0]
+    )
+    if item.process.poll() is not None:
+        raise RuntimeError(
+            f"backend exited with code {item.process.returncode}; see {LOG_ROOT}"
+        )
+    if not owner_ready:
+        raise RuntimeError(f"Backend engine ownership check failed: {reason}")
+
+
+def _service_liveness_ready(service: Service) -> bool:
+    return bool(service.readiness_urls and probe(service.readiness_urls[0]))
+
+
+def recover_owned_service(
+    owned: list[OwnedProcess],
+    index: int,
+    reused: list[Service],
+    *,
+    reason: str,
+) -> OwnedProcess:
+    """Replace one failed or unhealthy owned service until it is ready again."""
+
+    failed = owned[index]
+    service = failed.service
+    restart_count = failed.restart_count
+    failed.last_exit_code = failed.process.poll()
+    failed.last_exit_at_epoch = time.time()
+    failed.last_error = reason
+    failed.status = "stopping"
+    write_state(owned, reused)
+    stop_owned([failed])
+
+    delay = RESTART_INITIAL_DELAY_SECONDS
+    while True:
+        restart_count += 1
+        failed.status = "backoff"
+        failed.next_restart_at_epoch = time.time() + delay
+        failed.restart_count = restart_count
+        write_state(owned, reused)
+        print(
+            f"[recover] {service.name}: {reason}; retry {restart_count} in {delay:g}s",
+            file=sys.stderr,
+            flush=True,
+        )
+        time.sleep(delay)
+
+        candidate: OwnedProcess | None = None
+        try:
+            if _service_liveness_ready(service):
+                raise RuntimeError(
+                    f"{service.name} still has a responder on its liveness URL after "
+                    "the owned process tree stopped"
+                )
+            candidate = launch(service)
+            candidate.restart_count = restart_count
+            candidate.status = "starting"
+            owned[index] = candidate
+            write_state(owned, reused)
+            wait_until_ready(candidate)
+            _verify_backend_generation(candidate)
+            if candidate.process.poll() is not None:
+                raise RuntimeError(
+                    f"{service.name} exited with code {candidate.process.returncode} "
+                    "after readiness verification"
+                )
+        except Exception as exc:
+            reason = str(exc)
+            if candidate is not None:
+                candidate.last_error = reason
+                candidate.last_exit_code = candidate.process.poll()
+                candidate.last_exit_at_epoch = time.time()
+                stop_owned([candidate])
+                failed = candidate
+            else:
+                failed.last_error = reason
+            owned[index] = failed
+            delay = min(delay * 2, RESTART_MAX_DELAY_SECONDS)
+            continue
+
+        candidate.status = "ready"
+        candidate.ready_since_epoch = time.time()
+        candidate.next_restart_at_epoch = None
+        candidate.last_error = None
+        candidate.consecutive_failures = 0
+        write_state(owned, reused)
+        print(
+            f"[ready] {service.name}: recovered as pid {candidate.process.pid}",
+            flush=True,
+        )
+        return candidate
 
 
 def run(*, open_browser: bool = True) -> int:
@@ -522,18 +903,41 @@ def run(*, open_browser: bool = True) -> int:
     reused: list[Service] = []
     locked = False
     try:
+        validate_bundled_engine_configuration()
         acquire_lock()
         locked = True
         for service in services:
             validate_service(service)
+            if service.name == "backend" and probe(service.readiness_urls[0]) and not is_ready(service):
+                raise RuntimeError(
+                    "A backend already owns the configured port but does not expose a ready, "
+                    "Sineforge-owned BlokeyUI engine. Stop that backend before launching."
+                )
             if not service.always_start and is_ready(service):
+                if service.name == "backend" and len(service.readiness_urls) > 1:
+                    owner_ready, reason = unified_engine_owner_ready(
+                        service.readiness_urls[0].rsplit("/", 1)[0]
+                    )
+                    if not owner_ready:
+                        raise RuntimeError(f"Existing backend does not own the bundled engine: {reason}")
                 reused.append(service)
                 print(f"[ready] {service.name}: reusing existing healthy service", flush=True)
                 continue
             print(f"[start] {service.name}", flush=True)
             item = launch(service)
             owned.append(item)
-            wait_until_ready(item)
+            try:
+                wait_until_ready(item)
+                _verify_backend_generation(item)
+            except Exception as exc:
+                if not service.persistent:
+                    raise
+                item = recover_owned_service(
+                    owned,
+                    len(owned) - 1,
+                    reused,
+                    reason=str(exc),
+                )
             print(f"[ready] {service.name}: pid {item.process.pid}", flush=True)
             write_state(owned, reused)
 
@@ -545,15 +949,56 @@ def run(*, open_browser: bool = True) -> int:
         if open_browser:
             webbrowser.open(frontend_url, new=2)
         while True:
-            time.sleep(1)
+            for index, item in enumerate(list(owned)):
+                if not item.service.persistent:
+                    continue
+                exit_code = item.process.poll()
+                if exit_code is not None:
+                    recover_owned_service(
+                        owned,
+                        index,
+                        reused,
+                        reason=f"owned process exited with code {exit_code}",
+                    )
+                    continue
+                if _service_liveness_ready(item.service):
+                    if item.consecutive_failures:
+                        item.consecutive_failures = 0
+                        item.last_error = None
+                        item.status = "ready"
+                        write_state(owned, reused)
+                    continue
+                item.consecutive_failures += 1
+                item.status = "unhealthy"
+                item.last_error = (
+                    f"liveness probe failed {item.consecutive_failures} consecutive times"
+                )
+                write_state(owned, reused)
+                if item.consecutive_failures >= LIVENESS_FAILURE_THRESHOLD:
+                    recover_owned_service(
+                        owned,
+                        index,
+                        reused,
+                        reason=item.last_error,
+                    )
+            time.sleep(MONITOR_INTERVAL_SECONDS)
     except KeyboardInterrupt:
         print("\nStopping CineForge-owned services...")
+        if locked:
+            write_state(owned, reused, shutdown_requested=True)
         return 0
     except Exception as exc:
         if (
             isinstance(exc, RuntimeError)
             and "supervisor is already running" in str(exc)
-            and is_ready(services[-1])
+            and all(is_ready(service) for service in services if service.persistent)
+            and unified_engine_owner_ready(
+                next(
+                    service.readiness_urls[0].rsplit("/", 1)[0]
+                    for service in services
+                    if service.name == "backend"
+                )
+            )[0]
         ):
             frontend_url = services[-1].readiness_urls[0].rstrip("/") + "/projects"
             print(f"CineForge is already running: {frontend_url}")
@@ -586,6 +1031,12 @@ def main() -> int:
     args = parser.parse_args()
     if args.check:
         failed = False
+        try:
+            validate_bundled_engine_configuration()
+            print("blokeyui-engine: configured")
+        except Exception as exc:
+            failed = True
+            print(f"blokeyui-engine: invalid: {exc}", file=sys.stderr)
         for service in build_services():
             try:
                 validate_service(service)

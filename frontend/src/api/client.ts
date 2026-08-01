@@ -1,5 +1,6 @@
 import type { ProjectWorkflowLane } from '../workflowLanes'
 import type { PlanningAgent } from '../planningAgents'
+import type { BiblicalContext, CreativeThemeId } from '../themes'
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:8010'
 
@@ -14,6 +15,23 @@ export type Project = {
   created_at: string
   persistence: string
   workflow_lane: ProjectWorkflowLane
+  theme_id: CreativeThemeId
+  theme_version: string
+  theme_context: BiblicalContext | null
+}
+
+export type ThemeCatalog = {
+  default_theme_id: 'default'
+  themes: Array<{
+    id: CreativeThemeId
+    version: string
+    label: string
+    description: string
+    mode: 'passthrough' | 'preset'
+    requires_context: boolean
+    context_schema_id: string | null
+    prompt_profile_id: string | null
+  }>
 }
 
 export type AgentlessWorkflowAdmission = {
@@ -91,6 +109,8 @@ export type AgentlessWorkflowProfile = {
 export type ProjectWorkspaceCreatePayload = {
   idempotency_key: string
   workflow_lane: ProjectWorkflowLane
+  theme_id?: CreativeThemeId
+  theme_context?: BiblicalContext | null
   planning_agent: PlanningAgent
   planning_model_id?: string | null
   prompt_artifact_format?: 'json'
@@ -126,6 +146,7 @@ export type ProjectWorkspaceCreatePayload = {
   bootstrap_phase_plan?: boolean
   auto_approve_phases_through?: number | null
   run_phase_one?: boolean
+  run_phases_two_through_five?: boolean
   comparison_baseline?: 'transfiguration_phase_one' | null
   aspect_ratio: string
   preview_width: number
@@ -182,10 +203,43 @@ export type RootStatus = {
   current_phase: string
 }
 
+export type ManagedEngineStatus = {
+  schema: 'sineforge.comfy-engine/v1'
+  distribution: 'BlokeyUI'
+  engine: 'ComfyUI'
+  mode: 'bundled' | 'external'
+  managed: boolean
+  autostart: boolean
+  status: 'stopped' | 'starting' | 'running' | 'stopping' | 'restarting' | 'failed' | string
+  ready: boolean
+  reachable: boolean
+  checks: {
+    system_stats: boolean
+    sineforge_bridge: boolean
+    required_nodes: boolean
+    object_info?: boolean
+  }
+  missing_required_nodes: string[]
+  pid: number | null
+  started_at_epoch: number | null
+  stopped_at_epoch: number | null
+  last_exit_code: number | null
+  last_error: string | null
+  api_base_url: string
+  input_root: string
+  output_root: string
+  log_root: string
+  source_root: string
+  python_runtime: string
+  custom_nodes_root: string
+  launch_preset: string
+}
+
 export type RuntimeStatus = {
   status: string
   environment: string
   current_phase: string
+  engine: ManagedEngineStatus
   comfyui: HealthResponse
   comfy_api_runner: HealthResponse
   sulphur: HealthResponse & {
@@ -210,12 +264,14 @@ export type RuntimeStatus = {
     controlled_submission_enabled: boolean
     public_submission_enabled: boolean
     api_runner_available: boolean
+    execution_mode: 'sineforge_native'
     supported_states: string[]
   }
   disabled_actions: Record<string, string>
   links: {
-    comfyui: string
-    comfy_api_runner: string
+    engine_api: string
+    engine_control: string
+    comfyui_api: string
   }
 }
 
@@ -1287,6 +1343,8 @@ export type ProjectWorkspace = {
   settings: ProjectStoryboardSettings
   idempotent_replay: boolean
   production_pipeline: ProductionPipeline | null
+  initial_planning_run_id?: string | null
+  completed_planning_phases?: number[]
 }
 
 export type SulphurProjectWorkspace = ProjectWorkspace & {
@@ -1515,6 +1573,13 @@ export type PhaseVersionCreateResponse = {
   pipeline: ProductionPipeline
 }
 
+export type PlanningPhaseIterationResponse = PhaseVersionCreateResponse & {
+  orchestration_run_id: string
+  proposal_id: string
+  idempotent_replay: boolean
+  message: string
+}
+
 export type PhaseOneRevisionPayload = Pick<
   PhaseOnePackage,
   | 'project_title'
@@ -1622,7 +1687,10 @@ export type PhaseSevenVideoQueueRequest = {
 export type PhaseSevenVideoQueuedJob = {
   shot_id: string
   starting_image_asset_id: string
-  runner_job_id: string
+  engine: 'comfyui'
+  comfy_prompt_id: string
+  /** @deprecated Compatibility alias for comfy_prompt_id. */
+  runner_job_id?: string
   shot_code: string
   prompt: string
   negative_prompt: string
@@ -1637,7 +1705,10 @@ export type PhaseSevenVideoQueueResponse = {
   blocked_count: number
   required_count: number
   message: string
-  runner_url: string
+  engine: 'comfyui'
+  comfyui_url: string
+  /** @deprecated Compatibility alias for comfyui_url. */
+  runner_url?: string
   workflow_label: string
   jobs: PhaseSevenVideoQueuedJob[]
   blockers: string[]
@@ -2011,6 +2082,20 @@ export class ApiError extends Error {
   }
 }
 
+export class BackendUnavailableError extends Error {
+  readonly baseUrl: string
+
+  constructor(baseUrl: string, cause?: unknown) {
+    super(
+      `Sineforge is reconnecting to its local backend at ${baseUrl}. ` +
+        'If it does not recover automatically, relaunch Sineforge.',
+      { cause },
+    )
+    this.name = 'BackendUnavailableError'
+    this.baseUrl = baseUrl
+  }
+}
+
 function formatApiError(status: number, detail: unknown): string {
   if (typeof detail === 'string') {
     return detail
@@ -2035,23 +2120,35 @@ function formatApiError(status: number, detail: unknown): string {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  let response: Response
-  try {
-    const headers = new Headers(init?.headers)
-    if (init?.body != null && !headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json')
+  const headers = new Headers(init?.headers)
+  if (init?.body != null && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
+  const method = (init?.method ?? 'GET').toUpperCase()
+  const retryDelays = method === 'GET' || method === 'HEAD' ? [250, 750] : []
+  let response: Response | undefined
+  let lastTransportError: unknown
+
+  for (let attempt = 0; attempt <= retryDelays.length; attempt += 1) {
+    try {
+      response = await fetch(`${API_BASE_URL}${path}`, {
+        ...init,
+        headers,
+      })
+      break
+    } catch (error) {
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
+        throw error
+      }
+      lastTransportError = error
+      const delay = retryDelays[attempt]
+      if (delay === undefined) break
+      await new Promise((resolve) => window.setTimeout(resolve, delay))
     }
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers,
-    })
-  } catch (error) {
-    throw new Error(
-      `Backend unreachable at ${API_BASE_URL}. Start FastAPI or update VITE_CINEFORGE_API_BASE_URL. ${
-        error instanceof Error ? error.message : ''
-      }`,
-      { cause: error },
-    )
+  }
+
+  if (!response) {
+    throw new BackendUnavailableError(API_BASE_URL, lastTransportError)
   }
 
   const contentType = response.headers.get('content-type') ?? ''
@@ -2117,6 +2214,15 @@ export const api = {
   gpuHealth: () => request<HealthResponse>('/health/gpu'),
   ffmpegHealth: () => request<HealthResponse>('/health/ffmpeg'),
   runtimeStatus: () => request<RuntimeStatus>('/runtime/status'),
+  engineStatus: () => request<ManagedEngineStatus>('/runtime/engine'),
+  startEngine: () =>
+    request<{ status: string; message: string }>('/runtime/engine/start', {
+      method: 'POST',
+    }),
+  stopEngine: () =>
+    request<{ status: string; message: string }>('/runtime/engine/stop', {
+      method: 'POST',
+    }),
   listLmStudioModels: () =>
     request<LMStudioModelCatalog>('/runtime/lm-studio/models'),
   activateLmStudioModel: (modelId: string) =>
@@ -2130,6 +2236,7 @@ export const api = {
     request<ComfyRestartStatus>(`/runtime/comfyui/restart/${encodeURIComponent(restartId)}`),
 
   listProjects: () => request<Project[]>('/projects'),
+  listThemes: () => request<ThemeCatalog>('/themes'),
   createProject: (payload: {
     name: string
     description?: string | null
@@ -2144,6 +2251,13 @@ export const api = {
       body: JSON.stringify(payload),
     }),
   getProject: (projectId: string) => request<Project>(`/projects/${projectId}`),
+  updateProjectTheme: (
+    projectId: string,
+    payload: { theme_id: CreativeThemeId; theme_context: BiblicalContext | null },
+  ) => request<Project>(`/projects/${projectId}/theme`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  }),
   getAgentlessWorkflowProfile: (projectId: string) =>
     request<AgentlessWorkflowProfile>(
       `/projects/${encodeURIComponent(projectId)}/agentless-workflow`,
@@ -2220,6 +2334,20 @@ export const api = {
   ) =>
     request<PhaseVersionCreateResponse>(
       `/production/stories/${storyId}/phases/${phaseNumber}/versions`,
+      { method: 'POST', body: JSON.stringify(payload) },
+    ),
+  generatePlanningPhaseIteration: (
+    storyId: string,
+    phaseNumber: number,
+    payload: {
+      idempotency_key: string
+      label: string
+      notes?: string
+      requested_by?: string | null
+    },
+  ) =>
+    request<PlanningPhaseIterationResponse>(
+      `/production/stories/${storyId}/phases/${phaseNumber}/generate`,
       { method: 'POST', body: JSON.stringify(payload) },
     ),
   exportPhaseHistory: (storyId: string) =>
@@ -2697,7 +2825,7 @@ export const api = {
   runNativeApiRunnerWorkflow: (payload: {
     workflow: Record<string, unknown>
     workflow_name: string
-    workflow_sha256: string
+    workflow_sha256?: string | null
     confirmation: true
     idempotency_key: string
   }) =>

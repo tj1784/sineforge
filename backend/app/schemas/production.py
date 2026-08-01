@@ -88,6 +88,17 @@ class PhaseVersionCreateRequest(BaseModel):
     requested_by: str | None = Field(default=None, max_length=200)
 
 
+class PlanningPhaseIterationRequest(BaseModel):
+    """Generate, rather than merely retain, a new Phase 2-5 iteration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    idempotency_key: str = Field(min_length=8, max_length=128)
+    label: str = Field(min_length=1, max_length=300)
+    notes: str = Field(default="", max_length=4000)
+    requested_by: str | None = Field(default=None, max_length=200)
+
+
 class PhaseApproveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -195,6 +206,15 @@ class PhaseOneMutationResponse(BaseModel):
 class PhaseVersionCreateResponse(BaseModel):
     version: PhaseVersionDetail
     pipeline: ProductionPipelineRead
+
+
+class PlanningPhaseIterationResponse(BaseModel):
+    version: PhaseVersionDetail
+    pipeline: ProductionPipelineRead
+    orchestration_run_id: UUID
+    proposal_id: UUID
+    idempotent_replay: bool = False
+    message: str
 
 
 class PhaseHistoryExportIntegrity(BaseModel):

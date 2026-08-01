@@ -1,4 +1,5 @@
 from collections.abc import Generator
+from uuid import UUID
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,7 +12,9 @@ from backend.app.db.base import (
     Project,
     ProjectStoryboardSettings,
     ProjectWorkspaceCreation,
+    OrchestrationRun,
     ProductionPhase,
+    ProductionPhaseVersion,
     Scene,
     Shot,
     ShotPromptPackage,
@@ -28,6 +31,9 @@ from backend.app.services.planning.sulphur_project_intake import (
     SulphurProjectIntakeError,
     SulphurProjectIntakeResult,
 )
+from backend.app.services.planning.engine import PlanningEngine as RealPlanningEngine
+from backend.app.services.planning.provider import MockPlanningProvider
+from backend.app.services.planning import phase_iterations
 
 
 def _payload(**overrides) -> dict:
@@ -262,6 +268,194 @@ def test_workspace_bootstraps_approved_sulphur_phase_plan(
     assert "Scene label:" in (prompt_package.image_prompt or "")
     assert "Characters: Principal Story Subject" in (prompt_package.image_prompt or "")
     assert "Character assets:" in (prompt_package.image_prompt or "")
+
+
+def test_new_project_runs_and_retains_real_phase_two_through_five_planning(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        project_workspace,
+        "PlanningEngine",
+        lambda db: RealPlanningEngine(
+            db,
+            providers={"qwen": MockPlanningProvider(fixed_latency_ms=0)},
+        ),
+    )
+    response = client.post(
+        "/projects/workspace",
+        json=_payload(
+            idempotency_key="project-workspace-real-p2-p5-001",
+            planning_agent="qwen",
+            run_phase_one=True,
+            requested_chapter_count=2,
+            bootstrap_phase_plan=True,
+            auto_approve_phases_through=1,
+            run_phases_two_through_five=True,
+        ),
+    )
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["initial_planning_run_id"]
+    assert body["completed_planning_phases"] == [2, 3, 4, 5]
+    assert _count(db_session, OrchestrationRun) == 1
+
+    phases = list(
+        db_session.scalars(
+            select(ProductionPhase).order_by(ProductionPhase.phase_number.asc())
+        )
+    )
+    assert [phase.lifecycle_state for phase in phases[:5]] == ["approved"] * 5
+    for phase in phases[1:5]:
+        versions = list(
+            db_session.scalars(
+                select(ProductionPhaseVersion)
+                .where(ProductionPhaseVersion.production_phase_id == phase.id)
+                .order_by(ProductionPhaseVersion.version_number)
+            )
+        )
+        generated = [
+            version
+            for version in versions
+            if version.source == "generated"
+            and (version.input_snapshot_json or {}).get("orchestration_run_id")
+        ]
+        assert len(generated) == 1
+        assert generated[0].completed is True
+
+
+def test_new_project_phase_two_through_five_replay_does_not_duplicate_work(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        project_workspace,
+        "PlanningEngine",
+        lambda db: RealPlanningEngine(
+            db,
+            providers={"qwen": MockPlanningProvider(fixed_latency_ms=0)},
+        ),
+    )
+    payload = _payload(
+        idempotency_key="project-workspace-real-p2-p5-replay-001",
+        planning_agent="qwen",
+        run_phase_one=True,
+        requested_chapter_count=2,
+        bootstrap_phase_plan=True,
+        auto_approve_phases_through=1,
+        run_phases_two_through_five=True,
+    )
+
+    first = client.post("/projects/workspace", json=payload)
+    second = client.post("/projects/workspace", json=payload)
+
+    assert first.status_code == second.status_code == 201
+    assert second.json()["idempotent_replay"] is True
+    assert second.json()["initial_planning_run_id"] == first.json()["initial_planning_run_id"]
+    assert second.json()["completed_planning_phases"] == [2, 3, 4, 5]
+    assert _count(db_session, OrchestrationRun) == 1
+
+    phases = list(
+        db_session.scalars(
+            select(ProductionPhase)
+            .where(ProductionPhase.phase_number.in_([2, 3, 4, 5]))
+            .order_by(ProductionPhase.phase_number.asc())
+        )
+    )
+    for phase in phases:
+        generated = list(
+            db_session.scalars(
+                select(ProductionPhaseVersion).where(
+                    ProductionPhaseVersion.production_phase_id == phase.id,
+                    ProductionPhaseVersion.source == "generated",
+                )
+            )
+        )
+        assert len(generated) == 1
+
+
+def test_phase_two_new_iteration_runs_local_agent_and_persists_generated_version(
+    client: TestClient,
+    db_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    workspace = client.post(
+        "/projects/workspace",
+        json=_payload(
+            idempotency_key="phase-two-iteration-workspace-001",
+            planning_agent="qwen",
+            run_phase_one=True,
+            requested_chapter_count=2,
+            bootstrap_phase_plan=True,
+            auto_approve_phases_through=5,
+        ),
+    )
+    assert workspace.status_code == 201, workspace.text
+    story_id = workspace.json()["story"]["id"]
+    monkeypatch.setattr(
+        phase_iterations,
+        "PlanningEngine",
+        lambda db: RealPlanningEngine(
+            db,
+            providers={"qwen": MockPlanningProvider(fixed_latency_ms=0)},
+        ),
+    )
+    payload = {
+        "idempotency_key": "phase-two-iteration-request-001",
+        "label": "Alternate scene segmentation",
+        "notes": "Change the pacing while preserving the approved story.",
+        "requested_by": "test reviewer",
+    }
+
+    first = client.post(
+        f"/production/stories/{story_id}/phases/2/generate",
+        json=payload,
+    )
+    second = client.post(
+        f"/production/stories/{story_id}/phases/2/generate",
+        json=payload,
+    )
+
+    assert first.status_code == second.status_code == 201, first.text
+    body = first.json()
+    assert body["version"]["source"] == "generated"
+    assert body["version"]["label"] == "Alternate scene segmentation"
+    assert body["version"]["completed"] is True
+    assert body["orchestration_run_id"]
+    assert body["proposal_id"]
+    assert second.json()["idempotent_replay"] is True
+    assert second.json()["version"]["id"] == body["version"]["id"]
+
+    phase_two = db_session.scalar(
+        select(ProductionPhase).where(
+            ProductionPhase.story_id == UUID(body["version"]["story_id"]),
+            ProductionPhase.phase_number == 2,
+        )
+    )
+    assert phase_two is not None
+    assert phase_two.lifecycle_state == "ready_for_review"
+    assert phase_two.approved_at is None
+    generated = list(
+        db_session.scalars(
+            select(ProductionPhaseVersion).where(
+                ProductionPhaseVersion.production_phase_id == phase_two.id,
+                ProductionPhaseVersion.source == "generated",
+            )
+        )
+    )
+    assert len(generated) == 1
+    downstream = list(
+        db_session.scalars(
+            select(ProductionPhase).where(
+                ProductionPhase.story_id == phase_two.story_id,
+                ProductionPhase.phase_number > 2,
+            )
+        )
+    )
+    assert all(phase.is_stale and phase.is_locked for phase in downstream)
 
 
 def test_workspace_idempotent_replay_reuses_all_rows(client: TestClient, db_session: Session):

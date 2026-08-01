@@ -1,0 +1,134 @@
+{
+  "schema_version": "sineforge.semantic-workflow-manifest/v1",
+  "template_id": "krea2-character-ingredients-v1",
+  "workflow_name": "Krea 2 Character Ingredients Sheet — Selectable Local Model",
+  "editor_workflow": "SineForge_Krea2_Character_Ingredients.workflow.json",
+  "api_workflow": "SineForge_Krea2_Character_Ingredients.api.json",
+  "prompt_contract": "SineForge_Krea2_Character_Ingredients.prompt.json",
+  "execution_policy": {
+    "hosted_or_api_models_allowed": false,
+    "local_planner": "LM Studio",
+    "default_planner_model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+    "planner_model_selection": "all installed GGUF packages under C:\\Users\\Blokey\\.lmstudio\\models",
+    "shared_model_root": "C:\\ComfyUI\\ComfyUI_Shared_Folders\\models",
+    "queue_depth": 1,
+    "batch_size": 1,
+    "independent_generation_branches": 4,
+    "output_image": "16-bit PNG",
+    "prompt_and_provenance": "JSON",
+    "repository_managed_read_only": true
+  },
+  "bindings": {
+    "character_profile_json": {
+      "node_id": "1",
+      "class_type": "SineForgeKrea2CharacterIngredientsPlanner",
+      "input": "character_profile_json",
+      "media_type": "application/json"
+    },
+    "references": [
+      {
+        "node_id": "2",
+        "class_type": "LoadImage",
+        "input": "image",
+        "planner_input": "reference_image_1",
+        "krea_input": "image1",
+        "token_strength": "max"
+      },
+      {
+        "node_id": "3",
+        "class_type": "LoadImage",
+        "input": "image",
+        "planner_input": "reference_image_2",
+        "krea_input": "image2",
+        "token_strength": "high"
+      },
+      {
+        "node_id": "4",
+        "class_type": "LoadImage",
+        "input": "image",
+        "planner_input": "reference_image_3",
+        "krea_input": "image3",
+        "token_strength": "high"
+      },
+      {
+        "node_id": "5",
+        "class_type": "LoadImage",
+        "input": "image",
+        "planner_input": "reference_image_4",
+        "krea_input": "image4",
+        "token_strength": "normal"
+      }
+    ],
+    "generated_views": {
+      "front_face": {
+        "prompt_output_index": 1,
+        "seed_output_index": 5,
+        "encode_node": "10",
+        "sampler_node": "13",
+        "latent": [
+          768,
+          768
+        ]
+      },
+      "three_quarter_face": {
+        "prompt_output_index": 2,
+        "seed_output_index": 6,
+        "encode_node": "20",
+        "sampler_node": "23",
+        "latent": [
+          768,
+          768
+        ]
+      },
+      "profile": {
+        "prompt_output_index": 3,
+        "seed_output_index": 7,
+        "encode_node": "30",
+        "sampler_node": "33",
+        "latent": [
+          768,
+          768
+        ]
+      },
+      "body_turnaround": {
+        "prompt_output_index": 4,
+        "seed_output_index": 8,
+        "encode_node": "40",
+        "sampler_node": "43",
+        "latent": [
+          1024,
+          576
+        ]
+      }
+    },
+    "ingredients_grid": {
+      "node_id": "50",
+      "class_type": "VRGDG_LTXICIngredientsGrid",
+      "layout": "wide_bottom",
+      "output_size": [
+        768,
+        448
+      ],
+      "background": "#000000",
+      "labels": false
+    },
+    "save_image": {
+      "node_id": "51",
+      "class_type": "SaveImageAdvanced",
+      "format": "16-bit PNG"
+    },
+    "save_prompt_json": {
+      "node_id": "52",
+      "class_type": "SaveText",
+      "format": "json"
+    }
+  },
+  "sampler_profile": {
+    "sampler": "er_sde",
+    "scheduler": "simple",
+    "steps": 8,
+    "cfg": 1.0,
+    "denoise": 1.0,
+    "seed_policy": "four planner-derived independent seeds"
+  }
+}

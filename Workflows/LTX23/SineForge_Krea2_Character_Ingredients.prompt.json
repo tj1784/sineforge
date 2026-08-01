@@ -1,0 +1,233 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "schema_version": "sineforge.krea2-character-ingredients-prompt-contract/v1",
+  "planner_model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+  "trusted_lm_studio_model_root": "C:\\Users\\Blokey\\.lmstudio\\models",
+  "system_prompt": {
+    "role": "local_krea2_character_ingredients_planner",
+    "objective": "Create four production-ready Krea 2 image prompts for one canonical character reference set that can condition later LTX-2.3 Ingredients generations.",
+    "output_contract": "Return only one JSON object that conforms exactly to the supplied JSON Schema. Do not use Markdown, code fences, XML, commentary, or undeclared keys.",
+    "identity_rules": [
+      "All four outputs must depict exactly the same fictional character with the character profile treated as immutable.",
+      "When reference images are delivered to the selected model, preserve the same facial proportions, age presentation, complexion, hair, body proportions, wardrobe, accessories, and material details visible across the approved references.",
+      "When reference images were supplied but omitted because the selected local model does not advertise vision support, rely exclusively on the strict character profile and do not imply that unseen image details were inspected.",
+      "Reference image 1 is primary face identity, image 2 is an additional identity angle, image 3 is body or wardrobe guidance, and image 4 is accessory, material, or style guidance.",
+      "Resolve conflicts in favor of the explicit character profile, then the lower-numbered reference image.",
+      "Do not infer or state ethnicity, religion, politics, health, sexuality, identity, or other sensitive traits from appearance."
+    ],
+    "prompt_rules": [
+      "Each view prompt must be fully self-contained because Krea 2 may render the views as four independent jobs.",
+      "Repeat the same concise canonical identity block inside every view prompt.",
+      "Use clean, large, visually separate reference views with uncluttered neutral backgrounds and even identity-preserving light.",
+      "The front-face prompt is a centered eye-level close-up with neutral expression and unobstructed facial landmarks.",
+      "The three-quarter prompt is a face-and-shoulders three-quarter view that keeps both eyes and the full hair silhouette visible.",
+      "The profile prompt is one clean side profile with the ear, nose, chin, hairline, and neck silhouette unobstructed.",
+      "The body-turnaround prompt is one orderly reference board containing exactly four full-body views: front, three-quarter, side, and back, in equal clean panels.",
+      "Never request labels, captions, typography, logos, watermarks, measurement marks, decorative borders, dramatic action, props covering the face, extra people, duplicate limbs, or background scenery.",
+      "Do not invent a different outfit, hairstyle, age, anatomy, or visual style between views."
+    ],
+    "production_rules": [
+      "Describe realistic lens, framing, lighting, pose, and background choices appropriate to a character identity library.",
+      "Favor identity legibility, natural skin and material texture, accurate hands and anatomy, and consistent scale over cinematic drama.",
+      "Keep prompts direct and operational for Krea 2; do not include conversational advice or alternatives."
+    ]
+  },
+  "default_character_profile": {
+    "schema_version": "sineforge.character-profile/v1",
+    "character_id": "character_001",
+    "character_name": "Alex Rowan",
+    "character_kind": "fictional adult human",
+    "identity_brief": "A composed adult presenter with a distinctive oval face and calm, approachable presence.",
+    "age_presentation": "approximately 35 years old",
+    "face_identity": "oval face, balanced cheekbones, straight nose, softly defined jaw, medium brown eyes, natural brows",
+    "hair": "short dark brown textured hair with a neat side part",
+    "complexion": "medium warm complexion with realistic pores and subtle natural variation",
+    "body_build": "average-height balanced build with natural adult proportions",
+    "wardrobe": [
+      "charcoal tailored jacket",
+      "soft blue open-collar shirt",
+      "dark neutral trousers",
+      "plain dark shoes"
+    ],
+    "accessories": [
+      "small matte silver wristwatch"
+    ],
+    "identity_locks": [
+      "same face shape and facial proportions in every view",
+      "same age, hairline, hairstyle, complexion, wardrobe, and accessories",
+      "natural anatomy and realistic skin texture"
+    ],
+    "visual_style": "high-resolution photorealistic studio character reference photography",
+    "background": "clean seamless warm-gray studio background with no visible horizon",
+    "avoid": [
+      "identity drift",
+      "beautification that changes facial proportions",
+      "text, labels, logos, watermarks, borders, or extra people"
+    ]
+  },
+  "character_profile_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "schema_version",
+      "character_id",
+      "character_name",
+      "character_kind",
+      "identity_brief",
+      "age_presentation",
+      "face_identity",
+      "hair",
+      "complexion",
+      "body_build",
+      "wardrobe",
+      "accessories",
+      "identity_locks",
+      "visual_style",
+      "background",
+      "avoid"
+    ],
+    "properties": {
+      "schema_version": {
+        "type": "string",
+        "enum": [
+          "sineforge.character-profile/v1"
+        ],
+        "minLength": 1,
+        "maxLength": 80
+      },
+      "character_id": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 100
+      },
+      "character_name": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 120
+      },
+      "character_kind": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 160
+      },
+      "identity_brief": {
+        "type": "string",
+        "minLength": 12,
+        "maxLength": 800
+      },
+      "age_presentation": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 160
+      },
+      "face_identity": {
+        "type": "string",
+        "minLength": 12,
+        "maxLength": 800
+      },
+      "hair": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 300
+      },
+      "complexion": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 300
+      },
+      "body_build": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 300
+      },
+      "wardrobe": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 12,
+        "items": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 240
+        }
+      },
+      "accessories": {
+        "type": "array",
+        "minItems": 0,
+        "maxItems": 12,
+        "items": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 240
+        }
+      },
+      "identity_locks": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 16,
+        "items": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 300
+        }
+      },
+      "visual_style": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 300
+      },
+      "background": {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 300
+      },
+      "avoid": {
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 20,
+        "items": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 300
+        }
+      }
+    }
+  },
+  "response_schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+      "canonical_identity_summary",
+      "face_front_prompt",
+      "face_three_quarter_prompt",
+      "profile_prompt",
+      "body_turnaround_prompt"
+    ],
+    "properties": {
+      "canonical_identity_summary": {
+        "type": "string",
+        "minLength": 40,
+        "maxLength": 1200
+      },
+      "face_front_prompt": {
+        "type": "string",
+        "minLength": 160,
+        "maxLength": 2400
+      },
+      "face_three_quarter_prompt": {
+        "type": "string",
+        "minLength": 160,
+        "maxLength": 2400
+      },
+      "profile_prompt": {
+        "type": "string",
+        "minLength": 160,
+        "maxLength": 2400
+      },
+      "body_turnaround_prompt": {
+        "type": "string",
+        "minLength": 180,
+        "maxLength": 2800
+      }
+    }
+  }
+}

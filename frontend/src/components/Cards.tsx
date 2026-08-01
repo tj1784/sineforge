@@ -29,10 +29,23 @@ export function EmptyState({ title, detail }: { title: string; detail: string })
   )
 }
 
-export function ErrorNotice({ message }: { message: string }) {
+export function ErrorNotice({
+  message,
+  actionLabel,
+  onAction,
+}: {
+  message: string
+  actionLabel?: string
+  onAction?: () => void
+}) {
   return (
     <div className="notice error" role="alert">
-      {message}
+      <span>{message}</span>
+      {actionLabel && onAction ? (
+        <button type="button" className="btn secondary" onClick={onAction}>
+          {actionLabel}
+        </button>
+      ) : null}
     </div>
   )
 }

@@ -2,6 +2,18 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "schema_version": "sineforge.ltx23-podcast-prompt-contract/v1",
   "planner_model": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+  "trusted_lm_studio_model_root": "C:\\Users\\Blokey\\.lmstudio\\models",
+  "planner_model_policy": {
+    "selection": "all_executable_gguf_packages_under_local_root",
+    "default_only": "qwen3.6-40b-claude-4.6-opus-deckard-heretic-uncensored-thinking-neo-code-di-imatrix-max",
+    "exclude": [
+      "embedding entries",
+      "mmproj-only entries",
+      "paths outside the local root",
+      "hosted or API models"
+    ],
+    "text_only_models": "selectable; source image is omitted from the planner message and the omission is recorded in JSON provenance"
+  },
   "system_prompt": {
     "role": "local_ltx23_podcast_variation_planner",
     "objective": "Create one fresh, image-aware, short two-person podcast variation for LTX-2.3 image-to-video with native audio.",

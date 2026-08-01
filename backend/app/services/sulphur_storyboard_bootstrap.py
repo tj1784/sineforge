@@ -277,7 +277,7 @@ def _build_story_payload(
     }
 
 
-def _approve_bootstrap_records(db: Session, story_id) -> None:
+def _approve_planning_records(db: Session, story_id) -> None:
     for row in db.scalars(select(Chapter).where(Chapter.story_id == story_id)):
         row.approval_state = "approved"
     for row in db.scalars(select(Character).where(Character.story_id == story_id)):
@@ -315,6 +315,70 @@ def _approve_bootstrap_records(db: Session, story_id) -> None:
     db.flush()
 
 
+def approve_generated_planning_records(
+    db: Session,
+    story: Story,
+    *,
+    created_by: str,
+) -> StoryboardVersion:
+    """Approve a locally generated Phase 2-5 graph and retain a new snapshot.
+
+    This is used only after the selected local planning agent has completed and
+    its validated proposal has been applied.  It never mutates an older
+    StoryboardVersion snapshot.
+    """
+
+    _approve_planning_records(db, story.id)
+    story.approval_state = "approved"
+    story.updated_at = datetime.utcnow()
+    db.flush()
+
+    snapshot, digest = storyboard_snapshot.build_snapshot_with_hash(db, story.id)
+    current_number = (
+        db.scalar(
+            select(StoryboardVersion.version_number)
+            .where(StoryboardVersion.story_id == story.id)
+            .order_by(StoryboardVersion.version_number.desc())
+            .limit(1)
+        )
+        or 0
+    )
+    version = StoryboardVersion(
+        id=uuid4(),
+        story_id=story.id,
+        version_number=int(current_number) + 1,
+        status="approved",
+        snapshot_json=snapshot,
+        content_hash=digest,
+        created_by=created_by,
+        approved_by=created_by,
+        approved_at=datetime.utcnow(),
+        base_version_id=story.active_storyboard_version_id,
+    )
+    db.add(version)
+    db.flush()
+    story.active_storyboard_version_id = version.id
+    snapshot["story"]["approval_state"] = "approved"
+    snapshot["story"]["active_storyboard_version_id"] = str(version.id)
+    version.snapshot_json = snapshot
+    db.add(
+        AuditLog(
+            entity_type="story",
+            entity_id=story.id,
+            action="local_phase_two_through_five_plan_approved",
+            details={
+                "storyboard_version_id": str(version.id),
+                "version_number": version.version_number,
+                "created_by": created_by,
+                "phases_completed": [2, 3, 4, 5],
+                "media_generated": False,
+            },
+        )
+    )
+    db.flush()
+    return version
+
+
 def bootstrap_from_phase_one(
     db: Session,
     story: Story,
@@ -323,6 +387,7 @@ def bootstrap_from_phase_one(
     requested_chapter_count: int,
     chapter_intake: list[dict[str, Any]],
     created_by: str,
+    approve_records: bool = True,
 ) -> StoryboardVersion:
     """Create a complete initial storyboard/prompt plan without committing."""
 
@@ -350,13 +415,14 @@ def bootstrap_from_phase_one(
         voices,
         replace_identities=True,
     )
-    _approve_bootstrap_records(db, story.id)
-    story.approval_state = "approved"
+    if approve_records:
+        _approve_planning_records(db, story.id)
+    story.approval_state = "approved" if approve_records else "draft"
     story.updated_at = datetime.utcnow()
     db.flush()
 
     snapshot, digest = storyboard_snapshot.build_snapshot_with_hash(db, story.id)
-    snapshot["story"]["approval_state"] = "approved"
+    snapshot["story"]["approval_state"] = story.approval_state
     current_number = (
         db.scalar(
             select(StoryboardVersion.version_number)
@@ -370,12 +436,12 @@ def bootstrap_from_phase_one(
         id=uuid4(),
         story_id=story.id,
         version_number=int(current_number) + 1,
-        status="approved",
+        status="approved" if approve_records else "draft",
         snapshot_json=snapshot,
         content_hash=digest,
         created_by=created_by,
-        approved_by=created_by,
-        approved_at=datetime.utcnow(),
+        approved_by=created_by if approve_records else None,
+        approved_at=datetime.utcnow() if approve_records else None,
     )
     db.add(version)
     db.flush()

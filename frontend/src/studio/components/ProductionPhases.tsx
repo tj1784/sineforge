@@ -143,6 +143,7 @@ export function ProductionPhases({
   /** When the pipeline head is a non-package snapshot, hold the last script package from history. */
   const [packageFallback, setPackageFallback] = useState<PhaseOnePackage | null>(null)
   const phaseTabs = useRef<Array<HTMLButtonElement | null>>([])
+  const iterationIdempotencyKey = useRef(`phase-iteration-${crypto.randomUUID()}`)
   const scopeKey = `${projectId ?? 'project'}:${storyId}:${selectedPhaseNumber}`
 
   const loadPhaseHistory = useCallback(async (phaseNumber: number) => {
@@ -235,6 +236,8 @@ export function ProductionPhases({
   const selectedIterationId = selectedByPhase[selectedPhaseNumber] ?? ''
   const selectedIteration = phaseHistory.find((item) => item.id === selectedIterationId) ?? null
   const phaseOneRegenerateIteration = selectedPhaseNumber === 1 && !selectedIteration
+  const planningPhaseRegenerateIteration = selectedPhaseNumber >= 2 && selectedPhaseNumber <= 5 && !selectedIteration
+  const generateIteration = phaseOneRegenerateIteration || planningPhaseRegenerateIteration
 
   useEffect(() => {
     let active = true
@@ -283,6 +286,7 @@ export function ProductionPhases({
       if (event.defaultPrevented || document.querySelector('[role="dialog"]')) return
       if (!historyOpen && !createOpen && !workflowOpen && (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 's') {
         event.preventDefault()
+        iterationIdempotencyKey.current = `phase-iteration-${crypto.randomUUID()}`
         setCreateOpen(true)
       }
     }
@@ -497,6 +501,30 @@ export function ProductionPhases({
         }))
         setLoadedDetail(null)
         setApprovalNotice(result.completion_message)
+        setIterationLabel('')
+        setIterationNotes('')
+        setCreateOpen(false)
+        return
+      }
+      if (planningPhaseRegenerateIteration) {
+        const result = await api.generatePlanningPhaseIteration(
+          storyId,
+          selectedPhaseNumber,
+          {
+            idempotency_key: iterationIdempotencyKey.current,
+            label,
+            notes: iterationNotes,
+            requested_by: 'CineForge UI reviewer',
+          },
+        )
+        setPipeline(result.pipeline)
+        await loadPhaseHistory(selectedPhaseNumber)
+        setSelectedByPhase((current) => ({
+          ...current,
+          [selectedPhaseNumber]: result.version.id,
+        }))
+        setLoadedDetail(result.version)
+        setApprovalNotice(result.message)
         setIterationLabel('')
         setIterationNotes('')
         setCreateOpen(false)
@@ -852,8 +880,15 @@ export function ProductionPhases({
               Compare
             </button>
           ) : null}
-          <button type="button" className="primary" onClick={() => setCreateOpen(true)}>
-            {selectedIteration ? 'Retain current' : 'New iteration'}
+          <button type="button" className="primary" onClick={() => {
+            iterationIdempotencyKey.current = `phase-iteration-${crypto.randomUUID()}`
+            setCreateOpen(true)
+          }}>
+            {selectedIteration
+              ? 'Retain current'
+              : selectedPhaseNumber <= 5
+                ? 'New iteration'
+                : 'Retain current state'}
           </button>
         </div>
       </div>
@@ -1356,7 +1391,7 @@ export function ProductionPhases({
           >
             <header>
               <h3 id="retain-iteration-title">
-                {phaseOneRegenerateIteration ? 'Generate' : 'Retain'} Phase {selectedPhaseNumber} iteration
+                {generateIteration ? 'Generate' : 'Retain'} Phase {selectedPhaseNumber} iteration
               </h3>
               <button type="button" aria-label="Close" disabled={savingIteration} onClick={() => setCreateOpen(false)}>×</button>
             </header>
@@ -1364,6 +1399,8 @@ export function ProductionPhases({
               <p>
                 {phaseOneRegenerateIteration
                   ? 'This reruns Sulphur for Phase 1 using the current story prompt, then stores the generated package in SQLite history. Existing iterations are never changed.'
+                  : planningPhaseRegenerateIteration
+                    ? `This runs the selected local planning agent for Phase ${selectedPhaseNumber}, applies the validated phase-scoped proposal, and stores a new generated SQLite iteration. Existing iterations are never changed.`
                   : 'This captures the complete current draft from SQLite-backed backend records—not the visible historical copy. Existing iterations are never changed.'}
               </p>
               <label>
@@ -1392,8 +1429,8 @@ export function ProductionPhases({
                 <button type="button" className="secondary-button" disabled={savingIteration} onClick={() => setCreateOpen(false)}>Cancel</button>
                 <button type="button" className="primary-button" disabled={savingIteration} onClick={() => void saveIteration()}>
                   {savingIteration
-                    ? (phaseOneRegenerateIteration ? 'Generating…' : 'Retaining…')
-                    : (phaseOneRegenerateIteration ? 'Generate new iteration' : 'Retain current draft')}
+                    ? (generateIteration ? 'Generating…' : 'Retaining…')
+                    : (generateIteration ? 'Generate new iteration' : 'Retain current draft')}
                 </button>
               </div>
             </div>

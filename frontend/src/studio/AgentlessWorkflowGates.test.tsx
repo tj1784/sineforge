@@ -136,6 +136,7 @@ function studioValue(): StudioContextValue {
     animaticOpen: false,
     setAnimaticOpen: vi.fn(),
     busy: false,
+    retryProjectLoad: resolved,
     reload: resolved,
     createStory: resolved,
     loadExistingStory: resolved,

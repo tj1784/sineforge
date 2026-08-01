@@ -1,15 +1,17 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { api } from '../api/client'
+import { BackendUnavailableError, api } from '../api/client'
 import { Projects } from './Projects'
 
 vi.mock('../api/client', () => ({
+  BackendUnavailableError: class BackendUnavailableError extends Error {},
   api: {
     createProjectWorkspace: vi.fn(),
     createProjectFromSulphur: vi.fn(),
     restartComfyUi: vi.fn(),
     comfyRestartStatus: vi.fn(),
+    engineStatus: vi.fn(),
     listLmStudioModels: vi.fn(),
     activateLmStudioModel: vi.fn(),
     freeNativeApiRunnerMemory: vi.fn(),
@@ -134,6 +136,11 @@ afterEach(() => {
 
 beforeEach(() => {
   vi.mocked(api.listLmStudioModels).mockResolvedValue(lmStudioCatalog as never)
+  vi.mocked(api.engineStatus).mockResolvedValue({
+    status: 'running',
+    ready: true,
+    last_error: null,
+  } as never)
   vi.mocked(api.activateLmStudioModel).mockImplementation(async (modelId) => {
     const model = lmStudioCatalog.models.find((item) => item.model_id === modelId)
     if (!model) throw new Error('Model not found')
@@ -187,7 +194,7 @@ describe('new project workspace', () => {
     fireEvent.change(screen.getByLabelText('Privacy preference'), {
       target: { value: 'Hosted providers allowed' },
     })
-    fireEvent.click(screen.getByRole('button', { name: '✦ Create project & complete script' }))
+    fireEvent.click(screen.getByRole('button', { name: '✦ Create project & complete Phases 1–5' }))
 
     await waitFor(() => expect(api.createProjectWorkspace).toHaveBeenCalledTimes(1))
     expect(api.createProjectWorkspace).toHaveBeenCalledWith(expect.objectContaining({
@@ -228,7 +235,8 @@ describe('new project workspace', () => {
       ],
       run_phase_one: true,
       bootstrap_phase_plan: true,
-      auto_approve_phases_through: 5,
+      auto_approve_phases_through: 1,
+      run_phases_two_through_five: true,
     }))
     expect(onOpenProject).toHaveBeenCalledWith('project-1', 'The Test Film')
   })
@@ -278,7 +286,8 @@ describe('new project workspace', () => {
       prefer_local_providers: true,
       run_phase_one: true,
       bootstrap_phase_plan: true,
-      auto_approve_phases_through: 5,
+      auto_approve_phases_through: 1,
+      run_phases_two_through_five: true,
       require_production_plan_approval: false,
     }))
   })
@@ -290,11 +299,11 @@ describe('new project workspace', () => {
     render(<Projects mode="create" />)
     reachFinalStep()
 
-    fireEvent.click(screen.getByRole('button', { name: '✦ Create project & complete script' }))
+    fireEvent.click(screen.getByRole('button', { name: '✦ Create project & complete Phases 1–5' }))
     expect((await screen.findByRole('alert')).textContent).toContain(
       'Workspace creation failed safely; no partial project was kept.',
     )
-    fireEvent.click(screen.getByRole('button', { name: '✦ Create project & complete script' }))
+    fireEvent.click(screen.getByRole('button', { name: '✦ Create project & complete Phases 1–5' }))
 
     await waitFor(() => expect(api.createProjectWorkspace).toHaveBeenCalledTimes(2))
     const firstKey = vi.mocked(api.createProjectWorkspace).mock.calls[0][0].idempotency_key
@@ -304,6 +313,23 @@ describe('new project workspace', () => {
 })
 
 describe('project workspace navigation', () => {
+  it('preserves project data semantics and recovers after a backend outage', async () => {
+    vi.mocked(api.listProjects)
+      .mockRejectedValueOnce(new BackendUnavailableError('temporarily unavailable'))
+      .mockResolvedValueOnce([workspace.project] as never)
+    vi.mocked(api.listStories).mockResolvedValue([])
+
+    render(<Projects mode="list" />)
+
+    expect(await screen.findByRole('alert')).toBeTruthy()
+    expect(screen.queryByText('No projects yet.')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry now' }))
+
+    expect(await screen.findByText('The Test Film')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(api.listProjects).toHaveBeenCalledTimes(2)
+  })
+
   it('shows the persisted workflow lane on project cards', async () => {
     vi.mocked(api.listProjects).mockResolvedValue([workspace.project] as never)
     vi.mocked(api.listStories).mockResolvedValue([])
@@ -441,8 +467,9 @@ describe('project workspace navigation', () => {
     expect(api.createProjectFromSulphur).not.toHaveBeenCalled()
   })
 
-  it('shows the API Runner and completes a visible ComfyUI restart', async () => {
+  it('opens the in-app Engine and completes a visible bundled-engine restart', async () => {
     vi.mocked(api.listProjects).mockResolvedValue([])
+    const onNavigateStudio = vi.fn()
     vi.mocked(api.restartComfyUi).mockResolvedValue({
       restart_id: 'a'.repeat(32),
       status: 'scheduled',
@@ -456,13 +483,14 @@ describe('project workspace navigation', () => {
       failed: false,
     })
 
-    render(<Projects mode="list" onNavigateStudio={vi.fn()} />)
+    render(<Projects mode="list" onNavigateStudio={onNavigateStudio} />)
 
-    expect(screen.getByRole('link', { name: /Open API Runner/ }).getAttribute('href'))
-      .toBe('http://127.0.0.1:8022')
-    fireEvent.click(screen.getByRole('button', { name: /Restart ComfyUI/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Open Engine/ }))
+    expect(onNavigateStudio).toHaveBeenCalledWith('api-runner')
+    expect(screen.queryByRole('link', { name: /ComfyUI|API Runner/ })).toBeNull()
+    fireEvent.click(await screen.findByRole('button', { name: /Restart engine/ }))
 
-    expect(await screen.findByText('ComfyUI restarted successfully with CUDA device 0.'))
+    expect(await screen.findByText('The bundled ComfyUI engine restarted successfully.'))
       .toBeTruthy()
     expect(api.restartComfyUi).toHaveBeenCalledTimes(1)
     expect(api.comfyRestartStatus).toHaveBeenCalledWith('a'.repeat(32))
