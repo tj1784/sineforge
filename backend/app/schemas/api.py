@@ -83,7 +83,7 @@ class ProjectWorkspaceCreate(BaseModel):
     workflow_lane: ProjectWorkflowLane
     theme_id: CreativeThemeId = CreativeThemeId.default
     theme_context: BiblicalContext | None = None
-    planning_agent: Literal["sulphur", "qwen"] = "qwen"
+    planning_agent: Literal["sulphur", "qwen", "grok"] = "grok"
     planning_model_id: str | None = Field(
         default=None,
         min_length=1,
@@ -236,7 +236,7 @@ class SulphurProjectPromptCreate(BaseModel):
 
     idempotency_key: str = Field(min_length=8, max_length=128)
     workflow_lane: Literal["cineforge_studio"]
-    planning_agent: Literal["sulphur", "qwen"] = "qwen"
+    planning_agent: Literal["sulphur", "qwen", "grok"] = "grok"
     planning_model_id: str | None = Field(
         default=None,
         min_length=1,
@@ -251,7 +251,7 @@ class SulphurProjectPromptCreate(BaseModel):
 
 
 class SulphurProjectWorkspaceRead(ProjectWorkspaceRead):
-    intake_provider: Literal["sulphur", "qwen"]
+    intake_provider: Literal["sulphur", "qwen", "grok"]
     intake_model: str
     source_prompt_preserved: Literal[True] = True
     target_duration_sec: float

@@ -717,8 +717,8 @@ class AgentlessWorkflowProfileRead(StrictAgentlessModel):
     agent_runtime_required: Literal[True] = True
     local_planning_agent_required: Literal[True] = True
     hosted_planning_agents_allowed: Literal[False] = False
-    default_planning_agent: Literal["qwen"] = "qwen"
-    selected_planning_agent: Literal["qwen", "sulphur"] = "qwen"
+    default_planning_agent: Literal["grok"] = "grok"
+    selected_planning_agent: Literal["qwen", "sulphur", "grok"] = "grok"
     prompt_artifact_format: Literal["json"] = "json"
     prompt_artifact_extension: Literal[".json"] = ".json"
     deterministic_python_orchestrator: Literal[True] = True

@@ -37,6 +37,7 @@ from backend.app.schemas.providers import (
     RoutingValidationIssue,
 )
 from backend.app.services import storyboard_settings as storyboard_settings_service
+from backend.app.services.lm_studio_models import get_active_lm_studio_model_id
 from backend.app.services.planning.engine import DEFAULT_PIPELINE
 from backend.app.services.planning.errors import PlanningError
 from backend.app.services.planning.provider_registry import (
@@ -47,7 +48,7 @@ from backend.app.services.planning.routing import build_routing_snapshot, select
 
 
 MAX_CONNECTION_TEST_RESPONSE_BYTES = 65_536
-CONNECTION_TEST_CAPABLE = frozenset({"mock", "openai", "qwen", "sulphur"})
+CONNECTION_TEST_CAPABLE = frozenset({"mock", "openai", "qwen", "sulphur", "grok"})
 
 
 class ProviderContractNotFoundError(LookupError):
@@ -197,18 +198,18 @@ class ProviderConnectionTester:
         checked_at: datetime,
         capabilities: list[str],
     ) -> ProviderConnectionTestResponse:
-        qwen = provider_identifier == "qwen"
-        configured = (
-            self.settings.qwen_configured
-            if qwen
-            else self.settings.sulphur_configured
-        )
-        model_id = (
-            self.settings.qwen_model_id
-            if qwen
-            else self.settings.sulphur_model_id
-        )
-        display_name = "Qwen3 4B Hivemind" if qwen else "Sulphur 2 Base"
+        if provider_identifier == "qwen":
+            configured = self.settings.qwen_configured
+            model_id = self.settings.qwen_model_id
+            display_name = "Qwen3 4B Hivemind"
+        elif provider_identifier == "grok":
+            configured = self.settings.sulphur_planning_enabled
+            model_id = get_active_lm_studio_model_id(self.settings) or self.settings.grok_model_id
+            display_name = "Grok"
+        else:
+            configured = self.settings.sulphur_configured
+            model_id = self.settings.sulphur_model_id
+            display_name = "Sulphur 2 Base"
         if not configured:
             return self._result(
                 provider_identifier=provider_identifier,
@@ -387,7 +388,7 @@ class ProviderConnectionTester:
                 started_at=started_at,
             )
 
-        if descriptor.provider_identifier in {"qwen", "sulphur"}:
+        if descriptor.provider_identifier in {"qwen", "sulphur", "grok"}:
             return self._test_local_lm_studio(
                 provider_identifier=descriptor.provider_identifier,
                 timeout_sec=timeout_sec,

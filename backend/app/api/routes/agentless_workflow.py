@@ -83,10 +83,10 @@ def get_agentless_workflow_profile(
             project_settings.prompting_policy_json
             if project_settings is not None
             else {}
-        ).get("planning_agent", "qwen")
+        ).get("planning_agent", "grok")
     )
-    if selected_agent not in {"qwen", "sulphur"}:
-        selected_agent = "qwen"
+    if selected_agent not in {"qwen", "sulphur", "grok"}:
+        selected_agent = "grok"
     return build_agentless_profile(
         project_id=project_id,
         selected_planning_agent=selected_agent,

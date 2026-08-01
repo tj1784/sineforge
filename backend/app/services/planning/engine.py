@@ -313,7 +313,7 @@ class PlanningEngine:
             )
             selected_descriptor = descriptor_by_id.get(selected_agent)
             if (
-                selected_agent not in {"qwen", "sulphur"}
+                selected_agent not in {"qwen", "sulphur", "grok"}
                 or selected_descriptor is None
                 or selected_descriptor.privacy_classification != "local"
                 or (

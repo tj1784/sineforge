@@ -154,7 +154,7 @@ class SulphurProjectIntakeResult(BaseModel):
     brief: SulphurProjectBrief
     workspace_payload: ProjectWorkspaceCreate
     clip_plan: SceneClipPlan
-    planning_agent: Literal["sulphur", "qwen"]
+    planning_agent: Literal["sulphur", "qwen", "grok"]
     intake_model: str
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -219,13 +219,21 @@ def build_sulphur_project_intake(
     """Extract a validated brief, then prepare the existing atomic workspace request."""
 
     cfg = settings or get_settings()
-    model_id = request.planning_model_id or (
-        cfg.sulphur_model_id
-        if request.planning_agent == "sulphur"
-        else cfg.qwen_model_id
-    )
+    if request.planning_agent == "sulphur":
+        default_model_id = cfg.sulphur_model_id
+    elif request.planning_agent == "grok":
+        default_model_id = cfg.grok_model_id
+    else:
+        default_model_id = cfg.qwen_model_id
+    model_id = request.planning_model_id or default_model_id
     if not cfg.sulphur_planning_enabled:
-        agent_name = "Sulphur 2 Base" if request.planning_agent == "sulphur" else "Qwen3 4B Hivemind"
+        agent_name = (
+            "Sulphur 2 Base"
+            if request.planning_agent == "sulphur"
+            else "Grok"
+            if request.planning_agent == "grok"
+            else "Qwen3 4B Hivemind"
+        )
         raise SulphurProjectIntakeError(
             f"{agent_name} local planning is disabled"
         )

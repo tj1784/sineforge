@@ -35,7 +35,7 @@ _AGENTLESS_WORKFLOW_POLICY: dict = {
     "orchestration": "deterministic_python",
     "planning": {
         "mode": "local_lm_studio",
-        "default_agent": "qwen",
+        "default_agent": "grok",
         "local_agent_required": True,
         "hosted_agents_allowed": False,
         "prompt_artifact_format": "json",

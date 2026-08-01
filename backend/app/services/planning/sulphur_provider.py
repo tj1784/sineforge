@@ -84,3 +84,40 @@ def build_qwen_provider_from_settings(
     if not cfg.qwen_configured:
         return None
     return QwenPlanningProvider.from_settings(cfg)
+
+
+class GrokPlanningProvider(OpenAIPlanningProvider):
+    """OpenAI-compatible adapter for a local Grok-family LM Studio model."""
+
+    identifier = "grok"
+
+    @classmethod
+    def from_settings(
+        cls,
+        settings: Settings | None = None,
+    ) -> "GrokPlanningProvider":
+        cfg = settings or get_settings()
+        if not cfg.sulphur_planning_enabled:
+            raise ValueError("Grok local planning provider is not enabled")
+        active_model_id = get_active_lm_studio_model_id(cfg) or cfg.grok_model_id
+        return cls(
+            api_key="lm-studio",
+            base_url=cfg.sulphur_base_url,
+            timeout_sec=cfg.sulphur_timeout_sec,
+            wall_time_sec=cfg.sulphur_wall_time_sec,
+            transport_retries=cfg.sulphur_transport_retries,
+            max_response_bytes=cfg.sulphur_max_response_bytes,
+            repair_instruction_limit=cfg.sulphur_repair_instruction_limit,
+            model_luna=active_model_id,
+            model_terra=active_model_id,
+            model_sol=active_model_id,
+        )
+
+
+def build_grok_provider_from_settings(
+    settings: Settings | None = None,
+) -> GrokPlanningProvider | None:
+    cfg = settings or get_settings()
+    if not cfg.sulphur_planning_enabled:
+        return None
+    return GrokPlanningProvider.from_settings(cfg)

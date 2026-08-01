@@ -27,8 +27,10 @@ from backend.app.services.planning.openai_provider import (
 )
 from backend.app.services.planning.provider import MockPlanningProvider, PlanningProvider
 from backend.app.services.planning.sulphur_provider import (
+    GrokPlanningProvider,
     QwenPlanningProvider,
     SulphurPlanningProvider,
+    build_grok_provider_from_settings,
     build_qwen_provider_from_settings,
     build_sulphur_provider_from_settings,
 )
@@ -45,7 +47,7 @@ class ProviderAvailability(StrEnum):
 _SHELL_REFUSED_PROVIDERS = frozenset({"local_cli", "custom"})
 _HOSTED_STUBS = frozenset({"anthropic", "xai"})
 _KNOWN_PROVIDERS = frozenset(
-    {"mock", "sulphur", "openai", "anthropic", "xai", "qwen", "local_cli", "custom"}
+    {"mock", "sulphur", "openai", "anthropic", "xai", "qwen", "grok", "local_cli", "custom"}
 )
 
 _FORBIDDEN_REGISTRATION_KEYS = frozenset(
@@ -157,6 +159,16 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
         if cfg.qwen_configured
         else "Local Qwen planning is disabled or its configured GGUF is missing"
     )
+    grok_status = (
+        ProviderAvailability.available
+        if cfg.sulphur_planning_enabled
+        else ProviderAvailability.not_configured
+    )
+    grok_detail = (
+        "Local Grok-family model can be served through LM Studio"
+        if cfg.sulphur_planning_enabled
+        else "Local Grok planning requires the LM Studio planning endpoint to be enabled"
+    )
 
     return [
         ProviderDescriptor(
@@ -186,6 +198,20 @@ def describe_providers(settings: Settings | None = None) -> list[ProviderDescrip
             ),
             detail=sulphur_detail,
             routing_priority=100,
+        ),
+        ProviderDescriptor(
+            provider_identifier=GrokPlanningProvider.identifier,
+            display_name="Grok · local LM Studio",
+            availability_status=grok_status,
+            execution_mode="local_http" if cfg.sulphur_planning_enabled else "disabled",
+            privacy_classification="local",
+            capabilities=(
+                ("planning", "script_generation", "prompt_enhancement")
+                if cfg.sulphur_planning_enabled
+                else tuple()
+            ),
+            detail=grok_detail,
+            routing_priority=95,
         ),
         ProviderDescriptor(
             provider_identifier=MockPlanningProvider.identifier,
@@ -279,6 +305,9 @@ def build_provider_registry(
     qwen = build_qwen_provider_from_settings(cfg)
     if qwen is not None:
         registry[QwenPlanningProvider.identifier] = qwen
+    grok = build_grok_provider_from_settings(cfg)
+    if grok is not None:
+        registry[GrokPlanningProvider.identifier] = grok
 
     if extra:
         for key, provider in extra.items():
@@ -336,6 +365,20 @@ def resolve_provider(
                 },
             )
         return QwenPlanningProvider.from_settings(cfg)
+
+    if provider_identifier == GrokPlanningProvider.identifier:
+        cfg = settings or get_settings()
+        if not cfg.sulphur_planning_enabled:
+            raise PlanningError(
+                PlanningErrorCode.ROUTING_FAILED,
+                "Provider 'grok' is not enabled for local planning",
+                details={
+                    "provider_identifier": "grok",
+                    "availability_status": ProviderAvailability.not_configured.value,
+                    "sulphur_planning_enabled": cfg.sulphur_planning_enabled,
+                },
+            )
+        return GrokPlanningProvider.from_settings(cfg)
 
     if provider_identifier in _SHELL_REFUSED_PROVIDERS:
         raise PlanningError(

@@ -448,7 +448,7 @@ export function ImagesPage() {
               {artDirectionRows.length} references
             </span>
           </div>
-          <div className="image-grid">
+          <div className="image-grid art-direction-grid">
             {artDirectionRows.map(({ asset, sceneRow, sceneNumber }, index) => {
               const url = artDirectionBoardUrl({
                 sceneNumber,

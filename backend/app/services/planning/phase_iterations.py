@@ -119,7 +119,7 @@ def generate_planning_phase_iteration(
     policy = dict(settings.prompting_policy_json or {}) if settings is not None else {}
     agent = str(policy.get("planning_agent") or "qwen")
     model_id = policy.get("planning_model_id")
-    if agent not in {"qwen", "sulphur"}:
+    if agent not in {"qwen", "sulphur", "grok"}:
         raise PhaseIterationPlanningError(
             "The project does not have a valid local planning agent selected."
         )

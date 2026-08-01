@@ -157,7 +157,7 @@ function App() {
   const [newProjectWorkflowLane, setNewProjectWorkflowLane] =
     useState<ProjectWorkflowLane | null>(null)
   const [newProjectPlanningAgent, setNewProjectPlanningAgent] =
-    useState<PlanningAgent>('qwen')
+    useState<PlanningAgent>('grok')
 
   useEffect(() => {
     routeStateRef.current = routeState
@@ -183,7 +183,7 @@ function App() {
   const startNewProject = useCallback(
     (
       workflowLane: ProjectWorkflowLane | null = null,
-      planningAgent: PlanningAgent = 'qwen',
+      planningAgent: PlanningAgent = 'grok',
     ) => {
       setNewProjectWorkflowLane(workflowLane)
       setNewProjectPlanningAgent(planningAgent)

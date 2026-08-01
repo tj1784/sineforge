@@ -63,7 +63,7 @@ export type AgentlessWorkflowProfile = {
   agent_runtime_required: true
   local_planning_agent_required: true
   hosted_planning_agents_allowed: false
-  default_planning_agent: 'qwen'
+  default_planning_agent: 'grok'
   selected_planning_agent: PlanningAgent
   prompt_artifact_format: 'json'
   prompt_artifact_extension: '.json'
@@ -1373,6 +1373,12 @@ export type ComfyRestartRequest = {
   message: string
 }
 
+export type CineForgeRestartRequest = {
+  restart_id: string
+  status: string
+  message: string
+}
+
 export type ComfyRestartStatus = ComfyRestartRequest & {
   complete: boolean
   failed: boolean
@@ -2437,6 +2443,8 @@ export const api = {
     }),
   restartComfyUi: () =>
     request<ComfyRestartRequest>('/runtime/comfyui/restart', { method: 'POST' }),
+  restartCineForge: () =>
+    request<CineForgeRestartRequest>('/runtime/cineforge/restart', { method: 'POST' }),
   comfyRestartStatus: (restartId: string) =>
     request<ComfyRestartStatus>(`/runtime/comfyui/restart/${encodeURIComponent(restartId)}`),
 

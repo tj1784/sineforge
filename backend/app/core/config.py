@@ -136,6 +136,7 @@ class Settings(BaseSettings):
     sulphur_model_path: Path = Field(default=DEFAULT_SULPHUR_MODEL_PATH)
     qwen_model_id: str = DEFAULT_QWEN_MODEL_ID
     qwen_model_path: Path = Field(default=DEFAULT_QWEN_MODEL_PATH)
+    grok_model_id: str = "grok"
     sulphur_timeout_sec: float = Field(default=300.0, ge=1.0, le=900.0)
     sulphur_wall_time_sec: float = Field(default=420.0, ge=1.0, le=1200.0)
     sulphur_transport_retries: int = Field(default=1, ge=0, le=3)
@@ -150,7 +151,7 @@ class Settings(BaseSettings):
     ai_agent_enabled: bool = True
     ai_provider: str = "openai_compatible"
     ai_base_url: str = "http://127.0.0.1:1234/v1"
-    ai_model: str = DEFAULT_QWEN_MODEL_ID
+    ai_model: str = "grok"
     ai_api_key: SecretStr = SecretStr("lm-studio")
     ai_request_timeout_seconds: float = Field(default=120.0, ge=1.0, le=600.0)
     ai_max_tool_steps: int = Field(default=12, ge=1, le=24)
@@ -273,6 +274,7 @@ class Settings(BaseSettings):
         "openai_logical_model_sol",
         "sulphur_model_id",
         "qwen_model_id",
+        "grok_model_id",
         "ai_model",
     )
     @classmethod

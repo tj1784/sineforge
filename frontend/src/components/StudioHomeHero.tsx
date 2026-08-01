@@ -55,6 +55,7 @@ export function StudioHomeHero({
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [restarting, setRestarting] = useState(false)
+  const [restartingCineForge, setRestartingCineForge] = useState(false)
   const [freeingVram, setFreeingVram] = useState(false)
   const [runtimeMessage, setRuntimeMessage] = useState(
     'Checking the bundled BlokeyUI engine…',
@@ -266,6 +267,28 @@ export function StudioHomeHero({
     }
   }
 
+  const restartCineForge = async () => {
+    const requestId = ++runtimeRequest.current
+    setRestartingCineForge(true)
+    setRuntimeMessage('Restarting CineForge backend and UI…')
+    try {
+      const request = await api.restartCineForge()
+      if (requestId !== runtimeRequest.current) return
+      setRuntimeMessage(request.message)
+      onNotify?.('Restarting CineForge')
+      window.setTimeout(() => {
+        window.location.reload()
+      }, 7_000)
+    } catch (error) {
+      if (requestId !== runtimeRequest.current) return
+      const message =
+        error instanceof Error ? error.message : 'Unable to restart CineForge.'
+      setRuntimeMessage(message)
+      onNotify?.(message)
+      setRestartingCineForge(false)
+    }
+  }
+
   const selectedAgent = localPlanningAgent(planningAgent)
   const selectedModelLabel = planningModelLabel ?? selectedAgent?.label ?? 'local model'
   const callToAction =
@@ -396,13 +419,28 @@ export function StudioHomeHero({
           <i />
           {runtimeMessage}
         </span>
-        <button type="button" onClick={() => void freeVram()} disabled={!engineReady || freeingVram || restarting}>
+        <button
+          type="button"
+          onClick={() => void restartCineForge()}
+          disabled={restartingCineForge || restarting || freeingVram}
+        >
+          {restartingCineForge ? '↻ Restarting CineForge…' : '↻ Restart CineForge'}
+        </button>
+        <button
+          type="button"
+          onClick={() => void freeVram()}
+          disabled={!engineReady || freeingVram || restarting || restartingCineForge}
+        >
           {freeingVram ? '♨ Freeing VRAM…' : '♨ Free VRAM'}
         </button>
         <button type="button" onClick={() => onNavigateStudio('api-runner')}>
           ◇ Open Engine
         </button>
-        <button type="button" onClick={() => void restartComfyUi()} disabled={restarting || freeingVram}>
+        <button
+          type="button"
+          onClick={() => void restartComfyUi()}
+          disabled={restarting || freeingVram || restartingCineForge}
+        >
           {restarting
             ? engineReady
               ? '↻ Restarting engine…'

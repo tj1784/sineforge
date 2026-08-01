@@ -35,7 +35,7 @@ export function staticCharacterImageUrl(slug: string): string {
 }
 
 export function staticStoryboardUrl(sceneNumber: number): string {
-  return `/transfiguration/storyboards/scene-${String(sceneNumber).padStart(2, '0')}.webp`
+  return `/transfiguration/storyboards/scene-${String(sceneNumber).padStart(2, '0')}.png`
 }
 
 export function artDirectionBoardUrl(input: {

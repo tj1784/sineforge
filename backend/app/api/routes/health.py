@@ -1,12 +1,17 @@
 import asyncio
 import ipaddress
+import os
 import re
+import subprocess
+import textwrap
+import uuid
+from pathlib import Path
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 from fastapi.responses import JSONResponse
 
-from backend.app.core.config import Settings, get_settings
+from backend.app.core.config import REPO_ROOT, Settings, get_settings
 from backend.app.services.comfy.client import ComfyUIClient
 from backend.app.services.comfy.engine import ComfyEngineError, ComfyEngineManager
 from backend.app.services.ffmpeg.service import FFmpegService
@@ -76,6 +81,81 @@ def _require_local_control(request: Request) -> None:
         }
         if parsed.scheme not in {"http", "https"} or normalized not in allowed:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Untrusted control origin.")
+
+
+def _quote_ps(value: str | Path) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _write_cineforge_restart_script(settings: Settings, restart_id: str) -> Path:
+    repo_root = REPO_ROOT.resolve()
+    runtime_dir = settings.storage_root / "runtime" / "supervisor"
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    script_path = runtime_dir / f"restart-cineforge-{restart_id}.ps1"
+    stdout_path = runtime_dir / f"restart-cineforge-{restart_id}.out.log"
+    stderr_path = runtime_dir / f"restart-cineforge-{restart_id}.err.log"
+
+    script = f"""
+    $ErrorActionPreference = 'Continue'
+    $repo = {_quote_ps(repo_root)}
+    $stdoutPath = {_quote_ps(stdout_path)}
+    $stderrPath = {_quote_ps(stderr_path)}
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stdoutPath) | Out-Null
+    "Restart requested at $(Get-Date -Format o)" | Out-File -FilePath $stdoutPath -Encoding utf8 -Append
+    Start-Sleep -Milliseconds 800
+
+    $targets = Get-CimInstance Win32_Process | Where-Object {{
+      $cmd = $_.CommandLine
+      if ([string]::IsNullOrWhiteSpace($cmd)) {{ return $false }}
+      if ($_.ProcessId -eq $PID) {{ return $false }}
+      if ($cmd -notlike "*$repo*") {{ return $false }}
+      return (
+        $cmd -match 'scripts[\\\\/]start_cineforge\\.py' -or
+        $cmd -match 'backend\\.app\\.main:app' -or
+        ($cmd -match 'vite' -and $cmd -match '5174')
+      )
+    }}
+
+    foreach ($target in $targets) {{
+      try {{
+        "Stopping PID $($target.ProcessId): $($target.CommandLine)" | Out-File -FilePath $stdoutPath -Encoding utf8 -Append
+        Stop-Process -Id $target.ProcessId -Force -ErrorAction Stop
+      }} catch {{
+        "Unable to stop PID $($target.ProcessId): $($_.Exception.Message)" | Out-File -FilePath $stderrPath -Encoding utf8 -Append
+      }}
+    }}
+
+    Start-Sleep -Seconds 1
+    $python = Join-Path $repo '.venv\\Scripts\\python.exe'
+    if (-not (Test-Path $python)) {{ $python = 'python' }}
+    $launcher = Join-Path $repo 'scripts\\start_cineforge.py'
+    "Starting CineForge with $python $launcher --no-browser" | Out-File -FilePath $stdoutPath -Encoding utf8 -Append
+    Start-Process -FilePath $python -ArgumentList @($launcher, '--no-browser') -WorkingDirectory $repo -WindowStyle Hidden -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath
+    """
+    script_path.write_text(textwrap.dedent(script).strip() + "\n", encoding="utf-8")
+    return script_path
+
+
+def _launch_cineforge_restart(script_path: Path) -> None:
+    creationflags = 0
+    if os.name == "nt":
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+    subprocess.Popen(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(script_path),
+        ],
+        cwd=str(REPO_ROOT),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=creationflags,
+        close_fds=os.name != "nt",
+    )
 
 
 @router.get("/")
@@ -172,6 +252,28 @@ async def stop_engine(request: Request, force: bool = False) -> dict:
     return {
         "status": "stopped",
         "message": "The bundled ComfyUI engine stopped.",
+    }
+
+
+@router.post("/runtime/cineforge/restart", status_code=status.HTTP_202_ACCEPTED)
+async def restart_cineforge(request: Request) -> dict:
+    """Restart the local CineForge dev stack from the browser control row."""
+
+    _require_local_control(request)
+    settings = _app_settings(request)
+    restart_id = uuid.uuid4().hex
+    script_path = _write_cineforge_restart_script(settings, restart_id)
+    try:
+        _launch_cineforge_restart(script_path)
+    except OSError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Unable to launch CineForge restart helper: {exc}",
+        ) from exc
+    return {
+        "restart_id": restart_id,
+        "status": "scheduled",
+        "message": "Restarting CineForge backend and UI. The page should reconnect automatically.",
     }
 
 

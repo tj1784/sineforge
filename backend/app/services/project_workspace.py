@@ -81,6 +81,14 @@ _TASK_QUALITY = {
 }
 
 
+def _local_agent_label(agent: str) -> str:
+    return {
+        "qwen": "Qwen3 4B Hivemind",
+        "sulphur": "Sulphur 2 Base",
+        "grok": "Grok",
+    }.get(agent, agent)
+
+
 def _request_hash(payload: ProjectWorkspaceCreate) -> str:
     canonical = json.dumps(
         payload.model_dump(mode="json", exclude={"idempotency_key"}),
@@ -576,11 +584,7 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
         if payload.bootstrap_phase_plan:
             if not isinstance(phase_one_package, dict):
                 raise RuntimeError("Phase plan bootstrap requires a generated Phase 1 package.")
-            agent_label = (
-                "Qwen3 4B Hivemind"
-                if payload.planning_agent == "qwen"
-                else "Sulphur 2 Base"
-            )
+            agent_label = _local_agent_label(payload.planning_agent)
             bootstrap_from_phase_one(
                 db,
                 story,
@@ -594,11 +598,7 @@ def create_project_workspace(db: Session, payload: ProjectWorkspaceCreate) -> Pr
             )
 
         if payload.auto_approve_phases_through:
-            agent_label = (
-                "Qwen3 4B Hivemind"
-                if payload.planning_agent == "qwen"
-                else "Sulphur 2 Base"
-            )
+            agent_label = _local_agent_label(payload.planning_agent)
             for phase_number in range(1, payload.auto_approve_phases_through + 1):
                 production_phases.approve_phase(
                     db,

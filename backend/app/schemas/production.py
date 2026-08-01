@@ -34,7 +34,7 @@ class PhaseOneGenerationInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     original_prompt: str = Field(min_length=1)
-    planning_agent: Literal["sulphur", "qwen"] = "qwen"
+    planning_agent: Literal["sulphur", "qwen", "grok"] = "grok"
     planning_model_id: str | None = Field(
         default=None,
         min_length=1,

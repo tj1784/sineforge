@@ -21,7 +21,7 @@ import { formatDuration } from '../utils'
 import { EmptyState, LoadingState } from '../components/StateBlocks'
 import { ChapterIntakeForm } from '../../components/ChapterIntakeForm'
 import { makeChapterIntakeDraft, type ChapterIntakeDraft } from '../../components/chapterIntake'
-import type { PlanningAgent } from '../../planningAgents'
+import { isPlanningAgent, type PlanningAgent } from '../../planningAgents'
 import { formatPlanningRoute } from '../planningRouteDisplay'
 
 type ProviderPreference = 'local' | 'hosted' | 'mixed'
@@ -41,6 +41,11 @@ const PLANNING_TASKS: Array<{
 ]
 
 const BUILTIN_MOCK_ROUTE = 'builtin:mock'
+const LOCAL_AGENT_LABELS: Record<string, string> = {
+  qwen: 'Qwen3 4B Hivemind',
+  sulphur: 'Sulphur 2 Base',
+  grok: 'Grok',
+}
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback
@@ -251,11 +256,8 @@ export function StoryPage() {
         setProposals(proposalList)
         setProviderProfiles(profileList)
         setProviderCatalog(catalog?.providers ?? [])
-        setPlanningAgent(
-          projectSettings?.prompting_policy_json.planning_agent === 'sulphur'
-            ? 'sulphur'
-            : 'qwen',
-        )
+        const projectPlanningAgent = projectSettings?.prompting_policy_json.planning_agent
+        setPlanningAgent(isPlanningAgent(projectPlanningAgent) ? projectPlanningAgent : 'qwen')
 
         const runId =
           (preferredRunId && runList.some((run) => run.id === preferredRunId) && preferredRunId) ||
@@ -1415,7 +1417,7 @@ export function StoryPage() {
             </div>
             <p className="form-hint">
               {isAgentless
-                ? `This project is locked to the selected local ${planningAgent === 'qwen' ? 'Qwen3 4B Hivemind' : 'Sulphur 2 Base'} agent. Prompts are structured JSON; hosted/API and mock fallbacks are blocked.`
+                ? `This project is locked to the selected local ${LOCAL_AGENT_LABELS[planningAgent] ?? planningAgent} agent. Prompts are structured JSON; hosted/API and mock fallbacks are blocked.`
                 : 'Provider preferences are recorded with the run. This page does not install models, submit render jobs, or generate media.'}
             </p>
             <div className="split-2">

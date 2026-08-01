@@ -12,7 +12,7 @@ import {
   type StoryboardAggregate,
 } from '../../api/client'
 import type { PageId } from '../../components/AppShell'
-import type { PlanningAgent } from '../../planningAgents'
+import { isPlanningAgent, type PlanningAgent } from '../../planningAgents'
 import { ErrorNotice } from '../../components/Cards'
 import { ProductionPhasePreview } from './ProductionPhasePreview'
 import { LoadingState } from './StateBlocks'
@@ -91,9 +91,8 @@ function downloadText(filename: string, content: string) {
 function selectedPlanningAgent(
   settings: ProjectStoryboardSettings | null,
 ): PlanningAgent {
-  return settings?.prompting_policy_json.planning_agent === 'sulphur'
-    ? 'sulphur'
-    : 'qwen'
+  const agent = settings?.prompting_policy_json.planning_agent
+  return isPlanningAgent(agent) ? agent : 'qwen'
 }
 
 type ProductionPhasesProps = {

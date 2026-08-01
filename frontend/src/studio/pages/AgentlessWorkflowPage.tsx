@@ -5,6 +5,12 @@ import {
 } from '../../api/client'
 import { useStudio } from '../StudioState'
 
+const LOCAL_AGENT_LABELS: Record<string, string> = {
+  qwen: 'Qwen3 4B Hivemind',
+  sulphur: 'Sulphur 2 Base',
+  grok: 'Grok',
+}
+
 function roleLabel(role: 'flux_anchor' | 'ltx_ingredients_i2v'): string {
   return role === 'flux_anchor'
     ? 'FLUX.2 scene anchor'
@@ -82,11 +88,7 @@ export function AgentlessWorkflowPage({
             <article><span>Batch size</span><strong>{profile.batch_size}</strong></article>
             <article>
               <span>Local planning agent</span>
-              <strong>
-                {profile.selected_planning_agent === 'qwen'
-                  ? 'Qwen3 4B Hivemind'
-                  : 'Sulphur 2 Base'}
-              </strong>
+              <strong>{LOCAL_AGENT_LABELS[profile.selected_planning_agent] ?? profile.selected_planning_agent}</strong>
             </article>
           </div>
         ) : null}

@@ -25,9 +25,10 @@ type LocalPlanningAgentFieldsetProps = {
 const MODEL_REFRESH_INTERVAL_MS = 10_000
 
 function inferredAgent(model: Pick<LMStudioModel, 'model_id' | 'key' | 'display_name'>): PlanningAgent {
-  return `${model.model_id} ${model.key} ${model.display_name}`.toLowerCase().includes('sulphur')
-    ? 'sulphur'
-    : 'qwen'
+  const haystack = `${model.model_id} ${model.key} ${model.display_name}`.toLowerCase()
+  if (haystack.includes('sulphur')) return 'sulphur'
+  if (haystack.includes('grok') || haystack.includes('xai')) return 'grok'
+  return 'qwen'
 }
 
 function modelDetails(model: LMStudioModel) {
@@ -140,8 +141,30 @@ export function LocalPlanningAgentFieldset({
         Local LM Studio model <em>Required</em>
       </legend>
       {policyNote ? <p className="planning-agent-policy">{policyNote}</p> : null}
+      <div className="workflow-lane-options">
+        {LOCAL_PLANNING_AGENTS.map((agent) => (
+          <label className="workflow-lane-card" key={agent.value}>
+            <input
+              type="radio"
+              name={name}
+              value={agent.value}
+              checked={value === agent.value}
+              required
+              disabled={changingModelId !== null}
+              onChange={() => {
+                onChange(agent.value)
+                onModelChange?.(null, agent.value)
+              }}
+            />
+            <span>
+              <b>{agent.label}</b>
+              <small>{agent.description}</small>
+            </span>
+          </label>
+        ))}
+      </div>
       {liveModels.length ? (
-        <div className="workflow-lane-options planning-model-options" aria-live="polite">
+        <div className="workflow-lane-options planning-model-options" aria-live="polite" style={{ marginTop: 10 }}>
           {liveModels.map((model) => {
             const selected =
               selectedModelId === model.model_id ||
@@ -169,29 +192,7 @@ export function LocalPlanningAgentFieldset({
             )
           })}
         </div>
-      ) : (
-        <div className="workflow-lane-options">
-          {LOCAL_PLANNING_AGENTS.map((agent) => (
-            <label className="workflow-lane-card" key={agent.value}>
-              <input
-                type="radio"
-                name={name}
-                value={agent.value}
-                checked={value === agent.value}
-                required
-                onChange={() => {
-                  onChange(agent.value)
-                  onModelChange?.(null, agent.value)
-                }}
-              />
-              <span>
-                <b>{agent.label}</b>
-                <small>{agent.description}</small>
-              </span>
-            </label>
-          ))}
-        </div>
-      )}
+      ) : null}
       <div className="planning-model-status">
         <span>
           {loading

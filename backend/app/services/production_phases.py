@@ -1203,10 +1203,10 @@ def generate_phase_one(
         selected_agent = str(
             prompting_policy.get("planning_agent") or "qwen"
         )
-        if selected_agent not in {"qwen", "sulphur"}:
+        if selected_agent not in {"qwen", "sulphur", "grok"}:
             raise ProductionPhaseError(
                 "Agentless Phase 1 requires a valid persisted local planning "
-                "agent (qwen or sulphur)."
+                "agent (qwen, sulphur, or grok)."
             )
         payload = payload.model_copy(
             update={

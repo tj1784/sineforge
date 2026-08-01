@@ -3,6 +3,7 @@ import type { OrchestrationStep, ProviderCatalogEntry } from '../api/client'
 const LOCAL_PROVIDER_LABELS: Record<string, string> = {
   qwen: 'Qwen3 4B Hivemind',
   sulphur: 'Sulphur 2 Base',
+  grok: 'Grok',
   mock: 'Built-in mock',
   openai: 'OpenAI',
 }
